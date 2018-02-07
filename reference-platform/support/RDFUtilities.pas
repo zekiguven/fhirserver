@@ -1,11 +1,46 @@
 unit RDFUtilities;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
   SysUtils, Classes, Generics.Collections,
-  StringSupport,
-  AdvObjects, AdvGenerics;
+  StringSupport, TextUtilities,
+  AdvObjects, AdvGenerics,
+  TurtleParser;
+
+const
+	GOOD_IRI_CHAR = 'a-zA-Z0-9\u00A0-\uFFFE';
+  IRI_URL = '(([a-z])+:)*((%[0-9a-fA-F]{2})|[&''\\(\\)*+,;:@_~?!$\\/\\-\\#.\\='+GOOD_IRI_CHAR+'])+';
+  LANG_REGEX = '[a-z]{2}(\\-[a-zA-Z]{2})?';
 
 
 {
@@ -28,6 +63,7 @@ type
   TRDFString = class (TRDFTriple)
   private
     FValue : String;
+    FType : String;
   public
     Constructor create(value : String);
   end;
@@ -41,6 +77,7 @@ type
     Destructor Destroy; override;
     function write(b : TStringBuilder; indent : integer) : boolean;
     function predicate(predicate, obj : String) : TRDFComplex; overload;
+    function predicate(predicate, obj, xtype : String) : TRDFComplex; overload;
     function predicate(predicate : String; obj : TRDFTriple) : TRDFComplex; overload;
     function predicate(predicate : String) : TRDFComplex; overload;
     function complex : TRDFComplex;
@@ -105,7 +142,6 @@ type
     procedure checkPrefix(pname : String); overload;
     procedure checkPrefix(obj : TRDFTriple);  overload;
     function hasSection(sn : String) : boolean;
-    function matches(url, prefixUri, prefix : String) : String;
     procedure writeTurtlePrefixes(b : TStringBuilder; header : boolean);
     procedure writeTurtleSection(b : TStringBuilder; section : TRDFSection);
     procedure writeNTripleSection(b : TStringBuilder; section : TRDFSection);
@@ -113,7 +149,7 @@ type
     procedure writeNTriple(b: TStringBuilder; url1, url2, url3: String);
     function fullUrl(s: String): String;
   public
-    Constructor Create;
+    Constructor Create; override;
     Destructor Destroy; override;
     function Link : TRDFGenerator; overload;
 
@@ -121,7 +157,6 @@ type
     procedure prefix(code, url : String);
     function section(sn: String) : TRDFSection;
     procedure generate(b : TStringBuilder; header : boolean);
-
   end;
 
 function ttlLiteral(s : String) : String;
@@ -212,6 +247,7 @@ begin
     Fgen.FPredicateSet.add(predicate);
   if (obj is TRDFString) and not Fgen.FObjectSet.contains(TRDFString(obj).FValue) then
     Fgen.FObjectSet.add(TRDFString(obj).FValue);
+
   p := TRDFPredicate.Create;
   try
     p.FPredicate := predicate;
@@ -235,6 +271,8 @@ begin
   if (Fpredicates.Count = 1) and (Fpredicates[0].Fobj is TRDFString) and (Fpredicates[0].Fcomment = '') then
   begin
     b.Append(' '+Fpredicates[0].Fpredicate+' '+TRDFString(Fpredicates[0].Fobj).Fvalue);
+      if TRDFString(Fpredicates[0].FObj).FType <> '' then
+        b.Append('^^'+TRDFString(Fpredicates[0].FObj).FType);
     exit(false);
   end;
 
@@ -245,7 +283,11 @@ begin
   begin
     b.Append(#13#10);
     if (po.FObj is TRDFString) then
-      b.Append(left+' '+po.FPredicate+ ' '+TRDFString(po.FObj).Fvalue)
+    begin
+      b.Append(left+' '+po.FPredicate+ ' '+TRDFString(po.FObj).Fvalue);
+      if TRDFString(po.FObj).FType <> '' then
+        b.Append('^^'+TRDFString(po.FObj).FType);
+    end
     else
     begin
       b.Append(left+' '+po.FPredicate+' [');
@@ -266,6 +308,15 @@ function TRDFComplex.predicate(predicate: String): TRDFComplex;
 begin
   result := complex;
   self.predicate(predicate, result);
+end;
+
+function TRDFComplex.predicate(predicate, obj, xtype: String): TRDFComplex;
+var
+  s : TRDFString;
+begin
+  s := TRDFString.create(obj);
+  result := self.predicate(predicate, s);
+  s.FType := xtype;
 end;
 
 { TRDFPredicate }
@@ -470,7 +521,6 @@ function TRDFGenerator.sorted(list: TEnumerable<String>): TArray<String>;
 var
   sort : TStringList;
   s : String;
-  i : integer;
 begin
   sort := TStringList.Create;
   try
@@ -480,16 +530,6 @@ begin
     result := sort.ToStringArray;
   finally
     sort.Free;
-  end;
-end;
-
-function TRDFGenerator.matches(url, prefixUri, prefix: String): String;
-begin
-  result := '';
-  if (url.startsWith(prefixUri)) then
-  begin
-    Fprefixes.AddOrSetValue(prefix, prefixUri);
-    result := prefix+':'+jsonEscape(url.substring(prefixUri.length), false);
   end;
 end;
 
@@ -592,7 +632,6 @@ end;
 procedure TRDFGenerator.writeNTripleSection(b: TStringBuilder; section: TRDFSection);
 var
   subject : TRDFSubject;
-  s : string;
 begin
   for subject in section.FSubjects do
   begin
@@ -605,9 +644,12 @@ procedure TRDFGenerator.writeTurtlePrefixes(b: TStringBuilder; header : boolean)
 var
   p : String;
 begin
-  ln(b, '# FHIR Turtle');
-  ln(b, '# see http://hl7.org/fhir/rdf.html');
-  ln(b, '');
+  if (header) then
+  begin
+    ln(b, '# FHIR Turtle');
+    ln(b, '# see http://hl7.org/fhir/rdf.html');
+    ln(b, '');
+  end;
   for p in sorted(Fprefixes.Keys) do
     ln(b, '@prefix '+p+': <'+Fprefixes[p]+'> .');
   ln(b, '');

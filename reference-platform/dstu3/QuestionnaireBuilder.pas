@@ -39,12 +39,12 @@ interface
 
 uses
   SysUtils, Classes, Generics.Collections,
-  GUIDSupport, DateAndTime, AdvObjects, ShellSupport, StringSupport, AdvStringMatches, AdvExceptions,
-  FHIRResources, FHIRTypes, FHIRConstants, FHIRBase, FHIRParser,
+  GUIDSupport, DateSupport, AdvObjects, ShellSupport, StringSupport, AdvStringMatches, AdvExceptions,
+  FHIRResources, FHIRTypes, FHIRConstants, FHIRBase, FHIRParser, FHIRFactory,
   FHIRUtilities, FHIRSupport, FHIRProfileUtilities;
 
 Const
-  TYPE_EXTENSION = 'http://www.healthintersections.com.au/fhir/StructureDefinition/questionnnaire-type';
+  TYPE_EXTENSION = 'http://hl7.org/fhir/StructureDefinition/questionnnaire-baseType';
   TYPE_REFERENCE = 'http://www.healthintersections.com.au/fhir/StructureDefinition/questionnnaire-reference';
   FLYOVER_REFERENCE = 'http://www.healthintersections.com.au/fhir/StructureDefinition/questionnnaire-flyover';
   EXTENSION_FILTER_ONLY = 'http://www.healthintersections.com.au/fhir/StructureDefinition/expandNeedsFilter';
@@ -52,8 +52,8 @@ Const
 
 
 Type
-  TGetValueSetExpansion = function(vs : TFHIRValueSet; ref : TFhirReference; limit, count, offset : integer; allowIncomplete : Boolean; dependencies : TStringList) : TFhirValueSet of object;
-  TLookupCodeEvent = function(system, code : String) : String of object;
+  TGetValueSetExpansion = function(vs : TFHIRValueSet; ref : TFhirReference; lang : String; limit, count, offset : integer; allowIncomplete : Boolean; dependencies : TStringList) : TFhirValueSet of object;
+  TLookupCodeEvent = function(system, version, code : String) : String of object;
   TLookupReferenceEvent = function(Context : TFHIRRequest; uri : String) : TResourceWithReference of object;
 
   {
@@ -88,6 +88,7 @@ Type
     FOnLookupReference : TLookupReferenceEvent;
     FContext : TFHIRRequest;
     FDependencies: TList<String>;
+    FLang : String;
 
     function nextId(prefix : string) : String;
 
@@ -125,7 +126,6 @@ Type
     procedure addHumanNameQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure addIdRefQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure addIdentifierQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
-    procedure addInstantQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure addIntegerQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure addPeriodQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure addQuantityQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
@@ -138,7 +138,7 @@ Type
     procedure addTimeQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure addUriQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
 
-    function processAnswerGroup(group : TFhirQuestionnaireResponseItem; context : TFhirBase; defn :  TProfileDefinition) : boolean;
+    function processAnswerGroup(group : TFhirQuestionnaireResponseItem; context : TFHIRObject; defn :  TProfileDefinition) : boolean;
 
     procedure processDataType(profile : TFHirStructureDefinition; group: TFHIRQuestionnaireItem; element: TFhirElementDefinition; path: String; t: TFhirElementDefinitionType; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure buildQuestion(group : TFHIRQuestionnaireItem; profile : TFHirStructureDefinition; element : TFhirElementDefinition; path : String; answerGroups : TFhirQuestionnaireResponseItemList);
@@ -152,7 +152,7 @@ Type
     procedure SetPrebuiltQuestionnaire(const Value: TFhirQuestionnaire);
     procedure SetContext(const Value: TFHIRRequest);
   public
-    Constructor Create; override;
+    Constructor Create(lang : String);
     Destructor Destroy; override;
 
     Property Profiles : TProfileManager read FProfiles write SetProfiles;
@@ -242,20 +242,20 @@ procedure TQuestionnaireBuilder.processExisting(path : String; answerGroups, nAn
 var
   ag : TFhirQuestionnaireResponseItem;
   ans: TFhirQuestionnaireResponseItem;
-  children: TFHIRObjectList;
-  ch : TFHIRObject;
+  children: TFHIRSelectionList;
+  ch : TFHIRSelection;
 begin
   // processing existing data
   for ag in answerGroups do
   begin
-    children := TFHIRObjectList.Create;
+    children := TFHIRSelectionList.Create;
     try
       TFHIRObject(ag.tag).ListChildrenByName(tail(path), children);
       for ch in children do
-        if ch <> nil then
+        if ch.value <> nil then
         begin
           ans := ag.itemList.Append;
-          ans.Tag := ch.Link;
+          ans.Tag := ch.value.Link;
           nAnswers.add(ans.link);
         end;
     finally
@@ -278,16 +278,6 @@ begin
   inherited;
 end;
 
-function convertStatus(status : TFhirConformanceResourceStatusEnum) : TFHIRQuestionnaireStatusEnum;
-begin
-  case (status) of
-		ConformanceResourceStatusActive: result := QuestionnaireStatusPublished;
-		ConformanceResourceStatusDraft: result := QuestionnaireStatusDraft;
-		ConformanceResourceStatusRetired : result := QuestionnaireStatusRetired;
-	else
-  result := QuestionnaireStatusNull;
-	end;
-end;
 procedure TQuestionnaireBuilder.processMetadata;
 var
   id : TFhirIdentifier;
@@ -299,18 +289,18 @@ begin
     id.System := 'urn:ietf:rfc:3986';
     id.Value := FQuestionnaireId;
     FQuestionnaire.Version := profile.Version;
-    FQuestionnaire.Status := convertStatus(profile.Status);
-    FQuestionnaire.Date := profile.Date.link;
+    FQuestionnaire.Status := profile.Status;
+    FQuestionnaire.Date := profile.Date;
     FQuestionnaire.publisher := profile.Publisher;
     FQuestionnaire.ItemList.Add(TFHIRQuestionnaireItem.Create);
-    FQuestionnaire.itemList[0].conceptList.AddAll(profile.codeList);
+    FQuestionnaire.itemList[0].codeList.AddAll(profile.keywordList);
   end;
 
   if FAnswers <> nil then
   begin
     // no identifier - this is transient
     FQuestionnaire.xmlId := nextId('qs');
-    FAnswers.questionnaire := TFhirReference.Create;
+    FAnswers.questionnaire := TFHIRReference.Create;
     FAnswers.questionnaire.reference := '#'+FQuestionnaire.xmlId;
     FAnswers.containedList.Add(FQuestionnaire.Link);
     FAnswers.status := QuestionnaireAnswersStatusInProgress;
@@ -338,7 +328,7 @@ begin
     try
       ref.reference := url;
       try
-        result := OnExpand(nil, ref, MaxListboxCodings, 0, 0, false, dependencies);
+        result := OnExpand(nil, ref, FLang, MaxListboxCodings, 0, 0, false, dependencies);
         for s in dependencies do
           if not FDependencies.Contains(s) then
             FDependencies.Add(s);
@@ -387,7 +377,7 @@ begin
     begin
       vs := TFhirValueSet(Fprofile.contained[ref.reference.Substring(1)]);
       try
-        result := OnExpand(vs, nil, MaxListboxCodings, 0, 0, false, dependencies);
+        result := OnExpand(vs, nil, FLang, MaxListboxCodings, 0, 0, false, dependencies);
         for s in dependencies do
           if not FDependencies.Contains(s) then
             FDependencies.Add(s);
@@ -414,7 +404,7 @@ begin
       result := FQuestionnaire.contained[vsCache.GetValueByKey(ref.reference)].link as TFhirValueSet
     else
       try
-        result := OnExpand(nil, ref, MaxListboxCodings, 0, 0,false, dependencies);
+        result := OnExpand(nil, ref, FLang, MaxListboxCodings, 0, 0,false, dependencies);
         for s in dependencies do
           if not FDependencies.Contains(s) then
             FDependencies.Add(s);
@@ -519,7 +509,7 @@ begin
   else if ((s = 'Coding') and (t = 'code')) then
     result := TFhirEnum.Create(TFHIRCoding(v).system, TFHIRCoding(v).code)
   else if ((s = 'dateTime') and (t = 'date')) then
-    result := TFhirDate.Create(TFhirDateTime(v).value.Link)
+    result := TFhirDate.Create(TFhirDateTime(v).value)
   else
     raise Exception.Create('Unable to convert from '+s+' to '+t+' at path = '+path);
 end;
@@ -563,7 +553,11 @@ begin
       if cc.system = 'http://hl7.org/fhir/resource-types' then
       begin
         result.code := 'Reference';
-        result.profileList.Add(TFHIRString.create('http://hl7.org/fhir/Profile/'+cc.code));
+        {$IFDEF FHIR2CM}
+        result.profileList.add(TFhirUri.Create('http://hl7.org/fhir/Profile/'+cc.code));
+        {$ELSE}
+        result.profile := 'http://hl7.org/fhir/Profile/'+cc.code;
+        {$ENDIF}
       end
       else // cc.system = 'http://hl7.org/fhir/data-types'
       begin
@@ -586,14 +580,14 @@ begin
       result := qg;
 end;
 
-function TQuestionnaireBuilder.processAnswerGroup(group : TFhirQuestionnaireResponseItem; context : TFhirBase; defn :  TProfileDefinition) : boolean;
+function TQuestionnaireBuilder.processAnswerGroup(group : TFhirQuestionnaireResponseItem; context : TFHIRObject; defn :  TProfileDefinition) : boolean;
 var
   g, g1 : TFhirQuestionnaireResponseItem;
   q : TFhirQuestionnaireResponseItem;
   a : TFhirQuestionnaireResponseItemAnswer;
   d : TProfileDefinition;
   t : TFhirElementDefinitionType;
-  o : TFHIRBase;
+  o : TFHIRObject;
 begin
   result := false;
 
@@ -686,7 +680,7 @@ var
   ag : TFhirQuestionnaireResponseItem;
 begin
   group.LinkId := element.Path; // todo: this will be wrong when we start slicing
-  group.Text := element.comments;
+  group.Text := element.comment;
   group.SetExtensionString(FLYOVER_REFERENCE, element.definition);
   group.Required := element.Min > '0';
   group.Repeats := element.Max <> '1';
@@ -841,7 +835,7 @@ begin
   try
     for t in types do
     begin
-      if (t.profileList.Count > 0) then
+      if (t.profile <> '') then
         result.Add(t.Link)
       else if (t.code = '') then
       begin
@@ -900,7 +894,7 @@ begin
       result.url := ANY_CODE_VS;
       result.name := 'All codes known to the system';
       result.description := 'All codes known to the system';
-      result.status := ConformanceResourceStatusActive;
+      result.status := PublicationStatusActive;
       result.compose := TFhirValueSetCompose.create;
       result.compose.includeList.Append.system := ANY_CODE_VS;
       result.link;
@@ -922,9 +916,9 @@ begin
     vs.url := NewGuidURN;
     vs.name := 'Type options for '+path;
     vs.description := vs.name;
-    vs.status := ConformanceResourceStatusActive;
+    vs.status := PublicationStatusActive;
     vs.expansion := TFhirValueSetExpansion.Create;
-    vs.expansion.timestamp := NowUTC;
+    vs.expansion.timestamp := TDateTimeEx.makeUTC;
     for t in types do
     begin
       cc := vs.expansion.containsList.Append;
@@ -1066,8 +1060,8 @@ begin
     ag.Text := group.Text;
   end;
 
-  if element.comments <> '' then
-    group.setExtensionString(FLYOVER_REFERENCE, element.definition+' '+element.comments)
+  if element.comment <> '' then
+    group.setExtensionString(FLYOVER_REFERENCE, element.definition+' '+element.comment)
   else
     group.setExtensionString(FLYOVER_REFERENCE, element.definition);
 
@@ -1114,8 +1108,6 @@ begin
     addDecimalQuestions(group, element, path, required, answerGroups)
   else if (t.code = 'dateTime') or (t.code = 'date') then
     addDateTimeQuestions(group, element, path, required, answerGroups)
-  else if (t.code = 'instant') then
-    addInstantQuestions(group, element, path, required, answerGroups)
   else if (t.code = 'time') then
     addTimeQuestions(group, element, path, required, answerGroups)
   else if (t.code = 'CodeableConcept') then
@@ -1178,7 +1170,6 @@ begin
     itemTypeInteger: if value is TFhirInteger then result := value.link as TFhirType;
     itemTypeDate: if value is TFhirDate then result := value.link as TFhirType;
     itemTypeDateTime: if value is TFhirDateTime then result := value.link as TFhirType;
-    itemTypeInstant: if value is TFhirInstant then result := value.link as TFhirType;
     itemTypeTime: if value is TFhirTime then result := value.link as TFhirType;
     itemTypeString:
       if value is TFhirString then
@@ -1223,19 +1214,20 @@ end;
 
 
 
-constructor TQuestionnaireBuilder.create;
+constructor TQuestionnaireBuilder.create(lang : String);
 begin
-  inherited;
+  inherited create;
   vsCache := TAdvStringMatch.create;
   FDependencies := TList<String>.create;
+  FLang := lang;
 end;
 
 function TQuestionnaireBuilder.addQuestion(group : TFHIRQuestionnaireItem; af : TFhirItemTypeEnum; path, id, name : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList; vs : TFHIRValueSet) : TFHIRQuestionnaireItem;
 var
   ag : TFhirQuestionnaireResponseItem;
   aq : TFhirQuestionnaireResponseItem;
-  children : TFHIRObjectList;
-  child : TFHIRObject;
+  children : TFHIRSelectionList;
+  child : TFHIRSelection;
   vse : TFhirValueSet;
 begin
   try
@@ -1288,19 +1280,19 @@ begin
     begin
       for ag in answerGroups do
       begin
-        children := TFHIRObjectList.Create;
+        children := TFHIRSelectionList.Create;
         try
           aq := nil;
 
           if isPrimitive(ag.Tag) then
-            children.add(ag.Tag.Link)
+            children.add(ag.Tag.Link as TFHIRObject)
           else if ag.Tag is TFHIREnum then
             children.add(TFHIRString.create(TFHIREnum(ag.Tag).value))
           else
             TFHIRObject(ag.Tag).ListChildrenByName(id, children);
 
           for child in children do
-            if child <> nil then
+            if child.value <> nil then
             begin
               if (aq = nil) then
               begin
@@ -1308,7 +1300,7 @@ begin
                 aq.LinkId := result.linkId;
                 aq.Text := result.text;
               end;
-              aq.answerList.append.value := convertType(child, af, vs, result.linkId);
+              aq.answerList.append.value := convertType(child.value, af, vs, result.linkId);
             end;
         finally
           children.Free;
@@ -1431,17 +1423,6 @@ var
 begin
   group.setExtensionString(TYPE_EXTENSION, 'datetime');
   addQuestion(group, itemTypeDateTime, path, 'value', group.text, required, answerGroups);
-  group.text := '';
-  for ag in answerGroups do
-    ag.text := '';
-end;
-
-procedure TQuestionnaireBuilder.addInstantQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
-var
-  ag : TFhirQuestionnaireResponseItem;
-begin
-  group.setExtensionString(TYPE_EXTENSION, 'instant');
-  addQuestion(group, itemTypeInstant, path, 'value', group.text, required, answerGroups);
   group.text := '';
   for ag in answerGroups do
     ag.text := '';

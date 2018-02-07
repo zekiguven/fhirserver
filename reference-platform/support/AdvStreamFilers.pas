@@ -145,10 +145,6 @@ Type
 Implementation
 
 
-Uses
-  AdvFactories;
-
-
 Procedure TAdvStreamFilerReferenceHashEntry.Assign(oSource: TAdvObject);
 Begin
   Inherited;
@@ -267,7 +263,7 @@ End;
 
 Function TAdvStreamFilerResourceManager.ResolveObject(Const sResource: String; Const aClass : TAdvObjectClass): TAdvObject;
 Begin
-  Error('ResolveObject', 'ResolveObject must be overriden.');
+  RaiseError('ResolveObject', 'ResolveObject must be overriden.');
 
   Result := Nil;
 End;  
@@ -275,7 +271,7 @@ End;
 
 Function TAdvStreamFilerResourceManager.ResolveID(Const oObject: TAdvObject): String;
 Begin 
-  Error('ResolveID', 'ResolveObject must be overriden.');
+  RaiseError('ResolveID', 'ResolveObject must be overriden.');
 
   Result := '';
 End;  

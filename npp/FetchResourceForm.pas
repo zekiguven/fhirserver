@@ -1,5 +1,34 @@
 unit FetchResourceForm;
 
+
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
 // todo:
 //   look ahead on search parameters on past values by name
 //   better date entry
@@ -23,7 +52,7 @@ type
   TSearchEntryPanel = class (TAdvObject)
   private
     form : TFetchResourceFrm;
-    definition : TFhirConformanceRestResourceSearchParam;
+    definition : TFhirCapabilityStatementRestResourceSearchParam;
     panel : TPanel;
     lbl : TLabel;
     edit, edit2 : TEdit;
@@ -35,7 +64,7 @@ type
     procedure buildQuantityEdit;
     procedure readParamValue(s : String);
   public
-    constructor create(form : TFetchResourceFrm; definition : TFhirConformanceRestResourceSearchParam);
+    constructor create(form : TFetchResourceFrm; definition : TFhirCapabilityStatementRestResourceSearchParam);
     destructor Destroy; override;
 
     procedure AdjustPosition(top, left, width : integer);
@@ -88,8 +117,8 @@ type
     procedure vtMatchesDblClick(Sender: TObject);
   private
     { Private declarations }
-    FClient : TFHIRClient;
-    FConformance : TFHIRConformance;
+    FClient : TFhirHTTPClient;
+    FCapabilityStatement : TFHIRCapabilityStatement;
     FProfiles : TProfileManager;
 
     FType : TFhirResourceType;
@@ -100,8 +129,8 @@ type
     FSelectedId: String;
     FSelectedType: TFhirResourceType;
 
-    procedure SetClient(const Value: TFHIRClient);
-    procedure SetConformance(const Value: TFHIRConformance);
+    procedure SetClient(const Value: TFhirHTTPClient);
+    procedure SetCapabilityStatement(const Value: TFHIRCapabilityStatement);
 
     // choosing type
     procedure loadTypeCombo;
@@ -110,9 +139,9 @@ type
     // search parameters
     procedure ClearSearchItems;
     procedure AddSearchAll;
-    procedure AddSearch(rr : TFhirConformanceRestResource);
+    procedure AddSearch(rr : TFhirCapabilityStatementRestResource);
     procedure loadSortCombo;
-    function createSearchParam(name, definition : String; type_ : TFhirSearchParamTypeEnum) : TFhirConformanceRestResourceSearchParam;
+    function createSearchParam(name, definition : String; type_ : TFhirSearchParamTypeEnum) : TFhirCapabilityStatementRestResourceSearchParam;
     procedure SetProfiles(const Value: TProfileManager);
     procedure layoutSearchParameters;
     function asURL : String;
@@ -130,8 +159,8 @@ type
     function GetCell(res : TFhirResource; path : String ) : String;
   public
     { Public declarations }
-    property Client : TFHIRClient read FClient write SetClient;
-    property Conformance : TFHIRConformance read FConformance write SetConformance;
+    property Client : TFhirHTTPClient read FClient write SetClient;
+    property Conformance : TFHIRCapabilityStatement read FCapabilityStatement write SetCapabilityStatement;
     property Profiles : TProfileManager read FProfiles write SetProfiles;
 
     property SelectedType : TFhirResourceType read FSelectedType write FSelectedType;
@@ -177,14 +206,14 @@ begin
   end;
 end;
 
-procedure TFetchResourceFrm.AddSearch(rr: TFhirConformanceRestResource);
+procedure TFetchResourceFrm.AddSearch(rr: TFhirCapabilityStatementRestResource);
   function ignore(name : String) : boolean;
   begin
     result := StringArrayExistsInsensitive(['_sort', '_filter', '_count'],  name);
   end;
 var
   n : boolean;
-  sp : TFhirConformanceRestResourceSearchParam;
+  sp : TFhirCapabilityStatementRestResourceSearchParam;
   st : TFhirStructureDefinition;
   ed : TFhirElementDefinition;
 begin
@@ -319,15 +348,15 @@ begin
   clearColumns;
   clearSearch;
   obj := cbxType.Items.Objects[cbxType.ItemIndex] as TFHIRObject;
-  if obj is TFhirConformance then
+  if obj is TFhirCapabilityStatement then
   begin
     FType := frtNull;
     AddSearchAll
   end
   else
   begin
-    FType := ResourceTypeByName(CODES_TFHIRResourceTypesEnum[(obj as TFhirConformanceRestResource).type_]);
-    AddSearch(obj as TFhirConformanceRestResource);
+    FType := ResourceTypeByName(CODES_TFHIRResourceTypesEnum[(obj as TFhirCapabilityStatementRestResource).type_]);
+    AddSearch(obj as TFhirCapabilityStatementRestResource);
   end;
   btnCopy.Enabled := true;
   btnPaste.Enabled := true;
@@ -355,9 +384,9 @@ begin
   FSearchItems.Clear;
 end;
 
-function TFetchResourceFrm.createSearchParam(name, definition: String; type_: TFhirSearchParamTypeEnum): TFhirConformanceRestResourceSearchParam;
+function TFetchResourceFrm.createSearchParam(name, definition: String; type_: TFhirSearchParamTypeEnum): TFhirCapabilityStatementRestResourceSearchParam;
 begin
-  result := TFhirConformanceRestResourceSearchParam.Create;
+  result := TFhirCapabilityStatementRestResourceSearchParam.Create;
   try
     result.name := name;
     result.definition := definition;
@@ -451,7 +480,7 @@ end;
 procedure TFetchResourceFrm.FormDestroy(Sender: TObject);
 begin
   FClient.free;
-  FConformance.free;
+  FCapabilityStatement.free;
   FSearchItems.Free;
   FProfiles.Free;
   FColumns.Free;
@@ -478,9 +507,9 @@ end;
 
 function TFetchResourceFrm.GetCell(res: TFhirResource; path: String): String;
 var
-  query : TFHIRExpressionEngine;
+  query : TFHIRPathEngine;
 begin
-  query := TFHIRExpressionEngine.create(nil);
+  query := TFHIRPathEngine.create(nil);
   try
     result := query.evaluateToString(nil, res, path);
   finally
@@ -530,21 +559,21 @@ end;
 
 procedure TFetchResourceFrm.loadTypeCombo;
 var
-  r : TFhirConformanceRest;
-  rr : TFhirConformanceRestResource;
-  int : TFhirConformanceRestResourceInteraction;
-  it : TFhirConformanceRestInteraction;
+  r : TFhirCapabilityStatementRest;
+  rr : TFhirCapabilityStatementRestResource;
+  int : TFhirCapabilityStatementRestResourceInteraction;
+  it : TFhirCapabilityStatementRestInteraction;
   any, ok : boolean;
   fmt : TFHIRCode;
 begin
   cbxType.Items.Clear;
   any := false;
-  for r in FConformance.restList do
-    if r.mode = RestfulConformanceModeServer then
+  for r in FCapabilityStatement.restList do
+    if r.mode = RestfulCapabilityModeServer then
     begin
       for it in r.interactionList do
         if it.code = SystemRestfulInteractionSearchSystem then
-          cbxType.Items.AddObject('All Types', FConformance);
+          cbxType.Items.AddObject('All Types', FCapabilityStatement);
       for rr in r.resourceList do
       begin
         ok := false;
@@ -555,7 +584,7 @@ begin
           cbxType.Items.AddObject(CODES_TFHIRResourceTypesEnum[rr.type_], rr);
       end;
     end;
-  for fmt in FConformance.formatList do
+  for fmt in FCapabilityStatement.formatList do
     if fmt.value.ToLower.Contains('xml') then
       rbXml.Enabled := true
     else if fmt.value.ToLower.Contains('json') then
@@ -589,16 +618,16 @@ begin
     edtPageCount.Value := StrToIntDef(pm.GetVar('_count'), 20);
 end;
 
-procedure TFetchResourceFrm.SetClient(const Value: TFHIRClient);
+procedure TFetchResourceFrm.SetClient(const Value: TFhirHTTPClient);
 begin
   FClient.Free;
   FClient := Value;
 end;
 
-procedure TFetchResourceFrm.SetConformance(const Value: TFHIRConformance);
+procedure TFetchResourceFrm.SetCapabilityStatement(const Value: TFhirCapabilityStatement);
 begin
-  FConformance.Free;
-  FConformance := Value;
+  FCapabilityStatement.Free;
+  FCapabilityStatement := Value;
 end;
 
 procedure TFetchResourceFrm.SetProfiles(const Value: TProfileManager);
@@ -640,7 +669,7 @@ end;
 
 { TSearchEntryPanel }
 
-constructor TSearchEntryPanel.create(form: TFetchResourceFrm; definition: TFhirConformanceRestResourceSearchParam);
+constructor TSearchEntryPanel.create(form: TFetchResourceFrm; definition: TFhirCapabilityStatementRestResourceSearchParam);
 begin
   inherited create;
   self.form := form;
@@ -741,9 +770,10 @@ begin
   lbl.Left := 5;
   lbl.Width := form.Canvas.TextWidth(lbl.Caption);
 
-  hasMod := false;
-  for modc := low(TFhirSearchModifierCodeEnum) to high(TFhirSearchModifierCodeEnum) do
-    if modc in definition.modifier then
+//  todo: fetch the search parameter definitions?
+//  hasMod := false;
+//  for modc := low(TFhirSearchModifierCodeEnum) to high(TFhirSearchModifierCodeEnum) do
+//    if modc in definition.modifier then
       hasMod := true;
 
   case definition.type_ of
@@ -766,7 +796,7 @@ begin
     modlist.Style := csDropDownList;
     modlist.Items.Add('');
     for modc := low(TFhirSearchModifierCodeEnum) to high(TFhirSearchModifierCodeEnum) do
-      if modc in definition.modifier then
+// todo - use search parameter definition      if modc in definition.modifier then
         modlist.Items.Add(':'+CODES_TFhirSearchModifierCodeEnum[modc]);
   end;
 end;

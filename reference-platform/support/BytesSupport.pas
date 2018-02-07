@@ -4,27 +4,27 @@ unit BytesSupport;
 Copyright (c) 2001-2013, Kestral Computing Pty Ltd (http://www.kestral.com.au)
 All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification, 
+Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
 
- * Redistributions of source code must retain the above copyright notice, this 
+ * Redistributions of source code must retain the above copyright notice, this
    list of conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright notice, 
-   this list of conditions and the following disclaimer in the documentation 
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
    and/or other materials provided with the distribution.
- * Neither the name of HL7 nor the names of its contributors may be used to 
-   endorse or promote products derived from this software without specific 
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
    prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
-IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
-NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 }
 
@@ -33,7 +33,7 @@ POSSIBILITY OF SUCH DAMAGE.
 Interface
 
 Uses
-  SysUtils, Classes,
+  SysUtils, Classes, Soap.EncdDecd,
   Math,
   StringSupport,
   AdvStringBuilders,
@@ -57,6 +57,7 @@ type
       Procedure Append(ch : AnsiChar); Overload;
       Procedure Append(b : Byte); Overload;
       Procedure Append(Const bytes : TBytes); Overload;
+      Procedure Append(mem : Pointer; len : word); Overload;
 
       Function EndsWith(aBytes : TBytes) : Boolean;
       Property Length : Integer Read FLength;
@@ -66,7 +67,9 @@ type
       Procedure AddInteger(val : integer);
       Procedure AddUInt64(val : UInt64);
       Procedure AddString(val : String);
+      procedure AddUtf8(val : String);
       Procedure AddAnsiString(val : AnsiString);
+      Procedure addBase64(val : TBytes);
 
       procedure Read(index : integer; var buffer; ilength : integer);
 
@@ -448,7 +451,10 @@ function CompareBytes(bytes1, bytes2 : TBytes) : Integer;
 begin
   result := length(bytes1) - length(bytes2);
   if result = 0 then
-    result := integer(not compareMem(@bytes1[0], @bytes2[0], length(bytes1)));
+    if (length(bytes1) = 0) then
+      result := 0
+    else
+      result := integer(not compareMem(@bytes1[0], @bytes2[0], length(bytes1)));
 End;
 
 function SameBytes(bytes1, bytes2 : TBytes) : Boolean;
@@ -579,45 +585,45 @@ end;
 procedure TAdvBytesBuilder.Read(index : integer; var buffer; ilength: integer);
 begin
   if index < 1 Then
-    Error('Read', 'index < 1');
+    RaiseError('Read', 'index < 1');
   if index + ilength > FLength Then
-    Error('Read', 'index > length');
+    RaiseError('Read', 'index > length');
   Move(FContent[index], buffer, ilength);
 end;
 
 procedure TAdvBytesBuilder.WriteCardinal(index: integer; val: cardinal);
 begin
   if index < 1 Then
-    Error('Overwrite', 'index < 1');
+    RaiseError('Overwrite', 'index < 1');
   if index + 4 > FLength Then
-    Error('Overwrite', 'index > length');
+    RaiseError('Overwrite', 'index > length');
   Move(val, FContent[index], 4);
 end;
 
 procedure TAdvBytesBuilder.WriteString(index: integer; val: String);
 begin
   if index < 1 Then
-    Error('Overwrite', 'index < 1');
+    RaiseError('Overwrite', 'index < 1');
   if index + (val.Length*2) > FLength Then
-    Error('Overwrite', 'index > length');
+    RaiseError('Overwrite', 'index > length');
   Move(val[1], FContent[index], (val.Length*2));
 end;
 
 procedure TAdvBytesBuilder.WriteUInt64(index: integer; val: UInt64);
 begin
   if index < 1 Then
-    Error('Overwrite', 'index < 1');
+    RaiseError('Overwrite', 'index < 1');
   if index + 8 > FLength Then
-    Error('Overwrite', 'index > length');
+    RaiseError('Overwrite', 'index > length');
   Move(val, FContent[index], 8);
 end;
 
 procedure TAdvBytesBuilder.WriteWord(index: integer; val: word);
 begin
   if index < 1 Then
-    Error('Overwrite', 'index < 1');
+    RaiseError('Overwrite', 'index < 1');
   if index + 2 > FLength Then
-    Error('Overwrite', 'index > length');
+    RaiseError('Overwrite', 'index > length');
   Move(val, FContent[index], 2);
 end;
 
@@ -661,6 +667,11 @@ Begin
   Append(s);
 end;
 
+procedure TAdvBytesBuilder.addBase64(val: TBytes);
+begin
+  AddAnsiString(EncodeBase64(@val[0], System.length(val)));
+end;
+
 procedure TAdvBytesBuilder.AddCardinal(val: cardinal);
 Var
   s : TBytes;
@@ -700,6 +711,11 @@ Begin
   Append(s);
 end;
 
+procedure TAdvBytesBuilder.AddUtf8(val: String);
+begin
+  append(TEncoding.UTF8.GetBytes(val));
+end;
+
 procedure TAdvBytesBuilder.AddWord(val: word);
 Var
   s : TBytes;
@@ -707,6 +723,19 @@ Begin
   SetLength(s, 2);
   move(val, s[0], 2);
   Append(s);
+end;
+
+procedure TAdvBytesBuilder.Append(mem: Pointer; len: word);
+begin
+  If len > 0 Then
+  Begin
+    If FLength + len > System.Length(FContent) Then
+      SetLength(FContent, System.Length(FContent) + IntegerMax(FBufferSize, len));
+
+    Move(mem^, FContent[FLength], len);
+
+    Inc(FLength, len);
+  End;
 end;
 
 Procedure TAdvBytesBuilder.Append(Const bytes : TBytes);

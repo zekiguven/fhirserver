@@ -1,25 +1,62 @@
+{
+todo:
+ - support for descendent-of, ValueSet.compose.inactive
+
+}
 unit TerminologyServer;
+
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
 
 interface
 
 uses
   SysUtils, Classes, IniFiles, Generics.Collections,
-  StringSupport,
+
+  StringSupport, DateSupport,
   AdvObjects, AdvStringObjectMatches, AdvStringLists, AdvGenerics,
-  KDBManager, KDBOdbcExpress,
+  KDBManager,
   FHIRTypes, FHIRResources, FHIRUtilities, CDSHooksUtilities, FHIROperations,
-  TerminologyServices, SnomedServices, LoincServices, UcumServices, RxNormServices, UniiServices, CvxServices,
-  CountryCodeServices, AreaCodeServices,
-  FHIRValueSetChecker, ClosureManager, ServerAdaptations,
-  TerminologyServerStore;
+  TerminologyServices, SnomedServices, LoincServices, UcumServices, RxNormServices, UniiServices, ACIRServices, ICD10Services,
+  IETFLanguageCodeServices, FHIRValueSetChecker, ClosureManager, ServerAdaptations, ServerUtilities,
+  TerminologyServerStore, SnomedExpressions;
 
 Type
+  TDataBaseConnectionEvent = function (name : String; max, timeout : integer; driver, server, database, username, password : String; forCreate : boolean) : TKDBManager of object;
+
   TTerminologyServer = class (TTerminologyServerStore)
   private
     FExpansions : TAdvStringObjectMatch;
     FDependencies : TAdvStringObjectMatch; // object is TAdvStringList of identity
     FClosures : TAdvMap<TClosureManager>;
     FWebBase : String;
+    FOnConnectDB : TDataBaseConnectionEvent;
 
     procedure AddDependency(name, value : String);
     function getCodeDefinition(c : TFhirCodeSystemConcept; code : string) : TFhirCodeSystemConcept; overload;
@@ -28,11 +65,12 @@ Type
 
     // database maintenance
     procedure processValueSet(ValueSetKey : integer; URL : String; conn2, conn3 : TKDBConnection);
-    procedure processConcept(ConceptKey : integer; URL, Code : String; conn2, conn3 : TKDBConnection);
+    procedure processConcept(ConceptKey : integer; URL, version, Code : String; conn2, conn3 : TKDBConnection);
     function isOkTarget(cm: TLoadedConceptMap; vs: TFHIRValueSet): boolean;
     function isOkSource(cm: TLoadedConceptMap; vs: TFHIRValueSet; coding: TFHIRCoding; out group : TFhirConceptMapGroup; out match : TFhirConceptMapGroupElement): boolean; overload;
     function isOkSource(cm: TLoadedConceptMap; coding: TFHIRCoding; out group : TFhirConceptMapGroup; out match : TFhirConceptMapGroupElement): boolean; overload;
     procedure LoadClosures;
+    procedure BuildIndexesInternal(prog : boolean; conn1, conn2, conn3 : TKDBConnection);
   protected
     procedure invalidateVS(id : String); override;
   public
@@ -42,7 +80,7 @@ Type
     property webBase : String read FWebBase write FWebBase;
 
     // load external terminology resources (snomed, Loinc, etc)
-    procedure load(ini : TIniFile);
+    procedure load(ini : TFHIRServerIniFile);
     // functional services
 
     // if this id identifies a value set known to the external resources (if it does, construct it and return it)
@@ -56,36 +94,39 @@ Type
     function expandVS(uri: String; profile : TFhirExpansionProfile; textFilter : String; dependencies : TStringList; limit, count, offset : integer) : TFHIRValueSet; overload;
     function expandVS(vs: TFHIRValueSet; cacheId : String; profile : TFhirExpansionProfile; textFilter : String; dependencies : TStringList; limit, count, offset : integer): TFHIRValueSet; overload;
 
-    procedure lookupCode(coding : TFhirCoding; props : TList<String>; resp : TFHIRLookupOpResponse);
-    function validate(vs : TFHIRValueSet; coding : TFhirCoding; abstractOk : boolean) : TFhirParameters; overload;
-    function validate(vs : TFHIRValueSet; coded : TFhirCodeableConcept; abstractOk : boolean) : TFhirParameters; overload;
-    function translate(cm : TLoadedConceptMap; coding : TFhirCoding) : TFHIRParameters; overload;
-    function translate(source : TFHIRValueSet; coding : TFhirCoding; target : TFHIRValueSet) : TFHIRParameters; overload;
-    function translate(source : TFHIRValueSet; coded : TFhirCodeableConcept; target : TFHIRValueSet) : TFHIRParameters; overload;
-    Function MakeChecker(uri : string) : TValueSetChecker;
-    function getDisplayForCode(system, code : String): String;
-    function checkCode(op : TFhirOperationOutcome; path : string; code : string; system : string; display : string) : boolean;
+    procedure lookupCode(coding : TFhirCoding; lang : String; props : TList<String>; resp : TFHIRLookupOpResponse);
+    function validate(vs : TFHIRValueSet; coding : TFhirCoding; profile : TFhirExpansionProfile; abstractOk : boolean) : TFhirParameters; overload;
+    function validate(vs : TFHIRValueSet; coded : TFhirCodeableConcept; profile : TFhirExpansionProfile; abstractOk : boolean) : TFhirParameters; overload;
+    function translate(lang : String; cm : TLoadedConceptMap; coding : TFhirCoding) : TFHIRParameters; overload;
+    function translate(lang : String; source : TFHIRValueSet; coding : TFhirCoding; target : TFHIRValueSet) : TFHIRParameters; overload;
+    function translate(lang : String; source : TFHIRValueSet; coded : TFhirCodeableConcept; target : TFHIRValueSet) : TFHIRParameters; overload;
+    Function MakeChecker(uri : string; profile : TFhirExpansionProfile) : TValueSetChecker;
+    function getDisplayForCode(lang : String; system, version, code : String): String;
+    function checkCode(op : TFhirOperationOutcome; lang, path : string; code : string; system, version : string; display : string) : boolean;
+    function isValidCode(system, code : String) : boolean;
+    {$IFNDEF FHIR2}
+    procedure composeCode(req : TFHIRComposeOpRequest; resp : TFHIRComposeOpResponse);
+    {$ENDIF}
 
     // closures
     function InitClosure(name : String) : String;
     function UseClosure(name : String; out cm : TClosureManager) : boolean;
     function enterIntoClosure(conn : TKDBConnection; name, uri, code : String) : integer;
 
-    procedure getCodeView(coding : TFHIRCoding; response : TCDSHookResponse); overload;
-    procedure getCodeView(coding : TFhirCodeableConcept; response : TCDSHookResponse); overload;
+    procedure getCodeView(lang : String; coding : TFHIRCoding; response : TCDSHookResponse); overload;
+    procedure getCodeView(lang : String; coding : TFhirCodeableConcept; response : TCDSHookResponse); overload;
 
     // database maintenance
     procedure BuildIndexes(prog : boolean);
     function Summary : String;
+    property OnConnectDB : TDataBaseConnectionEvent read FOnConnectDB write FOnConnectDB;
   end;
 
 implementation
 
 uses
-  SystemService,
   FHIRLog,
   FHIRConstants,
-  USStateCodeServices,
   FHIRValueSetExpander;
 
 
@@ -94,7 +135,6 @@ uses
 constructor TTerminologyServer.Create(db : TKDBManager);
 begin
   inherited;
-  NCTSAssertion(FHIR_GENERATED_VERSION = '1.4.0', 'CSA-1', 'Version must be 1.4.0');
   FExpansions := TAdvStringObjectMatch.create;
   FExpansions.PreventDuplicates;
   FDependencies := TAdvStringObjectMatch.create;
@@ -110,46 +150,69 @@ begin
   inherited;
 end;
 
-procedure TTerminologyServer.load(ini : TIniFile);
+procedure TTerminologyServer.load(ini : TFHIRServerIniFile);
 var
-  fn : string;
+  fn, s : string;
   p : TCodeSystemProvider;
   sn: TSnomedServices;
+  def : boolean;
+  icdX: TICD10Provider;
 begin
   logt('Load DB Terminologies');
   Unii := TUniiServices.Create(Fdb.Link);
-  Cvx := TCvxServices.Create(Fdb.Link);
-  CountryCode := TCountryCodeServices.Create(Fdb.Link);
-  AreaCode := TAreaCodeServices.Create(Fdb);
-  p := TUSStateCodeServices.Create(Fdb);
+  ACIR := TACIRServices.Create;
+  p := TIETFLanguageCodeServices.Create(ini.ReadString(voVersioningNotApplicable, 'lang', 'source', 'C:\work\fhirserver\sql\lang.txt'));
   ProviderClasses.Add(p.system(nil), p);
+  ProviderClasses.Add(p.system(nil)+URI_VERSION_BREAK+p.version(nil), p.link);
   logt(' - done');
 
-  if ini.ReadString('RxNorm', 'database', '') <> '' then
+  if ini.ReadString(voVersioningNotApplicable, 'RxNorm', 'database', '') <> '' then
   begin
     logt('Connect to RxNorm');
-    RxNorm := TRxNormServices.Create(TKDBOdbcDirect.create('rxnorm', 100, 0, 'SQL Server Native Client 11.0',
-        Ini.ReadString('database', 'server', ''), Ini.ReadString('RxNorm', 'database', ''),
-        Ini.ReadString('database', 'username', ''), Ini.ReadString('database', 'password', '')));
+    RxNorm := TRxNormServices.Create(FOnConnectDB('rxnorm', 100, 0, Ini.ReadString(voVersioningNotApplicable, 'database', 'driver', ''),
+        Ini.ReadString(voVersioningNotApplicable, 'database', 'server', ''), Ini.ReadString(voVersioningNotApplicable, 'RxNorm', 'database', ''),
+        Ini.ReadString(voVersioningNotApplicable, 'database', 'username', ''), Ini.ReadString(voVersioningNotApplicable, 'database', 'password', ''), false));
   end;
-  if ini.ReadString('NciMeta', 'database', '') <> '' then
+  if ini.ReadString(voVersioningNotApplicable, 'NciMeta', 'database', '') <> '' then
   begin
     logt('Connect to NciMeta');
-    NciMeta := TNciMetaServices.Create(TKDBOdbcDirect.create('ncimeta', 100, 0, 'SQL Server Native Client 11.0',
-        Ini.ReadString('database', 'server', ''), Ini.ReadString('NciMeta', 'database', ''),
-        Ini.ReadString('database', 'username', ''), Ini.ReadString('database', 'password', '')));
+    NciMeta := TNciMetaServices.Create(FOnConnectDB('ncimeta', 100, 0, Ini.ReadString(voVersioningNotApplicable, 'database', 'driver', ''),
+        Ini.ReadString(voVersioningNotApplicable, 'database', 'server', ''), Ini.ReadString(voVersioningNotApplicable, 'NciMeta', 'database', ''),
+        Ini.ReadString(voVersioningNotApplicable, 'database', 'username', ''), Ini.ReadString(voVersioningNotApplicable, 'database', 'password', ''), false));
   end;
-  fn := ini.ReadString('snomed', 'cache', '');
+  fn := ini.ReadString(voVersioningNotApplicable, 'icd-10', 'source', '');
   if fn <> '' then
   begin
-    logt('Load Snomed from '+fn);
-    sn := TSnomedServices.Create;
-    snomed.Add(sn);
-    sn.Load(fn);
-    DefSnomed := sn.Link;
-    logt(' - done');
+    for s in fn.split([',']) do
+    begin
+      logt('Load ICD-10 from '+s);
+      icdX := TICD10Provider.Create(true, s);
+      icd10.Add(icdX);
+      ProviderClasses.Add(icdX.system(nil), icdX.Link);
+      ProviderClasses.Add(icdX.system(nil)+URI_VERSION_BREAK+icdX.version(nil), icdX.Link);
+      logt(' - done');
+    end;
   end;
-  fn := ini.ReadString('loinc', 'cache', '');
+  fn := ini.ReadString(voVersioningNotApplicable, 'snomed', 'cache', '');
+  if fn <> '' then
+  begin
+    def := true;
+    for s in fn.split([',']) do
+    begin
+      logt('Load Snomed from '+s);
+      sn := TSnomedServices.Create;
+      snomed.Add(sn);
+      sn.Load(s.Trim);
+      if (def) then
+        DefSnomed := sn.Link;
+      ProviderClasses.Add(sn.system(nil)+URI_VERSION_BREAK+sn.versionUri, sn.Link);
+      ProviderClasses.Add(sn.system(nil)+URI_VERSION_BREAK+sn.editionUri, sn.Link);
+      logt(' - done');
+      def := false;
+    end;
+  end;
+
+  fn := ini.ReadString(voVersioningNotApplicable, 'loinc', 'cache', '');
   if fn <> '' then
   begin
     logt('Load Loinc from '+fn);
@@ -157,14 +220,15 @@ begin
     Loinc.Load(fn);
     logt(' - done');
   end;
-  fn := ini.ReadString('ucum', 'source', '');
+  fn := ini.ReadString(voVersioningNotApplicable, 'ucum', 'source', '');
   if fn = '' then
     raise Exception.Create('Unable to start because [ucum] source= is not specified in the ini file');
   logt('Load Ucum from '+fn);
   Ucum := TUcumServices.Create;
   Ucum.Import(fn);
   logt(' - done');
-  LoadClosures;
+  if (DB <> nil) then
+    LoadClosures;
 end;
 
 procedure TTerminologyServer.LoadClosures;
@@ -188,13 +252,13 @@ begin
   end;
 end;
 
-procedure TTerminologyServer.lookupCode(coding : TFhirCoding; props : TList<String>; resp : TFHIRLookupOpResponse);
+procedure TTerminologyServer.lookupCode(coding : TFhirCoding; lang : String; props : TList<String>; resp : TFHIRLookupOpResponse);
 var
   provider : TCodeSystemProvider;
   ctxt : TCodeSystemProviderContext;
   s : String;
-  {$IFDEF FHIR3}
-  p : TFHIRLookupOpProperty_;
+  {$IFNDEF FHIR2}
+  p : TFHIRLookupOpRespProperty_;
   {$ENDIF}
   function hasProp(name : String; def : boolean) : boolean;
   begin
@@ -204,7 +268,7 @@ var
       result := props.Contains(name);
   end;
 begin
-  provider := getProvider(coding.system);
+  provider := getProvider(coding.system, coding.version, nil);
   try
     resp.name := provider.name(nil);
     s := provider.version(nil);
@@ -213,12 +277,12 @@ begin
     ctxt := provider.locate(coding.code);
     try
       if ctxt = nil then
-        raise Exception.Create('Unable to find code '+coding.code+' in '+s);
+        raise Exception.Create('Unable to find code '+coding.code+' in '+coding.system+' version '+s);
 
       if (hasProp('abstract', true) and provider.IsAbstract(ctxt)) then
       begin
-        {$IFDEF FHIR3}
-        p := TFHIRLookupOpProperty_.create;
+        {$IFNDEF FHIR2}
+        p := TFHIRLookupOpRespProperty_.create;
         resp.property_List.add(p);
         p.code := 'abstract';
         p.value := 'true';
@@ -227,8 +291,8 @@ begin
         {$ENDIF}
       end;
       if (hasProp('display', true)) then
-        resp.display := provider.Display(ctxt);
-      provider.extendLookup(ctxt, props, resp);
+        resp.display := provider.Display(ctxt, lang);
+      provider.extendLookup(ctxt, lang, props, resp);
     finally
       provider.Close(ctxt);
     end;
@@ -409,7 +473,7 @@ begin
     result.url := ANY_CODE_VS;
     result.name := 'All codes known to the system';
     result.description := 'All codes known to the system';
-    result.status := ConformanceResourceStatusActive;
+    result.status := PublicationStatusActive;
     result.compose := TFhirValueSetCompose.create;
     result.compose.includeList.Append.system := ANY_CODE_VS;
     result.link;
@@ -460,7 +524,7 @@ begin
   result := vs <> nil;
 end;
 
-function TTerminologyServer.MakeChecker(uri: string): TValueSetChecker;
+function TTerminologyServer.MakeChecker(uri: string; profile : TFhirExpansionProfile): TValueSetChecker;
 var
   vs : TFhirValueSet;
 begin
@@ -468,7 +532,7 @@ begin
   try
     vs := getValueSetByUrl(uri);
     try
-      result.prepare(vs);
+      result.prepare(vs, profile);
     finally
       vs.Free;
     end;
@@ -478,7 +542,7 @@ begin
   end;
 end;
 
-function TTerminologyServer.validate(vs : TFHIRValueSet; coding : TFhirCoding; abstractOk : boolean) : TFhirParameters;
+function TTerminologyServer.validate(vs : TFHIRValueSet; coding : TFhirCoding; profile : TFhirExpansionProfile; abstractOk : boolean) : TFhirParameters;
 var
   check : TValueSetChecker;
 begin
@@ -493,7 +557,7 @@ begin
   try
     check := TValueSetChecker.create(self.Link, vs.url);
     try
-      check.prepare(vs);
+      check.prepare(vs, profile);
       result := check.check(coding, abstractOk);
     finally
       check.Free;
@@ -504,7 +568,7 @@ begin
 end;
 
 
-function TTerminologyServer.validate(vs : TFHIRValueSet; coded : TFhirCodeableConcept; abstractOk : boolean) : TFhirParameters;
+function TTerminologyServer.validate(vs : TFHIRValueSet; coded : TFhirCodeableConcept; profile : TFhirExpansionProfile; abstractOk : boolean) : TFhirParameters;
 var
   check : TValueSetChecker;
 begin
@@ -519,7 +583,7 @@ begin
   try
     check := TValueSetChecker.create(self.Link, vs.url);
     try
-      check.prepare(vs);
+      check.prepare(vs, profile);
       result := check.check(coded, abstractOk);
     finally
       check.Free;
@@ -529,9 +593,9 @@ begin
   end;
 end;
 
-function TTerminologyServer.checkCode(op : TFhirOperationOutcome; path : string; code : string; system : string; display : string) : boolean;
+
+function TTerminologyServer.checkCode(op : TFhirOperationOutcome; lang, path : string; code : string; system, version : string; display : string) : boolean;
 var
-  vs : TFhirValueSet;
   cs : TFhirCodeSystem;
   cp : TCodeSystemProvider;
   lct : TCodeSystemProviderContext;
@@ -551,7 +615,7 @@ begin
   end
   else if system.StartsWith('http://loinc.org') and (Loinc <> nil) then
   begin
-    d := Loinc.GetDisplayByName(code);
+    d := Loinc.GetDisplayByName(code, Loinc.LangsForLang(lang));
     if op.warning('InstanceValidator', IssueTypeCodeInvalid, path, d <> '', 'The LOINC code "'+code+'" is unknown') then
       result := op.warning('InstanceValidator', IssueTypeCodeInvalid, path, (display = '') or (display = d), 'Display for Loinc Code "'+code+'" should be "'+d+'"');
   end
@@ -563,15 +627,15 @@ begin
   end
   else
   begin
-    cp := getProvider(system, true);
+    cp := getProvider(system, version, nil, true);
     if cp <> nil then
     begin
       try
         lct := cp.locate(code);
         try
           if (op.error('InstanceValidator', IssueTypeCodeInvalid, path, lct <> nil, 'Unknown Code ('+system+'#'+code+')')) then
-            result := op.warning('InstanceValidator', IssueTypeCodeInvalid, path, (display = '') or (display = cp.Display(lct)),
-            'Display for '+system+' code "'+code+'" should be "'+cp.Display(lct)+'"');
+            result := op.warning('InstanceValidator', IssueTypeCodeInvalid, path, (display = '') or (display = cp.Display(lct, '')),
+            'Display for '+system+' code "'+code+'" should be "'+cp.Display(lct, '')+'"');
         finally
           cp.Close(lct);
         end;
@@ -596,7 +660,98 @@ begin
   end;
 end;
 
+{$IFNDEF FHIR2}
+procedure TTerminologyServer.composeCode(req: TFHIRComposeOpRequest; resp: TFHIRComposeOpResponse);
+var
+  prop : TFHIRComposeOpReqProperty_;
+  cs : TCodeSystemProvider;
+  s : string;
+  first : boolean;
+  exp : TSnomedExpression;
+  list : TAdvList<TMatchingConcept>;
+  mc : TMatchingConcept;
+  match : TFHIRComposeOpRespMatch;
+  ref : TSnomedRefinementGroup;
+  unmatch : TFHIRComposeOpRespUnmatched;
+  function isValidCode(s : String) : boolean;
+  var
+    ctxt : TCodeSystemProviderContext;
+  begin
+    ctxt := cs.locate(s);
+    result := ctxt <> nil;
+    cs.Close(ctxt);
+  end;
+begin
+  cs := getProvider(req.system, req.version, nil);
+  try
+    s := '';
+    for prop in req.property_List do
+    begin
+      if prop.code = 'focus' then
+        if not isValidCode(prop.value) then
+          raise Exception.Create('invalid snomed value :'+prop.value)
+        else
+          s := prop.value;
+    end;
+    if s = '' then
+      raise Exception.Create('no focus found');
 
+    first := true;
+    for prop in req.property_List do
+    begin
+      if prop.code <> 'focus' then
+      begin
+        if not isValidCode(prop.code) then
+          raise Exception.Create('invalid snomed code :'+prop.code);
+        if not isValidCode(prop.value) then
+          raise Exception.Create('invalid snomed value :'+prop.value);
+        if prop.subpropertyList.Count > 0 then
+          raise Exception.Create('invalid sub-property');
+        if first then
+          s := s + ':'+ prop.code+'='+prop.value
+        else
+          s := s + ','+ prop.code+'='+prop.value;
+        first := false;
+      end;
+    end;
+    if not req.exact then
+      raise Exception.Create('Only ''exact=true'' is supported at present');
+    exp := TSnomedServices(cs).parseExpression(s);
+    try
+      list := TSnomedServices(cs).condenseExpression(exp);
+      try
+        for mc in list do
+        begin
+          match := TFHIRComposeOpRespMatch.Create;
+          resp.matchList.add(match);
+          match.code := TFhirCoding.Create('http://snomed.info/sct', mc.matched);
+          match.code.display := cs.getDisplay(mc.matched, '');
+          for ref in mc.Unmatched do
+          begin
+            unmatch := TFHIRComposeOpRespUnmatched.Create;
+            match.unmatchedList.Add(unmatch);
+            if ref.refinements.Count = 1 then
+            begin
+              unmatch.code := ref.refinements[0].name.code;
+              unmatch.value := ref.refinements[0].value.ToString;
+            end
+            else
+            begin
+              raise Exception.Create('not done yet');
+            end;
+          end;
+        end;
+      finally
+        list.free;
+      end;
+    finally
+      exp.free;
+    end;
+  finally
+    cs.free;
+  end;
+end;
+{$ENDIF}
 
 function TTerminologyServer.getCodeDefinition(c : TFhirCodeSystemConcept; code : string) : TFhirCodeSystemConcept;
 var
@@ -639,42 +794,42 @@ begin
 end;
 
 
-function TTerminologyServer.getDisplayForCode(system, code: String): String;
+function TTerminologyServer.getDisplayForCode(lang : String; system, version, code: String): String;
 var
   provider : TCodeSystemProvider;
 begin
-  provider := getProvider(system, true);
+  provider := getProvider(system, version, nil, true);
   if provider <> nil then
   try
-    result := provider.getDisplay(code);
+    result := provider.getDisplay(code, lang);
   finally
     provider.Free;
   end;
 end;
 
-procedure TTerminologyServer.getCodeView(coding: TFHIRCoding; response: TCDSHookResponse);
+procedure TTerminologyServer.getCodeView(lang : String; coding: TFHIRCoding; response: TCDSHookResponse);
 var
   card : TCDSHookCard;
   cs : TCodeSystemProvider;
 begin
-  cs := getProvider(coding.system, true);
+  cs := getProvider(coding.system, coding.version, nil, true);
   if cs <> nil then
   begin
     try
       card := response.addCard;
-      cs.getCDSInfo(card, webBase, coding.code, coding.display);
+      cs.getCDSInfo(card, lang, webBase, coding.code, coding.display);
     finally
       cs.Free;
     end;
   end;
 end;
 
-procedure TTerminologyServer.getCodeView(coding: TFhirCodeableConcept; response: TCDSHookResponse);
+procedure TTerminologyServer.getCodeView(lang : String; coding: TFhirCodeableConcept; response: TCDSHookResponse);
 var
   c : TFhirCoding;
 begin
   for c in coding.codingList do
-    getCodeView(c, response);
+    getCodeView(lang, c, response);
 end;
 
 function TTerminologyServer.InitClosure(name: String) : String;
@@ -714,7 +869,7 @@ var
   em : TFhirConceptMapGroupElement;
 begin
   result := false;
-  {$IFDEF FHIR2CM}
+  {$IFDEF FHIR2}
     for em in cm.resource.elementList do
       if (em.system = coding.system) and (em.code = coding.code) then
   {$ELSE}
@@ -738,6 +893,29 @@ begin
   // todo: or it might be ok to use this value set if it's a subset of the specified one?
 end;
 
+function TTerminologyServer.isValidCode(system, code: String): boolean;
+var
+  cp : TCodeSystemProvider;
+  lct : TCodeSystemProviderContext;
+begin
+  cp := getProvider(system, '', nil, true);
+  if cp = nil then
+    result := false
+  else
+  begin
+    try
+      lct := cp.locate(code);
+      try
+        result := lct <> nil;
+      finally
+        cp.Close(lct);
+      end;
+    finally
+      cp.Free;
+    end;
+  end
+end;
+
 function TTerminologyServer.isOkSource(cm : TLoadedConceptMap; vs : TFHIRValueSet; coding : TFHIRCoding; out group : TFhirConceptMapGroup; out match : TFhirConceptMapGroupElement) : boolean;
 var
   g : TFhirConceptMapGroup;
@@ -746,7 +924,7 @@ begin
   result := false;
   if (vs = nil) or ((cm.source <> nil) and (cm.Source.url = vs.url)) then
   begin
-    {$IFDEF FHIR2CM}
+    {$IFDEF FHIR2}
       for em in cm.Resource.elementList do
         if (em.system = coding.system) and (em.code = coding.code) then
     {$ELSE}
@@ -762,7 +940,7 @@ begin
   end;
 end;
 
-function TTerminologyServer.translate(source : TFHIRValueSet; coding : TFhirCoding; target : TFHIRValueSet) : TFHIRParameters;
+function TTerminologyServer.translate(lang : String; source : TFHIRValueSet; coding : TFhirCoding; target : TFHIRValueSet) : TFHIRParameters;
 var
   op : TFHIROperationOutcome;
   list : TLoadedConceptMapList;
@@ -779,11 +957,11 @@ begin
   op := TFhirOperationOutcome.Create;
   try
     try
-      if not checkCode(op, '', coding.code, coding.system, coding.display) then
+      if not checkCode(op, lang, '', coding.code, coding.system, coding.version, coding.display) then
         raise Exception.Create('Code '+coding.code+' in system '+coding.system+' not recognized');
 
       // check to see whether the coding is already in the target value set, and if so, just return it
-      p := validate(target, coding, false);
+      p := validate(target, coding, nil, false);
       try
         if TFhirBoolean(p.NamedParameter['result']).value then
         begin
@@ -816,7 +994,7 @@ begin
               result.AddParameter('result', true);
               outcome := TFhirCoding.Create;
               result.AddParameter('outcome', outcome);
-              {$IFDEF FHIR2CM}
+              {$IFDEF FHIR2}
               outcome.system := map.system;
               {$ELSE}
               outcome.system := g.target;
@@ -828,8 +1006,8 @@ begin
               result.AddParameter('result', false);
             end;
             result.AddParameter('equivalence', map.equivalenceElement.Link);
-            if (map.commentsElement <> nil) then
-              result.AddParameter('message', map.commentsElement.Link);
+            if (map.{$IFDEF FHIR2}commentsElement{$ELSE}commentElement{$ENDIF} <> nil) then
+              result.AddParameter('message', map.{$IFDEF FHIR2}commentsElement{$ELSE}commentElement{$ENDIF}.Link);
             exit;
           end;
         end;
@@ -855,10 +1033,10 @@ begin
   end;
 end;
 
-function TTerminologyServer.translate(source : TFHIRValueSet; coded : TFhirCodeableConcept; target : TFHIRValueSet) : TFHIRParameters;
+function TTerminologyServer.translate(lang : String; source : TFHIRValueSet; coded : TFhirCodeableConcept; target : TFHIRValueSet) : TFHIRParameters;
 begin
   if coded.codingList.count = 1 then
-    result := translate(source, coded.codingList[0], target)
+    result := translate(lang, source, coded.codingList[0], target)
   else
     raise Exception.Create('Not done yet');
 end;
@@ -941,10 +1119,88 @@ begin
 end;
 *)
 
+procedure TTerminologyServer.BuildIndexesInternal(prog: boolean; conn1, conn2, conn3: TKDBConnection);
+var
+  i : integer;
+  finish : TDateTime;
+begin
+  finish := now + DATETIME_SECOND_ONE * 30;
+  MaintenanceThreadStatus := 'BI: counting';
+  if conn1.CountSQL('Select Count(*) from ValueSets where NeedsIndexing = 0') = 0 then
+    conn1.ExecSQL('Update Concepts set NeedsIndexing = 0'); // we're going to index them all anwyay
+
+  // first, update value set member information
+  MaintenanceThreadStatus := 'BI: Updating ValueSet Members';
+  if (prog) then logtn('Updating ValueSet Members');
+  conn1.SQL := 'Select ValueSetKey, URL from ValueSets where NeedsIndexing = 1';
+  conn1.Prepare;
+  conn1.Execute;
+  i := 0;
+
+  while conn1.FetchNext do
+  begin
+    inc(i);
+    if (prog and (i mod 10 = 0)) then Write('.');
+    MaintenanceThreadStatus := 'BI: Updating ValueSet Members for '+conn1.ColStringByName['ValueSetKey'];
+    processValueSet(conn1.ColIntegerByName['ValueSetKey'], conn1.ColStringByName['URL'], conn2, conn3);
+    if finish < now then
+      break;
+  end;
+  conn1.Terminate;
+  if (prog) then Writeln;
+  if finish < now then
+    exit;
+
+
+  // second, for each concept that needs indexing, check it's value set information
+  if (prog) then logtn('Indexing Concepts');
+  MaintenanceThreadStatus := 'BI: Indexing Concepts';
+  conn1.SQL := 'Select ConceptKey, URL, Code from Concepts where NeedsIndexing = 1';
+  conn1.Prepare;
+  conn1.Execute;
+  i := 0;
+  while conn1.FetchNext do
+  begin
+    inc(i);
+    if (prog and (i mod 10 = 0)) then Write('.');
+    MaintenanceThreadStatus := 'BI: Indexing Concept '+conn1.ColStringByName['ConceptKey'];
+    processConcept(conn1.ColIntegerByName['ConceptKey'], conn1.ColStringByName['URL'], '', conn1.ColStringByName['Code'], conn2, conn3);
+    if finish < now then
+      break;
+  end;
+  conn1.Terminate;
+  if (prog) then Writeln;
+  if finish < now then
+    exit;
+
+  // last, for each entry in the closure entry table that needs closureing, do it
+  if (prog) then logtn('Generating Closures');
+  MaintenanceThreadStatus := 'BI: Generating Closures';
+  conn1.SQL := 'select ClosureEntryKey, Closures.ClosureKey, SubsumesKey, Name, URL, Code from ClosureEntries, Concepts, Closures '+
+     'where Closures.ClosureKey = ClosureEntries.ClosureKey and ClosureEntries.IndexedVersion = 0 and ClosureEntries.SubsumesKey = Concepts.ConceptKey';
+  conn1.Prepare;
+  conn1.Execute;
+  while conn1.FetchNext do
+  begin
+    inc(i);
+    if (prog and (i mod 100 = 0)) then Write('.');
+    MaintenanceThreadStatus := 'BI: Generating Closures for '+conn1.ColStringByName['Name'];
+    FClosures[conn1.ColStringByName['Name']].processEntry(conn2, conn1.ColIntegerByName['ClosureEntryKey'], conn1.ColIntegerByName['SubsumesKey'], conn1.ColStringByName['URL'], conn1.ColStringByName['Code']);
+    if finish < now then
+      break;
+  end;
+  conn1.Terminate;
+  if (prog) then Writeln;
+  if finish < now then
+    exit;
+
+  if (prog) then logt('Done');
+  MaintenanceThreadStatus := 'BI: ';
+end;
+
 procedure TTerminologyServer.BuildIndexes(prog : boolean);
 var
   conn1, conn2, conn3 : TKDBConnection;
-  i : integer;
 begin
   conn1 := DB.GetConnection('BuildIndexes');
   try
@@ -952,63 +1208,7 @@ begin
     try
       conn3 := DB.GetConnection('BuildIndexes');
       try
-        BackgroundThreadStatus := 'BI: counting';
-        if conn1.CountSQL('Select Count(*) from ValueSets where NeedsIndexing = 0') = 0 then
-          conn1.ExecSQL('Update Concepts set NeedsIndexing = 0'); // we're going to index them all anwyay
-
-        // first, update value set member information
-        BackgroundThreadStatus := 'BI: Updating ValueSet Members';
-        if (prog) then logtn('Updating ValueSet Members');
-        conn1.SQL := 'Select ValueSetKey, URL from ValueSets where NeedsIndexing = 1';
-        conn1.Prepare;
-        conn1.Execute;
-        i := 0;
-        while conn1.FetchNext do
-        begin
-          inc(i);
-          if (prog and (i mod 10 = 0)) then Write('.');
-          BackgroundThreadStatus := 'BI: Updating ValueSet Members for '+conn1.ColStringByName['ValueSetKey'];
-          processValueSet(conn1.ColIntegerByName['ValueSetKey'], conn1.ColStringByName['URL'], conn2, conn3);
-        end;
-        conn1.Terminate;
-        if (prog) then Writeln;
-
-        // second, for each concept that needs indexing, check it's value set information
-        if (prog) then logtn('Indexing Concepts');
-        BackgroundThreadStatus := 'BI: Indexing Concepts';
-        conn1.SQL := 'Select ConceptKey, URL, Code from Concepts where NeedsIndexing = 1';
-        conn1.Prepare;
-        conn1.Execute;
-        i := 0;
-        while conn1.FetchNext do
-        begin
-          inc(i);
-          if (prog and (i mod 10 = 0)) then Write('.');
-          BackgroundThreadStatus := 'BI: Indexing Concept '+conn1.ColStringByName['ConceptKey'];
-          processConcept(conn1.ColIntegerByName['ConceptKey'], conn1.ColStringByName['URL'], conn1.ColStringByName['Code'], conn2, conn3);
-        end;
-        conn1.Terminate;
-        if (prog) then Writeln;
-
-        // last, for each entry in the closure entry table that needs closureing, do it
-        if (prog) then logtn('Generating Closures');
-        BackgroundThreadStatus := 'BI: Generating Closures';
-        conn1.SQL := 'select ClosureEntryKey, Closures.ClosureKey, SubsumesKey, Name, URL, Code from ClosureEntries, Concepts, Closures '+
-           'where Closures.ClosureKey = ClosureEntries.ClosureKey and ClosureEntries.IndexedVersion = 0 and ClosureEntries.SubsumesKey = Concepts.ConceptKey';
-        conn1.Prepare;
-        conn1.Execute;
-        while conn1.FetchNext do
-        begin
-          inc(i);
-          if (prog and (i mod 100 = 0)) then Write('.');
-          BackgroundThreadStatus := 'BI: Generating Closures for '+conn1.ColStringByName['Name'];
-          FClosures[conn1.ColStringByName['Name']].processEntry(conn2, conn1.ColIntegerByName['ClosureEntryKey'], conn1.ColIntegerByName['SubsumesKey'], conn1.ColStringByName['URL'], conn1.ColStringByName['Code']);
-        end;
-        conn1.Terminate;
-        if (prog) then Writeln;
-
-        if (prog) then logt('Done');
-        BackgroundThreadStatus := 'BI: ';
+        BuildIndexesInternal(prog, conn1, conn2, conn3);
         conn3.Release;
       except
         on e : exception do
@@ -1035,10 +1235,11 @@ begin
   end;
 end;
 
-procedure TTerminologyServer.processConcept(ConceptKey: integer; URL, Code: String; conn2, conn3: TKDBConnection);
+procedure TTerminologyServer.processConcept(ConceptKey: integer; URL, version, Code: String; conn2, conn3: TKDBConnection);
 var
   vs : TFhirValueSet;
   val : TValuesetChecker;
+  profile : TFhirExpansionProfile;
 begin
   conn2.SQL := 'select ValueSetKey, URL from ValueSets';
   conn2.Prepare;
@@ -1050,19 +1251,24 @@ begin
       conn3.ExecSQL('Update ValueSets set NeedsIndexing = 0, Error = ''Unable to find definition'' where ValueSetKey = '+conn2.ColStringByName['ValueSetKey'])
     else
       try
+        profile := TFhirExpansionProfile.Create;
         try
-          val := TValueSetChecker.create(self.Link, vs.url);
           try
-            val.prepare(vs);
-            if not val.check(URL, code, true) then
-              conn3.ExecSQL('Delete from ValueSetMembers where ValueSetKey = '+conn2.ColStringByName['ValueSetKey']+' and ConceptKey = '+inttostr(ConceptKey))
-            else if conn3.CountSQL('select Count(*) from ValueSetMembers where ValueSetKey = '+conn2.ColStringByName['ValueSetKey']+' and ConceptKey = '+inttostr(ConceptKey)) = 0 then
-              conn3.ExecSQL('insert into ValueSetMembers (ValueSetMemberKey, ValueSetKey, ConceptKey) values ('+inttostr(NextValueSetMemberKey)+','+conn2.ColStringByName['ValueSetKey']+', '+inttostr(ConceptKey)+')');
+            val := TValueSetChecker.create(self.Link, vs.url);
+            try
+              val.prepare(vs, profile);
+              if not val.check(URL, version, code, true) then
+                conn3.ExecSQL('Delete from ValueSetMembers where ValueSetKey = '+conn2.ColStringByName['ValueSetKey']+' and ConceptKey = '+inttostr(ConceptKey))
+              else if conn3.CountSQL('select Count(*) from ValueSetMembers where ValueSetKey = '+conn2.ColStringByName['ValueSetKey']+' and ConceptKey = '+inttostr(ConceptKey)) = 0 then
+                conn3.ExecSQL('insert into ValueSetMembers (ValueSetMemberKey, ValueSetKey, ConceptKey) values ('+inttostr(NextValueSetMemberKey)+','+conn2.ColStringByName['ValueSetKey']+', '+inttostr(ConceptKey)+')');
+            finally
+              val.Free;
+            end;
           finally
-            val.Free;
+            vs.Free;
           end;
         finally
-          vs.Free;
+          profile.free;
         end;
       except
         on e : Exception do
@@ -1079,36 +1285,42 @@ procedure TTerminologyServer.processValueSet(ValueSetKey: integer; URL: String; 
 var
   vs : TFhirValueSet;
   val : TValuesetChecker;
-  system, code : String;
+  system, version, code : String;
+  profile : TFhirExpansionProfile;
 begin
   vs := getValueSetByURL(URL);
   if vs = nil then
     conn2.ExecSQL('Update ValueSets set NeedsIndexing = 0, Error = ''Unable to find definition'' where ValueSetKey = '+inttostr(valuesetKey))
   else
     try
+      profile := TFhirExpansionProfile.defaultProfile;
       try
-        val := TValueSetChecker.create(self.Link, vs.url);
         try
-          val.prepare(vs);
-          conn2.SQL := 'select ConceptKey, URL, Code from Concepts';
-          conn2.Prepare;
-          conn2.Execute;
-          while conn2.FetchNext do
-          begin
-            system := conn2.ColStringByName['URL'];
-            code := conn2.ColStringByName['Code'];
-            if not val.check(system, code, true) then
-              conn3.ExecSQL('Delete from ValueSetMembers where ValueSetKey = '+inttostr(ValueSetKey)+' and ConceptKey = '+conn2.ColStringByName['ConceptKey'])
-            else if conn3.CountSQL('select Count(*) from ValueSetMembers where ValueSetKey = '+inttostr(ValueSetKey)+' and ConceptKey = '+conn2.ColStringByName['ConceptKey']) = 0 then
-              conn3.ExecSQL('insert into ValueSetMembers (ValueSetMemberKey, ValueSetKey, ConceptKey) values ('+inttostr(NextValueSetMemberKey)+','+inttostr(ValueSetKey)+', '+conn2.ColStringByName['ConceptKey']+')');
+          val := TValueSetChecker.create(self.Link, vs.url);
+          try
+            val.prepare(vs, profile);
+            conn2.SQL := 'select ConceptKey, URL, Code from Concepts';
+            conn2.Prepare;
+            conn2.Execute;
+            while conn2.FetchNext do
+            begin
+              system := conn2.ColStringByName['URL'];
+              code := conn2.ColStringByName['Code'];
+              if not val.check(system, version, code, true) then
+                conn3.ExecSQL('Delete from ValueSetMembers where ValueSetKey = '+inttostr(ValueSetKey)+' and ConceptKey = '+conn2.ColStringByName['ConceptKey'])
+              else if conn3.CountSQL('select Count(*) from ValueSetMembers where ValueSetKey = '+inttostr(ValueSetKey)+' and ConceptKey = '+conn2.ColStringByName['ConceptKey']) = 0 then
+                conn3.ExecSQL('insert into ValueSetMembers (ValueSetMemberKey, ValueSetKey, ConceptKey) values ('+inttostr(NextValueSetMemberKey)+','+inttostr(ValueSetKey)+', '+conn2.ColStringByName['ConceptKey']+')');
+            end;
+            Conn2.Terminate;
+            conn2.ExecSQL('Update ValueSets set NeedsIndexing = 0, Error = null where ValueSetKey = '+inttostr(valuesetKey));
+          finally
+            val.Free;
           end;
-          Conn2.Terminate;
-          conn2.ExecSQL('Update ValueSets set NeedsIndexing = 0, Error = null where ValueSetKey = '+inttostr(valuesetKey));
         finally
-          val.Free;
+          vs.Free;
         end;
       finally
-        vs.Free;
+        profile.Free;
       end;
     except
       on e : Exception do
@@ -1134,12 +1346,9 @@ begin
   end;
 end;
 
-function TTerminologyServer.translate(cm: TLoadedConceptMap; coding: TFhirCoding): TFHIRParameters;
+function TTerminologyServer.translate(lang : String; cm: TLoadedConceptMap; coding: TFhirCoding): TFHIRParameters;
 var
   op : TFHIROperationOutcome;
-  list : TLoadedConceptMapList;
-  i : integer;
-  p : TFhirParameters;
   g : TFhirConceptMapGroup;
   em : TFhirConceptMapGroupElement;
   map : TFhirConceptMapGroupElementTarget;
@@ -1150,7 +1359,7 @@ begin
   op := TFhirOperationOutcome.Create;
   try
     try
-      if not checkCode(op, '', coding.code, coding.system, coding.display) then
+      if not checkCode(op, lang, '', coding.code, coding.system, coding.version, coding.display) then
         raise Exception.Create('Code '+coding.code+' in system '+coding.system+' not recognized');
 
 //      // check to see whether the coding is already in the target value set, and if so, just return it
@@ -1176,13 +1385,13 @@ begin
       if em.targetList.Count = 0 then
         raise Exception.Create('Concept Map has an element with no map for '+'Code '+coding.code+' in system '+coding.system);
       map := em.targetList[0]; // todo: choose amongst dependencies
-      if (map.equivalence in [ConceptMapEquivalenceEquivalent, ConceptMapEquivalenceEqual, ConceptMapEquivalenceWider, ConceptMapEquivalenceSubsumes, ConceptMapEquivalenceNarrower, ConceptMapEquivalenceSpecializes, ConceptMapEquivalenceInexact]) then
+      if (map.equivalence in [ConceptMapEquivalenceNull, ConceptMapEquivalenceEquivalent, ConceptMapEquivalenceEqual, ConceptMapEquivalenceWider, ConceptMapEquivalenceSubsumes, ConceptMapEquivalenceNarrower, ConceptMapEquivalenceSpecializes, ConceptMapEquivalenceInexact]) then
       begin
         found := true;
         result.AddParameter('result', true);
         outcome := TFhirCoding.Create;
         result.AddParameter('outcome', outcome);
-        {$IFDEF FHIR2CM}
+        {$IFDEF FHIR2}
         outcome.system := map.system;
         {$ELSE}
         outcome.system := g.target;
@@ -1193,9 +1402,13 @@ begin
       begin
         result.AddParameter('result', false);
       end;
-      result.AddParameter('equivalence', TFHIRCode.Create(map.equivalenceElement.value));
-      if (map.commentsElement <> nil) then
-        result.AddParameter('message', map.commentsElement.Link);
+      if (map.equivalenceElement = nil) then
+        result.AddParameter('equivalence', TFHIRCode.Create('equivalent'))
+      else
+        result.AddParameter('equivalence', TFHIRCode.Create(map.equivalenceElement.value));
+      if (map.{$IFDEF FHIR2}commentsElement{$ELSE}commentElement{$ENDIF} <> nil) then
+        result.AddParameter('message', map.{$IFDEF FHIR2}commentsElement{$ELSE}commentElement{$ENDIF}
+        .Link);
       end;
 
       if not found then

@@ -1,3 +1,30 @@
+{
+Copyright (c) 2017+, Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
 program fhirtests2;
 
 {$APPTYPE CONSOLE}
@@ -9,10 +36,9 @@ uses
   FHIRTests,
   DecimalTests in '..\support\tests\DecimalTests.pas',
   JWTTests in '..\Support\tests\JWTTests.pas',
-  FHIRPathTests in 'tests\FHIRPathTests.pas',
+  FluentPathTests in 'tests\FluentPathTests.pas',
   FHIRValidatorTests in 'tests\FHIRValidatorTests.pas',
   FHIRConstants,
-  FHIRParser,
   SysUtils,
   Classes,
   ActiveX,
@@ -52,8 +78,6 @@ uses
   AdvExclusiveCriticalSections in '..\support\AdvExclusiveCriticalSections.pas',
   AdvThreads in '..\support\AdvThreads.pas',
   AdvSignals in '..\support\AdvSignals.pas',
-  AdvSynchronizationRegistries in '..\support\AdvSynchronizationRegistries.pas',
-  AdvTimeControllers in '..\support\AdvTimeControllers.pas',
   AdvIntegerMatches in '..\support\AdvIntegerMatches.pas',
   AdvBuffers in '..\support\AdvBuffers.pas',
   BytesSupport in '..\support\BytesSupport.pas',
@@ -72,20 +96,21 @@ uses
   AdvOrdinalSets in '..\support\AdvOrdinalSets.pas',
   AdvStreamReaders in '..\support\AdvStreamReaders.pas',
   AdvStringStreams in '..\support\AdvStringStreams.pas',
-  DateAndTime in '..\support\DateAndTime.pas',
-  KDate in '..\support\KDate.pas',
   HL7V2DateSupport in '..\support\HL7V2DateSupport.pas',
-  FHIRBase in 'FHIRBase.pas',
+  FHIRBase in '..\support\FHIRBase.pas',
   AdvStringMatches in '..\support\AdvStringMatches.pas',
   FHIRResources in 'FHIRResources.pas',
-  FHIRParserBase in 'FHIRParserBase.pas',
-  FHIRSupport in 'FHIRSupport.pas',
+  FHIRParser in '..\support\FHIRParser.pas',
+  FHIRParserXml,
+  FHIRParserJson,
+  FHIRParserBase in '..\support\FHIRParserBase.pas',
+  FHIRSupport in '..\support\FHIRSupport.pas',
   ParseMap in '..\support\ParseMap.pas',
   MsXmlParser in '..\support\MsXmlParser.pas',
   AdvMemories in '..\support\AdvMemories.pas',
   XMLBuilder in '..\support\XMLBuilder.pas',
   AdvWinInetClients in '..\support\AdvWinInetClients.pas',
-  MsXmlBuilder in '..\support\MsXmlBuilder.pas',
+  MXmlBuilder in '..\support\MXmlBuilder.pas',
   TextUtilities in '..\support\TextUtilities.pas',
   AdvVCLStreams in '..\support\AdvVCLStreams.pas',
   AdvXmlBuilders in '..\support\AdvXmlBuilders.pas',
@@ -93,13 +118,12 @@ uses
   AdvXMLEntities in '..\support\AdvXMLEntities.pas',
   AdvJSON in '..\support\AdvJSON.pas',
   AdvGenerics in '..\support\AdvGenerics.pas',
-  FHIRLang in 'FHIRLang.pas',
+  FHIRLang in '..\support\FHIRLang.pas',
   FHIRPath in 'FHIRPath.pas',
   AfsResourceVolumes in '..\support\AfsResourceVolumes.pas',
   AfsVolumes in '..\support\AfsVolumes.pas',
   AfsStreamManagers in '..\support\AfsStreamManagers.pas',
   AdvObjectMatches in '..\support\AdvObjectMatches.pas',
-  RegExpr in '..\support\RegExpr.pas',
   FHIRUtilities in 'FHIRUtilities.pas',
   AdvStringObjectMatches in '..\support\AdvStringObjectMatches.pas',
   JWT in '..\support\JWT.pas',
@@ -117,9 +141,17 @@ uses
   AdvZipUtilities in '..\support\AdvZipUtilities.pas',
   AdvZipDeclarations in '..\support\AdvZipDeclarations.pas',
   FHIRTestWorker in 'tests\FHIRTestWorker.pas',
-  FHIRXhtml in 'FHIRXhtml.pas',
+  FHIRXhtml in '..\support\FHIRXhtml.pas',
   InternetFetcher in '..\support\InternetFetcher.pas',
-  FHIRContext in 'FHIRContext.pas';
+  FHIRContext in 'FHIRContext.pas',
+  GraphQL in '..\support\GraphQL.pas',
+  ParserSupport in '..\support\ParserSupport.pas',
+  MXML in '..\support\MXML.pas',
+  AdvZipWriters in '..\support\AdvZipWriters.pas',
+  SCIMObjects in '..\support\SCIMObjects.pas',
+  FHIRSecurity in '..\support\FHIRSecurity.pas',
+  TurtleParser in '..\support\TurtleParser.pas',
+  FHIRIndexBase in '..\support\FHIRIndexBase.pas';
 
 (*
 procedure SaveStringToFile(s : AnsiString; fn : String);

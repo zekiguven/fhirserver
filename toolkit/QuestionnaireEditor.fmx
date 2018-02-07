@@ -1,0 +1,1349 @@
+object QuestionnaireEditorFrame: TQuestionnaireEditorFrame
+  Size.Width = 1073.000000000000000000
+  Size.Height = 760.000000000000000000
+  Size.PlatformDefault = False
+  object Panel2: TPanel
+    Align = Left
+    Size.Width = 121.000000000000000000
+    Size.Height = 760.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 0
+    object Panel4: TPanel
+      Align = Top
+      Size.Width = 121.000000000000000000
+      Size.Height = 33.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      object Label1: TLabel
+        Position.X = 8.000000000000000000
+        Position.Y = 4.000000000000000000
+        Size.Width = 120.000000000000000000
+        Size.Height = 21.000000000000000000
+        Size.PlatformDefault = False
+        Text = 'Questionnaire'
+        TabOrder = 0
+      end
+    end
+    object tvStructure: TTreeView
+      Align = Client
+      Size.Width = 121.000000000000000000
+      Size.Height = 727.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 1
+      OnClick = tvStructureClick
+      Viewport.Width = 117.000000000000000000
+      Viewport.Height = 723.000000000000000000
+      object tvMetadata: TTreeViewItem
+        IsChecked = False
+        IsExpanded = False
+        IsSelected = False
+        TabOrder = 0
+        Text = 'Metadata'
+      end
+      object tvContext: TTreeViewItem
+        IsChecked = False
+        IsExpanded = False
+        IsSelected = False
+        TabOrder = 2
+        Text = 'Context'
+      end
+      object tvGrid: TTreeViewItem
+        IsChecked = False
+        IsExpanded = False
+        IsSelected = False
+        TabOrder = 1
+        Text = 'Grid'
+      end
+      object tvForm: TTreeViewItem
+        IsChecked = False
+        IsExpanded = False
+        IsSelected = False
+        TabOrder = 3
+        Text = 'Layout'
+      end
+    end
+  end
+  object Panel3: TPanel
+    Align = Client
+    Size.Width = 952.000000000000000000
+    Size.Height = 760.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 2
+    object tbStructure: TTabControl
+      Align = Client
+      Size.Width = 952.000000000000000000
+      Size.Height = 760.000000000000000000
+      Size.PlatformDefault = False
+      TabIndex = 3
+      TabOrder = 0
+      TabPosition = None
+      Sizes = (
+        952s
+        760s
+        952s
+        760s
+        952s
+        760s
+        952s
+        760s)
+      object tbMetadata: TTabItem
+        CustomIcon = <
+          item
+          end>
+        IsSelected = False
+        Size.Width = 8.000000000000000000
+        Size.Height = 8.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = ''
+        TabOrder = 0
+        Text = 'tbMetadata'
+        ExplicitSize.cx = 8.000000000000000000
+        ExplicitSize.cy = 8.000000000000000000
+        object ScrollBox1: TScrollBox
+          Align = Client
+          Size.Width = 952.000000000000000000
+          Size.Height = 760.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          Viewport.Width = 952.000000000000000000
+          Viewport.Height = 760.000000000000000000
+          object dedDate: TDateEdit
+            Date = 42965.000000000000000000
+            OnChange = inputChanged
+            OnCheckChanged = inputChanged
+            HelpContext = 24
+            Position.X = 84.000000000000000000
+            Position.Y = 330.000000000000000000
+            Size.Width = 380.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 11
+          end
+          object edtCopyright: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 9
+            TextSettings.VertAlign = Leading
+            Position.X = 84.000000000000000000
+            Position.Y = 261.000000000000000000
+            HelpContext = 32
+            Size.Width = 348.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            OnChange = inputChanged
+            OnChangeTracking = inputChanged
+          end
+          object edtDescription: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 7
+            TextSettings.VertAlign = Leading
+            Position.X = 84.000000000000000000
+            Position.Y = 192.000000000000000000
+            HelpContext = 27
+            Size.Width = 348.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            OnChange = inputChanged
+            OnChangeTracking = inputChanged
+          end
+          object edtName: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 1
+            Position.X = 84.000000000000000000
+            Position.Y = 50.000000000000000000
+            HelpContext = 20
+            Size.Width = 205.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            OnChange = inputChanged
+            OnChangeTracking = inputChanged
+          end
+          object edtPublisher: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 6
+            Position.X = 84.000000000000000000
+            Position.Y = 157.000000000000000000
+            HelpContext = 25
+            Size.Width = 348.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            OnChange = inputChanged
+            OnChangeTracking = inputChanged
+          end
+          object edtPurpose: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 8
+            TextSettings.VertAlign = Leading
+            Position.X = 84.000000000000000000
+            Position.Y = 226.000000000000000000
+            HelpContext = 31
+            Size.Width = 348.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            OnChange = inputChanged
+            OnChangeTracking = inputChanged
+          end
+          object edtTitle: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 3
+            Position.X = 84.000000000000000000
+            Position.Y = 85.000000000000000000
+            HelpContext = 21
+            Size.Width = 348.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            OnChange = inputChanged
+            OnChangeTracking = inputChanged
+          end
+          object edtURL: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 0
+            Position.X = 84.000000000000000000
+            Position.Y = 16.000000000000000000
+            HelpContext = 17
+            Size.Width = 381.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            OnChange = inputChanged
+            OnChangeTracking = inputChanged
+          end
+          object edtVersion: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 2
+            Position.X = 384.000000000000000000
+            Position.Y = 50.000000000000000000
+            HelpContext = 19
+            Size.Width = 81.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            OnChange = inputChanged
+            OnChangeTracking = inputChanged
+          end
+          object Label10: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 226.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Purpose'
+            TabOrder = 16
+          end
+          object Label11: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 261.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Copyright:'
+            TabOrder = 17
+          end
+          object Label13: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 296.000000000000000000
+            Size.Width = 113.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Jurisdiction:'
+            TabOrder = 18
+          end
+          object Label2: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 16.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'URL:'
+            TabOrder = 19
+          end
+          object Label3: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 50.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Name:'
+            TabOrder = 20
+          end
+          object Label4: TLabel
+            Position.X = 328.000000000000000000
+            Position.Y = 50.000000000000000000
+            Size.Width = 65.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Version:'
+            TabOrder = 22
+          end
+          object Label5: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 85.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Title'
+            TabOrder = 24
+          end
+          object Label6: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 120.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Status'
+            TabOrder = 26
+          end
+          object Label7: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 330.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Date:'
+            TabOrder = 28
+          end
+          object Label8: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 157.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Publisher'
+            TabOrder = 29
+          end
+          object Label9: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 192.000000000000000000
+            Size.Width = 97.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Description:'
+            TabOrder = 30
+          end
+          object btnCopyright: TButton
+            Images = ToolbarImages
+            ImageIndex = 0
+            Position.X = 440.000000000000000000
+            Position.Y = 261.000000000000000000
+            Size.Width = 24.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 31
+            OnClick = btnCopyrightClick
+          end
+          object btnDescription: TButton
+            Images = ToolbarImages
+            ImageIndex = 0
+            Position.X = 440.000000000000000000
+            Position.Y = 192.000000000000000000
+            Size.Width = 24.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 35
+            OnClick = btnDescriptionClick
+          end
+          object btnPurpose: TButton
+            Images = ToolbarImages
+            ImageIndex = 0
+            Position.X = 440.000000000000000000
+            Position.Y = 226.000000000000000000
+            Size.Width = 24.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 36
+            OnClick = btnPurposeClick
+          end
+          object cbExperimental: TCheckBox
+            HelpContext = 23
+            Position.X = 361.000000000000000000
+            Position.Y = 120.000000000000000000
+            Size.Width = 122.000000000000000000
+            Size.Height = 19.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 5
+            Text = 'Experimental'
+            OnChange = inputChanged
+          end
+          object cbxJurisdiction: TComboBox
+            HelpContext = 29
+            Items.Strings = (
+              ''
+              'Austria (AT)'
+              'Australia (AU)'
+              'Brazil (BR)'
+              'Canada (CA)'
+              'Switzerland (CH)'
+              'Chile (CL)'
+              'China (CN)'
+              'Germany (DE)'
+              'Denmark (DK)'
+              'Estonia (EE)'
+              'Spain (ES)'
+              'Finland (FI)'
+              'France (FR)'
+              'United Kingdom (GB)'
+              'Netherlands (the) (NL)'
+              'Norway (NO)'
+              'New Zealand (NZ)'
+              'Russian Federation (the) (RU)'
+              'United States (US)'
+              'Viet Nam (VN)'
+              '--'
+              'World '
+              'Africa'
+              'Americas '
+              'Asia '
+              'Europe '
+              'Australia and New Zealand')
+            Position.X = 84.000000000000000000
+            Position.Y = 296.000000000000000000
+            Size.Width = 380.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 10
+            OnChange = inputChanged
+          end
+          object cbxStatus: TComboBox
+            HelpContext = 22
+            Items.Strings = (
+              ''
+              'draft'
+              'active'
+              'retired'
+              'unknown')
+            Position.X = 84.000000000000000000
+            Position.Y = 120.000000000000000000
+            Size.Width = 269.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 4
+            OnChange = inputChanged
+          end
+          object Label14: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 362.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Approval:'
+            TabOrder = 27
+          end
+          object dedApproval: TDateEdit
+            Date = 42965.000000000000000000
+            OnChange = inputChanged
+            OnCheckChanged = inputChanged
+            HelpContext = 24
+            Position.X = 84.000000000000000000
+            Position.Y = 362.000000000000000000
+            Size.Width = 380.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 12
+          end
+          object Label15: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 394.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Review:'
+            TabOrder = 25
+          end
+          object dedReview: TDateEdit
+            Date = 42965.000000000000000000
+            OnChange = inputChanged
+            OnCheckChanged = inputChanged
+            HelpContext = 24
+            Position.X = 84.000000000000000000
+            Position.Y = 394.000000000000000000
+            Size.Width = 380.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 13
+          end
+          object dedBegin: TDateEdit
+            Date = 42965.000000000000000000
+            OnChange = inputChanged
+            OnCheckChanged = inputChanged
+            HelpContext = 24
+            Position.X = 84.000000000000000000
+            Position.Y = 426.000000000000000000
+            Size.Width = 380.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 14
+          end
+          object Label16: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 426.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Use Begin:'
+            TabOrder = 23
+          end
+          object dedEnd: TDateEdit
+            Date = 42965.000000000000000000
+            OnChange = inputChanged
+            OnCheckChanged = inputChanged
+            HelpContext = 24
+            Position.X = 84.000000000000000000
+            Position.Y = 458.000000000000000000
+            Size.Width = 380.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 15
+          end
+          object Label17: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 458.000000000000000000
+            Size.Width = 70.000000000000000000
+            Size.Height = 17.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Use End:'
+            TabOrder = 21
+          end
+          object btnPublisher: TButton
+            Images = ToolbarImages
+            ImageIndex = 0
+            Position.X = 440.000000000000000000
+            Position.Y = 157.000000000000000000
+            Size.Width = 24.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 34
+            OnClick = btnPublisherClick
+          end
+          object btnTitle: TButton
+            Images = ToolbarImages
+            ImageIndex = 0
+            Position.X = 440.000000000000000000
+            Position.Y = 85.000000000000000000
+            Size.Width = 24.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 33
+            OnClick = btnTitleClick
+          end
+          object btnName: TButton
+            Images = ToolbarImages
+            ImageIndex = 0
+            Position.X = 296.000000000000000000
+            Position.Y = 50.000000000000000000
+            Size.Width = 24.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 32
+            OnClick = btnNameClick
+          end
+        end
+      end
+      object tbContext: TTabItem
+        CustomIcon = <
+          item
+          end>
+        IsSelected = False
+        Size.Width = 8.000000000000000000
+        Size.Height = 8.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = ''
+        TabOrder = 0
+        Text = 'Context'
+        ExplicitSize.cx = 8.000000000000000000
+        ExplicitSize.cy = 8.000000000000000000
+        object Label18: TLabel
+          StyledSettings = [Family, Size, FontColor]
+          Position.X = 8.000000000000000000
+          Position.Y = 8.000000000000000000
+          TextSettings.Font.StyleExt = {00070000000000000004000000}
+          Text = 'Codes'
+          TabOrder = 1
+        end
+        object Label19: TLabel
+          StyledSettings = [Family, Size, FontColor]
+          Position.X = 8.000000000000000000
+          Position.Y = 104.000000000000000000
+          TextSettings.Font.StyleExt = {00070000000000000004000000}
+          Text = 'Resource Types'
+          TabOrder = 0
+        end
+        object lbResources: TListBox
+          Anchors = [akLeft, akTop, akRight, akBottom]
+          Position.X = 8.000000000000000000
+          Position.Y = 128.000000000000000000
+          Size.Width = 929.000000000000000000
+          Size.Height = 601.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 2
+          Columns = 3
+          DisableFocusEffect = True
+          DefaultItemStyles.ItemStyle = ''
+          DefaultItemStyles.GroupHeaderStyle = ''
+          DefaultItemStyles.GroupFooterStyle = ''
+          ShowCheckboxes = True
+          OnChangeCheck = lbResourcesChangeCheck
+          Viewport.Width = 929.000000000000000000
+          Viewport.Height = 601.000000000000000000
+        end
+        object Grid1: TGrid
+          Anchors = [akLeft, akTop, akRight]
+          CanFocus = True
+          ClipChildren = True
+          Position.X = 8.000000000000000000
+          Position.Y = 32.000000000000000000
+          Size.Width = 929.000000000000000000
+          Size.Height = 65.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 3
+          Viewport.Width = 929.000000000000000000
+          Viewport.Height = 65.000000000000000000
+        end
+      end
+      object tbGrid: TTabItem
+        CustomIcon = <
+          item
+          end>
+        StyledSettings = []
+        IsSelected = False
+        Size.Width = 8.000000000000000000
+        Size.Height = 8.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = ''
+        TabOrder = 0
+        Text = 'tbGrid'
+        ExplicitSize.cx = 8.000000000000000000
+        ExplicitSize.cy = 8.000000000000000000
+        object Panel6: TPanel
+          Align = Top
+          Size.Width = 952.000000000000000000
+          Size.Height = 33.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          object btnAddItem: TButton
+            StyledSettings = []
+            Position.X = 6.000000000000000000
+            Position.Y = 6.000000000000000000
+            TabOrder = 0
+            Text = 'Add'
+            OnClick = btnAddItemClick
+          end
+          object btnAddChildItem: TButton
+            Position.X = 96.000000000000000000
+            Position.Y = 6.000000000000000000
+            TabOrder = 1
+            Text = 'Add Child'
+            OnClick = btnAddChildItemClick
+          end
+          object btnEditItem: TButton
+            Position.X = 184.000000000000000000
+            Position.Y = 6.000000000000000000
+            TabOrder = 3
+            Text = 'Edit'
+            OnClick = btnEditItemClick
+          end
+          object btnItemUp: TButton
+            Position.X = 280.000000000000000000
+            Position.Y = 6.000000000000000000
+            Size.Width = 41.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 7
+            Text = 'Up'
+            OnClick = btnItemUpClick
+          end
+          object btnItemDown: TButton
+            Position.X = 324.000000000000000000
+            Position.Y = 6.000000000000000000
+            Size.Width = 53.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 4
+            Text = 'Down'
+            OnClick = btnItemDownClick
+          end
+          object btnItemIn: TButton
+            Position.X = 380.000000000000000000
+            Position.Y = 6.000000000000000000
+            Size.Width = 41.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 6
+            Text = 'In'
+            OnClick = btnItemInClick
+          end
+          object btnItemOut: TButton
+            Position.X = 424.000000000000000000
+            Position.Y = 6.000000000000000000
+            Size.Width = 41.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 5
+            Text = 'Out'
+            OnClick = btnItemOutClick
+          end
+          object btnDeleteItem: TButton
+            Position.X = 480.000000000000000000
+            Position.Y = 6.000000000000000000
+            TabOrder = 2
+            Text = 'Delete'
+            OnClick = btnDeleteItemClick
+          end
+        end
+        object grdItems: TGrid
+          Align = Client
+          CanFocus = True
+          ClipChildren = True
+          Size.Width = 952.000000000000000000
+          Size.Height = 695.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 2
+          RowCount = 0
+          Options = [Editing, ColumnResize, ColumnMove, ColLines, RowLines, AlwaysShowSelection, Tabs, Header, HeaderClick, AutoDisplacement]
+          OnSelChanged = grdItemsSelChanged
+          OnGetValue = grdItemsGetValue
+          OnSetValue = grdItemsSetValue
+          OnCellDblClick = grdItemsCellDblClick
+          Viewport.Width = 952.000000000000000000
+          Viewport.Height = 695.000000000000000000
+          object StringColumn6: TStringColumn
+            Enabled = False
+            Header = 'Depth'
+            Size.Width = 49.000000000000000000
+          end
+          object StringColumn1: TStringColumn
+            Header = 'LinkId'
+            Size.Width = 71.000000000000000000
+          end
+          object StringColumn2: TStringColumn
+            Header = 'Definition (URI)'
+          end
+          object StringColumn3: TStringColumn
+            Header = 'Codes'
+          end
+          object StringColumn4: TStringColumn
+            Header = 'Prefix'
+          end
+          object StringColumn5: TStringColumn
+            Header = 'Text'
+          end
+          object PopupColumn1: TPopupColumn
+            Header = 'Type'
+          end
+          object CheckColumn1: TCheckColumn
+            Header = 'Req'
+          end
+          object CheckColumn2: TCheckColumn
+            Header = 'Rep'
+          end
+          object CheckColumn3: TCheckColumn
+            Header = 'R.O'
+          end
+        end
+        object Panel8: TPanel
+          Align = Bottom
+          Position.Y = 728.000000000000000000
+          Size.Width = 952.000000000000000000
+          Size.Height = 32.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 1
+          object Label20: TLabel
+            Position.X = 16.000000000000000000
+            Position.Y = 8.000000000000000000
+            Text = 'Search:'
+            TabOrder = 0
+          end
+          object edtSearch: TEdit
+            Touch.InteractiveGestures = [LongTap, DoubleTap]
+            TabOrder = 1
+            Position.X = 64.000000000000000000
+            Position.Y = 6.000000000000000000
+            Size.Width = 177.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+          end
+          object btnSearchStart: TButton
+            Position.X = 248.000000000000000000
+            Position.Y = 5.000000000000000000
+            Size.Width = 89.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 5
+            Text = 'From Start'
+          end
+          object btnSearchNext: TButton
+            Position.X = 336.000000000000000000
+            Position.Y = 5.000000000000000000
+            Size.Width = 89.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 4
+            Text = 'Next'
+          end
+          object btnSearchPrev: TButton
+            Position.X = 424.000000000000000000
+            Position.Y = 5.000000000000000000
+            Size.Width = 89.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+            Text = 'Prev'
+          end
+          object btnSearchEnd: TButton
+            Position.X = 512.000000000000000000
+            Position.Y = 5.000000000000000000
+            Size.Width = 89.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 2
+            Text = 'From End'
+          end
+          object CheckBox1: TCheckBox
+            Position.X = 608.000000000000000000
+            Position.Y = 6.000000000000000000
+            TabOrder = 7
+            Text = 'CheckBox1'
+          end
+        end
+      end
+      object tbForm: TTabItem
+        CustomIcon = <
+          item
+          end>
+        IsSelected = True
+        Size.Width = 8.000000000000000000
+        Size.Height = 8.000000000000000000
+        Size.PlatformDefault = False
+        StyleLookup = ''
+        TabOrder = 0
+        Text = 'tbForm'
+        ExplicitSize.cx = 8.000000000000000000
+        ExplicitSize.cy = 8.000000000000000000
+        object Panel1: TPanel
+          Align = Top
+          Size.Width = 952.000000000000000000
+          Size.Height = 30.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 0
+          object btnAddQuestionItem: TButton
+            Position.X = 8.000000000000000000
+            Position.Y = 4.000000000000000000
+            Size.Width = 97.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 1
+            Text = 'Add Item'
+            OnClick = btnAddQuestionItemClick
+          end
+          object Label12: TLabel
+            Position.X = 128.000000000000000000
+            Position.Y = 4.000000000000000000
+            Size.Width = 120.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            Text = 'Display Language:'
+            TabOrder = 2
+          end
+          object ComboBox1: TComboBox
+            Position.X = 240.000000000000000000
+            Position.Y = 4.000000000000000000
+            Size.Width = 201.000000000000000000
+            Size.Height = 22.000000000000000000
+            Size.PlatformDefault = False
+            TabOrder = 3
+          end
+        end
+      end
+    end
+  end
+  object ImageList1: TImageList
+    Source = <
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              01DA49444154384F75924F48545114C6BF19840852D06084221207C74583AB0C
+              C44C5250181171E9267421415A2A2AB468A59B41840217824B414544411137A3
+              0B11D1B085A2E0420297A6A5C108BE3FF7CD34DF99775FEF29FEE0BD7BEE9FEF
+              3BF79E7B43B8876C0E37144239DC30C09D412D6C9DAF923E31FED8487D3896F8
+              B651A043B1164EB42C48EB646DA88C42EF4C87F469E437F1022DD6C29FE9031C
+              5AABB01D07B18246440BE3B033163E4D7661EBCB8967223FBFF8CABCC0E6F514
+              87454C2C47C1B46CBC2A6A47C98308FAC6DE636FFC544CC2B2C2871693E1F219
+              4FCC76E3D79C3BF39FB0CEFE2D312BDB66567EFDCFA76581169B96829555D8B9
+              482139388678E753D9B9EC805566A176AF176531336B465E2C2159B582AF2FD7
+              60E54C0E2EBFBB3379BC23B040CCC6EF3ECC4C6E37CAC18D32DD11D7C0B85462
+              107B582B3B18F8919049D2B3D784EEED06BCDBAA13F1B3C2A88C9B57F9446156
+              92D7C2EB297F1447DA34E4AC1491B471E365B694427D6913067A0771B27C1EBC
+              05E36FDEB1E671B39C95229D558B6B9FBC9187E527F090AA87CAA4C264F36C1D
+              47BFF7258E1657E275E4ADC4431F3F7BD9D9F70C084D783D24399A945667A490
+              F8C524604068C2B6A22D227D0D85C42F26770C34DA48735B9807F807A7B917C7
+              C27B07C30000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\action_back.gif'
+          end>
+        Name = 'arrow left'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              01DC49444154384F75924F481B4114C69FA1904B3DC44304452809D14BF0A687
+              68954215A14A2F1E722AF654A86DA42442A1BDF56008F6520A42AF4521050F42
+              2F5541420E6DB107B5050F01F1D83F314A13E2CEEC66E37C6F7796DDD8FE6032
+              6F26F37DEFCDBCEDA2FFD056B821D3A570C300D736B570AE38CC6B609C99B4F3
+              F898E34EA3C002622D7C73EF03CFC06C095A5C4F730C23BF891768B1169ED48F
+              E8BBFCA8C4160DDEB84BF1EE2499B6A4CCDA432ABFAC7826FCE3175F882A951A
+              EFB0CD6220AD16350C83C622F3D4138ED252E111EDAF9EB249884FF8D062CD72
+              6C83C560FBD73ACF7E423AFBEB99F75C36B2EA81CC6065788BEACAC4B6DBF4F9
+              CF0EE5B3054A2EF473E55C015E197CA96FB20859315E0C16791FBC1DFD448629
+              E9B0F6D5DD71F0AE206D411259DD7BFF0B693B555D5AC2DD710D8C9A2A59BD70
+              229CA28610943D98E591F936C387C083F26D160F74C7792DCE9DAA437849B405
+              ED89DD54ADB22C12D2E4D15466408BA5FA6FB2779A9E3DC95265EB77B00BC685
+              E338DA33C577FD2B9A5C727A2FE589C7FA26A8D576CE69021FD248EE16BF3028
+              FDDCA51FD5038EE391211A8FDEE138F7F4B9971D6BCF00C004ED01F957799E75
+              4608815F0C020600269813F7A3BCD64008FC6270CD40A38D349D4207A22B78D2
+              0BD5554035370000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\action_forward.gif'
+          end>
+        Name = 'arrow right'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              020749444154384F75934D48545114C7FFF33EE64DE04463E8221745C3E422D1
+              4D9F9889496D22A222C48DB429C80F706126242E2A6916CAA0B6D11649E04282
+              20CAA00F8241A4859BD211C1411124B4D09582F9E6BD99EE39EFDE699EE60F66
+              FEE71ECEF9CFB9E7BD09601F7202193201810C7DEC49AAC69AA731848A0DCE85
+              0E9B78D730C3F16E23AF4242CDA73B8E2174C8C4E0FD9730B5207F0CCDC0B5F1
+              CA7C4DA1493E50CD039DC37C5EDA4A61617B0A56D0C4B9A25B8886AB38DF3671
+              9BA75126FC45CD1577CA30F02C81D5ED157CDBF888B015425037D880D4D475D4
+              16DD43C42AF1996864504872758275C776F0F8E41B3C8A8DF399486E8DC8E81F
+              1AFD7AEC7A29E24FE248AE7DC14E36035B34274E7D9025C083E363320216377F
+              60E8EA6BDE09F5FA2648AD7F677D51FD95B590F6A3AF90715DCCDAEF65C6236F
+              E0E632ACB6E3A269B2062DD357F84CF4CCDD446FBA81633251B5846F8268A45C
+              46C2485C4361BB8ED889B89AD013463D9CAC833F1B9E89469B4CBFFD8D8EB62E
+              5C28AD1313383C05ED42410B5526D170055AC71AF1B979FEFF4FA1FAC8C5BC09
+              5DE5EED425D8396A7670E6E00D64B2B6ACF4F0BD48F434FA86E2D0032692BF3E
+              6165731141434755F1599C2FB9CC750F475A31D99DF6BF480A6542249EF7B31E
+              302CD6AEFE4ED6E9BE65DFFFC167409009291959119373446AF4276B6133B1C7
+              40A18C14BB1B3D80BFD05EDC3713B3E2F80000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\action_up.gif'
+          end>
+        Name = 'arrow up'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              01FC49444154384F75924D4854511886DFB97F1638ABC2CC08429BA01ACB8DAB
+              4107C25AA82108320B216A91AD2C041782D622144D0734B45CB873A1486444B4
+              4954C8A4DF8D518B1AA69F8582863F64D4CCBDC799EEF7CD39E3DC111FB8F77B
+              CF37E77DEF3DDF5C1FF621ED2225E37391D2C39EA63206AF1EE33591DC74107B
+              BAC63A3FC89095217365FB09D6F77B07B9FE1349AE818622AEB42737242BE887
+              AAEE00EEB58CF0FAF5AF192C6DBC852D7670DC5F86F0914BD8493B686FEDE0B7
+              51217C23F3C587A7D11F19C3F2DFEF985D9D849D16B06D8164CAE1105B08844A
+              AA71D27FC613A25180C2D42CBCFBFD04059601CB67602C3487F1AA055886EE5E
+              0616575ECA9DBB68EAE923CD93886F7F72CD262CDDE0104581E6F664C8ABB579
+              4487FB7826E4E5373870C884A119F82A66A53913A2B072C2E29B5FA4CA903D82
+              EE3361EA3AEBCEC014EE9E9D664D3CA87C913D0A417B159E19945BF51C32F4F3
+              8AECEC727DF102D7E0E10AAE0A8D26F92CF211ADCF9B50E63F2FDBC0C0B766A9
+              80B60FB57C0C9A45B8B8061DB7F7F9178870618B54404F2C823B9F1BB3030D1F
+              ADE39A8BE743BA3C750EC3758F781DDF5EC29B3F8F91B41D9C3A1842696190FB
+              B7FA6FE07DF487F74352A81062A876022225E0A46CBE6E8E5E4362CBF198094F
+              004121542928B1EE702FB121B0D015639D6B26F60428549022DF9801F80F79EE
+              C5A55059476E0000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\action_down.gif'
+          end>
+        Name = 'arrow down'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              01AD49444154384FAD92BF4B425114C7BF2F4312420A0A8940684A9A1A131C82
+              40FF0387406C0C5A8226CBB16C2842826C8C1CFA17C4C1451C1D121A9EA04842
+              450899923F5FBEBAE778DFD397D1D4070EE778CFFD7E3D977714FCE04B20CB09
+              14812C4D2C07243E0A04E0F6FBE509A03D3E727E291671924E4F984CCBCCE2F3
+              5008C79797501A8DE159B90CDDE1E01A1E0F62EBEB7C6FDC840B437C108DA27E
+              73C30D7D30E03CD034CEBAC84B4E2762A9140EEFEFCD491412EF6E6DE13A91F8
+              534C68BD1EDC8B8BD84E2671F7F4C42653DC11744B2516522C9C9D99E2F77C1E
+              4B57572C369877BB650598060489285EF7F7E18AC759BC9ACB019188BC219EDB
+              6CCA6A88C5804635A2E8F399E26AADC67D63AA7AB5CA99B01810346AB35018FD
+              F3E9A939D96F580C8C771AE2CAF3332AE130566E6FF9FC374C03BB5898B6781F
+              851A0C42153BD0EB7438E877BFDB45BBD592B747987BB0B3B9898B8D0DD42A15
+              7CCACFF89335970B47990C62AA3ADA03EE08C64DE6DEDEF0D1EFCBCE9059BB1D
+              D16C96C5BAAEC366B3590D0832D9F37AB12CC6FE10231BCCCECCE0417C095A9E
+              7131613120C84496131863FF23C037FE85F6C2BCB2FAFE0000000049454E44AE
+              426082}
+            FileName = 'C:\data\Images\collection\16\action_stop.gif'
+          end>
+        Name = 'delete'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              02AA49444154384FA5535948545118FE66713233212D1DC7B47452B34C095B2C
+              2B912210A1022170D02088A24070C097E8AD90C0B7901EA2A7547C2A5F12D16C
+              C4169481286D1F5107CD599A6CC6B9B379EF596EF7DEB101899EFC0EE7FCF06F
+              E75FB159E8D6690ADD8E4E2BA7D44608BBC264C11CE50A93C2CF397A0995077A
+              5A7AE7939A496C70D03D666F660C3D85B9D6FC727335B6A66542E21202512FA6
+              E6C61158F9E9A3126D7F7C75F0D9BA090CEB54338E098927B507CE661F2EAC83
+              7FCD87F9A80BBEC4320C4603AA761F478406B7FBBDBF9A0E5DD8E7FA3834FB4D
+              B5D322B83FD651C224BCA9293D6929CDABC22BDF0BC463711099223D7D0B64E5
+              885C44455625265D2FF1D53DEF9539393D78CBB1A0571D80C9AD39D9BB2C7B77
+              EEC75BBF0309B2863849C05E7307370F7662550C2118F663CA3781DAB206184D
+              CC2211D6AA9A6A0E28E56D7B72CBF13DFC192BC20A84B880D558481569F0B897
+              40C4186291DF5816DCA82BAF0361B44D9519D587F078417A5A0616236EA56822
+              6E1FEB52D9293C6CEED7A87DD406CFEA022A738E808483052A2F190103622482
+              8824801888CAFA2F64C695C2C9F8ABA5399018F578428BC834664294E2B0BFBE
+              86EB4F2F6B0A2AD49FD5ABD7E961C92AC252C00D6A347A5499E68030DE37ED76
+              A228A3183211A16314D93BB6A9A2143893A1E73A1466156378C6A1A4CDFB547E
+              3202CAFA791C5EE7DC044E58CEC1A428524EB55F3B866D4AD8324C7A03EA4B1A
+              31323D847024EA55DAAA15461BA477839F42D517CB168381705398064C67ACE7
+              61D4A769E998146A55DA5B653E8A9199E7707E71C69469BD3173777652B5DD30
+              CA2D8F1A9B2549EC612639BFBEE214F2B2F295AA013F424B18FD300E4188FB18
+              27ED1FEEB952A3FCCF325D7AD0601519B5296929CB44CC31AEB488523F63BC17
+              646DE07DD7DC8665DA24803FBF785647FA74D6C80000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\add.png'
+          end>
+        Name = 'add'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              030749444154384F75936B48536118C79FBDE7CCB9E3DCA6D3CDDBDCA9B59977
+              EC6A170357D0452B0D1762863532880A340A2A2AD9872ED097E89B41E4A754A8
+              EC02157445C1F032F3D6D1744EB37959731777719ECD6DE9380931FCC1CB73DE
+              FFFBFE7F1F0EBC2C5883FCDA666E0EE938E9C390F38979B219B4DA0073F41F88
+              9961A427D2EAD234E9ED238A94BB6A6ED24E260E634D81F04F5F012F9213178B
+              E332DE44572E1387B1A6C066359B4C731698B3DB213282B3C0C461AC29400859
+              110B010B21E072385E2686B2DA5A2EF31962555072B3FEE055ADF6D3A96A8D66
+              656FB17BE697BB802F2FE38CDD5F5757873467AAAEA8B2B374775E7DAE0A9596
+              C1990922DA59480A84AAE474A1CA79BCBA7CC6E69578163DB0B4FCEFADB4FC86
+              71CE75BEAAB26A37CBBF04CFDA07D3991A60CC04E72643AB6DD11AE76705B60C
+              4D7BE4C89F2699B111A09F6503CE958B831091EA738E385ABF7DD11AFA5D77F5
+              FA4EFF4A6F55800E38356292508B655162C1463B9823462096A3021E5701EBC8
+              1898353940D7F3FEFACBE6C6FBFFCA2B8404E21BFC8A92BC9D0D1539E5E2631B
+              CE818C9F087CD208D3D007225F21441151E0B28DC192F757EBD8D0405BA8C980
+              811AB09C8CE447FB73B7A7201F17321276C06F8B01308E0F4C3405430338606E
+              020E17B0209E1FB98B4C5324AFCF4D1BA074FDF321C166753157245CB87622F3
+              8260ABE428F0F9029044CB401494C3A8A31B3A3A8DE01A76FA0FED2351566636
+              9E24966CC57CC1B214792A1DB9A772102B3A72AF26CADB550A2237EA34BD0185
+              701BBC1F6E00CAF9018CF3167075DB031EABF9F4E804D58001CA572A95313292
+              142852A4450863C7619B8A2B94D9D298D21ECF57407153205C92829E6E036340
+              0F5354100ECA8A5873EEC9BA96A7CFDB088268199F1C972488E3B3A5D254F8DC
+              3FFE18EB79D7D49BB7FF626064ACCFF2C3F193D059DF0A75663DDDDB6B6D542E
+              EE35E24181DB3048D51B0C06374551F31DDF3A5E100989D3069ADDFEF092E641
+              E8399FADAF6753E3AF79147CDC1CC1C65501604DD20EACA920B186CFF3468B9A
+              6E5DFEBE722F1C80BFD4D529A1444ECF520000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\Node 2  Add.png'
+          end>
+        Name = 'add child'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              02B049444154384FA593C14F134114C6BF6DA5220B54684DE8122D05140D46D0
+              A07880C4839C008560342180474F249E8C1C3CF91F4842B81121E1208278C5E8
+              811A30DA7080108345109452142C85966D7766767CBBD526C4232F79FB32B3F3
+              7EF3CD9B3738AA297F63D6DA06BF5408D3E8148CF7B074BA84D39C04A212E630
+              83189D79D4F035B332638700B7073E7718CCE80FB8A5EF9AFF240A5D4E7B3EAE
+              7304C35B5888243625646FE869D3B8FD832C0B681958E860FADEF3A6B35EF562
+              690136760C44E33A8429E1CE734273E722BCBD8F57534B49E9CAB91F7A76CB86
+              D880E681F9729EE2C1A64A55AB2A29C0C7D55D70CE50E32F22FD1273AB31280E
+              05D5BE7C7C8FED63722A1C914C690C0DDD59715800C67857A0506AE77D85980D
+              FF86A11B606913AD753EB45ED5C00866A40D2CFED84599D78D7395851A2DEAB2
+              723300C1BAEBCB3C588D2608C6C04C41D2392666D7314E4E7581C10D24741DDF
+              7EEDA1A1D60F85B1EE2CC088C74A8B0A8E617337092E84BDD8F2AE1BE5B69BC2
+              04DD0A043711DDD983573D8EE4AE5E9A05C4E89E24158B5334789A12044C1A2F
+              AEC57090A244839C097082708341DA9513D627035085736327998247CD81221D
+              36CC82482AA0D505D6EE261DCDA4A3B869F7ADBD7DA8AAB99105482E46A6177F
+              C07F4A056D0D4B4AFBF5325C385384BCDC1CF4B6D7D8B5E1E481123782C1650B
+              3E62E5DA62EA1EBE2C570E64B0E566A5162856F19E60965C61A9A028A5493A24
+              2E579DC6364BE3CDD8BB081CCEC6D044DF8ADD6A910F2F625A4DDBDAD2A7E566
+              4FC0E3BAE4F742A76BD35369BB8FBDC5F9A8ADD2B0913CC0DBB1A92470E24168
+              F2F18C957BA895EBEE0E754026FA2BAAFDBE86FA0A78F25D342BF1339EC2F4CC
+              12D6E7C39B702ABDA1D77DFFB7F23FBB726FB082DAB0D3618A1ED063A2A24071
+              29513AC7B050D8E8DCE493438FE98806FC012FC07090E01C64B6000000004945
+              4E44AE426082}
+            FileName = 'C:\data\Images\collection\16\information.png'
+          end>
+        Name = 'info'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              02F949444154384F4D934B4C13511486FF99E9D0879DB64162004525DA881A82
+              460D0BD1105F899898B8718389AC88C6B074A50B5DB8D0851B16181FF1B12026
+              B8C0A889E02B28BE125311821A6209A808A5D0964EDB69A79D3B9E7BA71A4E72
+              EE9C9C7BCF771EF78E049283E7873ADC4177BB226187A1C3E3D520FC62B569B1
+              198A8C459716D88BE4D4ECD9AF7DC74DB14F220E1EBE34FCE66ED78ECDB98C1E
+              D2020105B6D813620BDB463C5344EFA7147E4CE472C9E9C9CAA7DD6D05BEE3E2
+              8BAC489BCC5C36346B8694D822319DA4B06829956C18450BAD610D076B86D1AE
+              DFF329E1C67C76DB21203F7352E680A2A1FB354D532A14192A795C042013D412
+              2452998885B97E84F52154379EC0C67D1D58B7AB13E96CDD1501507D013AC60F
+              92F2008A5AAE416310567A1495E1DD3012DF604C7D8416A886E65E1B14002EBC
+              5797424A0417A576AA90E037DE22EC8E2058BF1F9639880ADF4F4C8F3CC1CBBE
+              3BB629CF3709000FE6B37249B293956C1EECD15F63ADFD0CC10D6DC8FFB90149
+              4D42F56BF0B2047ACDC3C5E6AEFE0907404A3373FA2D979D9F7A84CAEC20821B
+              8FD2AC7A20AB4598E9F588BDF902EFDE8B98B16A788848065672AAE01E0ECB4E
+              3E814F7F87555B8FC09CBB09A5C24621BD0EB1E108165B7A20AD6C8025C2FF01
+              984D00A78FB9C87D7853EFE9E1D46276AC9BA0796413AB11FBF01DFADE6B90FC
+              35F0A81292499EAA0CE0348BC7D3373E760B5B5A3AE1FE358C89876F313290C0
+              F8F311649A2FA3E4AB1515AA74C7F44278A8F39018D1185570E1B389C6681CE6
+              F863D437EDC1527C11D191285EB53EC0C254DDFFA0DE6A95D694B00520090B96
+              05D404548CFF98C7D5EB3DD8D5500FA3B6099903F7B04D5BE3DC14E9E87C892A
+              2523EF0C4100BC32638954CA36AD5552E8DC6F4C4A36A2E5FF8965E8763225AA
+              900074B5329390CBE98CE555518E009886150B5505AA4E4B0B2BE849CBBCD1F2
+              9011F48A2322BB9786A7EB69E6F77A74D35666B85FA4D9796AE04CB1641F9365
+              653B43C6C77D422868D947180578F22A4344B6EDDED1DB6DB7FE02CF224F1C4B
+              EB4D630000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\page_edit.png'
+          end>
+        Name = 'edit'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              033D49444154384F45525D6C5365187EBE737A5ACFDAB54D595999494B65C802
+              2C538CC022060513136720247801C8C285E1C264C9C00B2397CAA524461234D1
+              C805CEC89D4466743318D94C2460B6C160584857D66D8EFEEEB43DEDF9FBCEF1
+              3D5D33DEE4C997EF9CF779DEE77DDF8FA1158357177633D1F9E285B0DC5F376D
+              B8306D1BAA652B82C5ABDC231444300E1B65301421D8577C85C2D8BAC0C91FD3
+              437DB1C0971FED8FB6BEAC856A9018A1AC71182650D53932851A7E99AB949824
+              0E0BAD3C70CBEA0C7AD7F4B2AB1C2B8A8D42C58661013E49403C2461DB461FFA
+              37B7E1C84B517CB07753C4B6EA179E09E866D0EF012C9BAA180C0A555BD50145
+              5B43B101E46ABC99FBC9C802FA937EEC8CFAA3EB02B66946DABD025422A964B7
+              A651FFBA8D1AA1EA9E9A8386417994CB78057FA7CBB8935196A9E65A9896D619
+              9245280D0B75DD81203810495EE0AC798A70F05CE50F3C1ABF8C0F3B7AA14EFE
+              89F7786CE49903DD4A740625B2EB80DA86E110886C90EB06B523947E46247703
+              B1DEF7D17DE01412AF9E46979A1B5C17504C3D110BF968EA0E985B9131B83F5D
+              04AABF222ECD22B2F535344A7368646EA13D1843BB1C0F35058E5EB82A07B8E5
+              75A7ED5614C8AEDBAD43F0A913487A6E239C3C086E8CC1DBB68027D3A3981DBB
+              583490EB6B0AACE6E4A88F362810DC21B97C77A1727502DDEC7784B6BC036DF9
+              1B30A90C29D08E72EDB1EDA8A5B7F60CFD946A0A98A6D1E621AA876EA2AB423D
+              F08551C43991BB0F415BFA0A8264C2A86CC6D389197CB778F8E1CB67C6A75DAE
+              B0FFEC488765699FEDEE8963A5E220F39443498D2266DEC2C61D033056BE85E8
+              75A05712C84F4E21DBFB291ED43AD22ED90D416BE8076DB531F0CFDC3C2E8D3E
+              46FAE6D7D88ADBF4A0BAF0DFBD8BE44B835A7A1E999B0F507FE31216553F6CCD
+              CAB7F8B466D3D8F5EE9B3BE51FCE0DE0FCF117B11DD7B17DDF69F8B293485DFB
+              0BD3BF95F0EF8D194C443E861CEE42B55607E746B1C587C731CDF9958282EFC7
+              E7100EC848A5F330EE5F47B2EF7528F92296EEA571E0DC356CF26E818F9E5DBE
+              54A56D988B2D3ED82BC73EEFE0CC334CF34F30266CE8CC9E7F7B4F32CAF6F524
+              D9ACE677C69676314DDA80A05F4638D886BB0FB32988F689A92B67EF00C0FF58
+              86840309AFC32C0000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\script_edit.png'
+          end>
+        Name = 'conditions'
+      end>
+    Destination = <
+      item
+        Layers = <
+          item
+            Name = 'arrow left'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'arrow right'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'arrow up'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'arrow down'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'delete'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'add'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'add child'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'info'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'edit'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'conditions'
+          end>
+      end>
+    Left = 24
+    Top = 296
+  end
+  object ToolbarImages: TImageList
+    Source = <
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              02EE49444154384F7D535B489361187EFEFDCE79683A75CB531E42DC9C8A9993
+              0CCDD29AD212340A0A82C81673D28D7425413761045D0875531E4223892E422F
+              1C9958612975E129029DA98987340F736E6E4DE7E1DFFABE2F1157D0032FDFFB
+              BFA7EFFB9FF77D39FC858A8A8A5072647BBD5E25C771117FAC5821DF6382200C
+              34353539776D0C3E050C068356AD3955F9D31A5ADA3DB6269E5E70307B627408
+              7234B15B2AC9BC6978F0635D6363E33BE620E0774F9A5CA23C59DEF2B4D3923D
+              6971F3498764B8744689BC8C18B8DCDB181C5EE2FB2685D4A262AD2E512E320F
+              0D0D4DD03CD16EB23625B7FC596BF78CA2E5AE0E3B3B1E34DD298634D89F09D5
+              A98DFA5ABBA715E4A2669A437379BD5E2F4DCF3A7DBFBE6B59F3E6D105747C9A
+              823A311CC53909E81F5DA231C8CF8C85FDD72616AC2ED454E6A1AAB637B8E444
+              92343E46DEC9914A85E2B42B9DA6F7DFFDE322A5985D7440269520245802AB7D
+              8315889005C2E1DA84DDB989F8A810FC5872E2F2F1A86DC78C49E74798567D1E
+              98F337D596214C1A80C29BAFD0F6A01412318F96376656E0AA2E159BDB02CE56
+              B5E165CD39D89C6EE8EF75893512AF9272205F27241D495690EA52EC081E24C7
+              C9981E1612C084EAD4467D54A7B1AEF56D5A5BCE48DC0FCEB7B33E1071BE3EF2
+              7A811658090A10E3EB8485FCBF133CCF6172CECE749BC3CD84EAD42612714CA7
+              B10782C420C365DB23B1AB67CA5F192FC3B7191B0E8605229C3C7DDEE26237C5
+              2A82B14A0A2DDB3690921086F1593BCE6B148C443E3333D3AA4E50A40D4E09EA
+              56425E28619F325D7F5B0B8FD70B8D3A120F6F1560D1BA8E82AC38545F3B86E7
+              1D23D0A60BED96859927223ADBE6C10F8F0D652ACBC5EA76E46644E345E7289C
+              EB5BEC760A876B8B7584FA688CA12CC5324C721A1A1AD6F658A1A39C46A6B1AE
+              635CCEF322A41E0E676C8BFD78F48D2C925F5B8540BA70A3546519EF69BE4EF6
+              E135CDF3A1D5683416A98EE61BFFB74CE62FBDF5046F9983E09F9EED5B671539
+              2368AB886E2532E1F178FA7DD719F80DEBF55095B3FCC3250000000049454E44
+              AE426082}
+            FileName = 'C:\temp\flag-un.png'
+          end>
+        Name = 'lang-translations'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              031849444154384F5D537948147114FE7E33BBABCEB4EEA1E6E6B1AEA669D2A5
+              7647247440814545877F98662058111145FD5390051544440445649A050612D9
+              4165271911C4868B96769A6BA5AB2E1EBBCDBA3BBB33D3FCA692F483C7FC78EF
+              FBDE1BDE413001872A2B2D334283EB3859CE3728F264EA1309E90B28ACB32D4A
+              BE73EA52C38846FC8B71090EEF282B2A9D997BD61188CB60DFFE84B7D7A7F9E3
+              A7C42252900237EFEDBCDADABEF75875ED5D2DA082FDFBC5911D659B76CE2E6C
+              B03779E2989FAA30C50CB23C078659C9D0074530EF3CB07E0E597296CEDDCC27
+              993A5EB4B8DAA94E4B402B53B1EDD50FD67F782DA29E7420746E1BEE79083E73
+              264C2D5F08DD4D27FCC7D723AEDEC94C9F376B0397646E696E717D620F566C32
+              6DCFCEBB6D7FECB18E9E2F81FE6507588715BAC5D9E0DA3A912407119F670746
+              7C205E1FC45D2B6139F39C495D92BA884FCFAC23D74BB7946C99B6AA4E7CFA05
+              5CA21182C707DE1805F0AA0D8FD21F04CC31801082E00F81B7C522D0E747D48A
+              4CDCF8F268BB8E23D25C9DF30784B3C5106239182A6AE03F5D0CC6A0037FF78D
+              A6178AE643162388DE7D0DC289CD88F802E08E368233CAF98C415112956018A6
+              1C3BF8A47844241946870D7CAA1D5D16AB66F44D7D344639948B40187A28898C
+              56E23F90F1931D07864C88299018BA24245A8F910FDD107ABC605902BFDB03E1
+              7B371C43839AD137F5310CD138940B4E8F3021DEB12692E66F60ED6684DD43D0
+              5BD4A6C5460303C29F4A093CE00B223C340A7D9A0552F730B02C5D6B229BB520
+              D79D9162DD1AF735640EAACD03C7426733AA9BB5115D60309C9B02F3813540FF
+              2022F969089717427FCF85CE5CA5AB6938B88FA1BB5DD7FA7E4FDFEA4C29667F
+              3DC43969C0C30E88EAD828DC2C07F15708CA83762D46399E35D324AA3979E1C2
+              D05857E82A57E62DAFB7DDFFC482557B9B6E05B21220EB5830EF3D6AA641409D
+              42EFEA2CE9A2EB597155756D03D58DDD02DDED49C91657EAA2E40526DB140BF3
+              7100DED75D186DED01A7C623F3EDF8365DEABCD2E62CAFBA5C73EB8F6AC23552
+              FC3BE7182952602064321D9508A53F20332DEF62D038FE9C81DFAF6C46932BBC
+              81760000000049454E44AE426082}
+            FileName = 'C:\temp\flag-un.png'
+          end>
+        Name = 'flag-2'
+      end>
+    Destination = <
+      item
+        Layers = <
+          item
+            Name = 'lang-translations'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'flag-2'
+          end>
+      end>
+    Left = 24
+    Top = 350
+  end
+end

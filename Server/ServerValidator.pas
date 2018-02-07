@@ -1,10 +1,38 @@
 Unit ServerValidator;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 Interface
 
 Uses
-  SysUtils, Classes, ActiveX, ComObj,
-  MsXml, MsXmlParser,
+  SysUtils, Classes,
   StringSupport, kCritSct,
   AdvObjects, AdvGenerics, AdvBuffers, AdvNameBuffers, AdvMemories, AdvVclStreams, AdvZipReaders, AdvZipParts,
   FHIRTypes, FHIRResources, FHIRValidator, FHIRParser, FHIRContext, FHIRUtilities, FHIRSupport, FHIRProfileUtilities, FHIRConstants,
@@ -27,6 +55,7 @@ Type
 
     Function Link : TFHIRServerWorkerContext; overload;
 
+    procedure checkResource(r : TFhirResource);
     procedure SeeResource(r : TFhirResource); override;
 
     Property TerminologyServer : TTerminologyServer read FTerminologyServer write SetTerminologyServer;
@@ -34,9 +63,9 @@ Type
     function fetchResource(t : TFhirResourceType; url : String) : TFhirResource; override;
 
     function expand(vs : TFhirValueSet) : TFHIRValueSet; override;
-    function supportsSystem(system : string) : boolean; override;
-    function validateCode(system, code, display : String) : TValidationResult; override;
-    function validateCode(system, code, version : String; vs : TFHIRValueSet) : TValidationResult; override;
+    function supportsSystem(system, version : string) : boolean; override;
+    function validateCode(system, version, code, display : String) : TValidationResult; override;
+    function validateCode(system, version, code : String; vs : TFHIRValueSet) : TValidationResult; override;
     function validateCode(code : TFHIRCoding; vs : TFhirValueSet) : TValidationResult; override;
     function validateCode(code : TFHIRCodeableConcept; vs : TFhirValueSet) : TValidationResult; override;
 
@@ -45,6 +74,12 @@ Type
 Implementation
 
 { TFHIRServerWorkerContext }
+
+procedure TFHIRServerWorkerContext.checkResource(r: TFhirResource);
+begin
+  r.checkNoImplicitRules('Repository.SeeResource', 'Resource');
+  TFhirDomainResource(r).checkNoModifiers('Repository.SeeResource', 'Resource');
+end;
 
 constructor TFHIRServerWorkerContext.Create;
 begin
@@ -73,8 +108,7 @@ end;
 
 procedure TFHIRServerWorkerContext.SeeResource(r : TFhirResource);
 begin
-  r.checkNoImplicitRules('Repository.SeeResource', 'Resource');
-  TFhirDomainResource(r).checkNoModifiers('Repository.SeeResource', 'Resource');
+  checkResource(r);
   if (r.ResourceType in [frtValueSet, frtConceptMap {$IFDEF FHIR3}, frtCodeSystem{$ENDIF}]) then
     FTerminologyServer.SeeSpecificationResource(r)
   else if r.resourceType = frtQuestionnaire then
@@ -93,7 +127,7 @@ begin
     inherited SeeResource(r);
 end;
 
-function TFHIRServerWorkerContext.validateCode(system, code, version: String; vs: TFHIRValueSet): TValidationResult;
+function TFHIRServerWorkerContext.validateCode(system, version, code: String; vs: TFHIRValueSet): TValidationResult;
 var
   c : TFHIRCoding;
   p : TFHIRParameters;
@@ -103,7 +137,7 @@ begin
     c.system := system;
     c.code := code;
     c.version := version;
-    p := FTerminologyServer.validate(vs, c, false);
+    p := FTerminologyServer.validate(vs, c, FProfile, false);
     try
       result := TValidationResult.Create;
       try
@@ -163,12 +197,12 @@ begin
   result := FTerminologyServer.expandVS(vs, '', FProfile, '', 0, 0, 0);
 end;
 
-function TFHIRServerWorkerContext.supportsSystem(system : string) : boolean;
+function TFHIRServerWorkerContext.supportsSystem(system, version : string) : boolean;
 begin
-  result := FTerminologyServer.supportsSystem(system);
+  result := FTerminologyServer.supportsSystem(system, version);
 end;
 
-function TFHIRServerWorkerContext.validateCode(system, code, display : String) : TValidationResult;
+function TFHIRServerWorkerContext.validateCode(system, version, code, display : String) : TValidationResult;
 var
   op : TFHIROperationOutcome;
 begin
@@ -176,7 +210,7 @@ begin
   try
     result := TValidationResult.Create;
     try
-      if FTerminologyServer.checkCode(op, '', code, system, display) then
+      if FTerminologyServer.checkCode(op, 'en', '', code, system, version, display) then
         result.Severity := IssueSeverityNull
       else if op.issueList.Count = 1 then
       begin
@@ -207,7 +241,7 @@ var
 begin
   result := TValidationResult.Create;
   try
-    p := FTerminologyServer.validate(vs, code, false);
+    p := FTerminologyServer.validate(vs, code, nil, false);
     try
       result.Message := p.str['result'];
       if p.bool['result'] then
@@ -230,7 +264,7 @@ var
 begin
   result := TValidationResult.Create;
   try
-    p := FTerminologyServer.validate(vs, code, false);
+    p := FTerminologyServer.validate(vs, code, FProfile, false);
     try
       result.Message := p.str['message'];
       if p.bool['result'] then
@@ -247,4 +281,5 @@ begin
 end;
 
 end.
+
 

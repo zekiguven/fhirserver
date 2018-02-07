@@ -1,5 +1,9 @@
 unit DBInstaller;
 
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 {
 Copyright (c) 2001-2013, Health Intersections Pty Ltd (http://www.healthintersections.com.au)
 All rights reserved.
@@ -31,7 +35,7 @@ POSSIBILITY OF SUCH DAMAGE.
 interface
 
 uses
-  SysUtils, Classes, GuidSupport,
+  SysUtils, Classes, GuidSupport, ThreadSupport,
   AdvObjects, AdvExceptions,
   KDBManager, KDBDialects, TextUtilities,
   FHIRBase, FHIRResources, FHIRConstants, FHIRIndexManagers, FHIRUtilities,
@@ -43,7 +47,21 @@ const
 //  ServerDBVersion = 5; // added scores to search entries table
 //  ServerDBVersion = 6; // added reverse to search entries table
 //  ServerDBVersion = 7; // changed compartment table. breaking change
-  ServerDBVersion = 8; // added ImplementationGuide column to Types table
+//  ServerDBVersion = 8; // added ImplementationGuide column to Types table
+//  ServerDBVersion = 9; // added Observations Table
+//  ServerDBVersion = 10; // added ForTesting flag
+//  ServerDBVersion = 11; // added ResourcePreviousVersion field to SubscriptionQueue
+//  ServerDBVersion = 12; // rework Observations Table (can't do this as an upgrade)
+//  ServerDBVersion = 13; // add Observations.ConceptList
+//  ServerDBVersion = 14; // add Authorizations
+//   ServerDBVersion = 15; // add Uuid to Authorizations
+//  ServerDBVersion = 16; // add PatientId to Authorizations
+//  ServerDBVersion = 17; // add AuthorizationSessions and Connections
+//  ServerDBVersion = 18; // add AsyncTasks
+//  ServerDBVersion = 19; // add RegisteredClients
+//  ServerDBVersion = 20; // add PseudoData
+//  ServerDBVersion = 21; // add ClientRegistrations.PatientContext
+  ServerDBVersion = 22; // add AsyncTasks.Request and AsyncTasks.TransactionTime
 
   // config table keys
   CK_Transactions = 1;   // whether transactions and batches are allowed or not
@@ -59,12 +77,12 @@ const
 Type
   TFHIRDatabaseInstaller = class (TAdvObject)
   private
+    Fcallback : TInstallerCallback;
     FConn : TKDBConnection;
     FDoAudit: boolean;
     FTransactions: boolean;
     FBases: TStringList;
     FSupportSystemHistory: boolean;
-    FTextIndexing: boolean;
     FTxPath : String;
     procedure CreateResourceCompartments;
     procedure CreateResourceConfig;
@@ -94,7 +112,16 @@ Type
     procedure DefineResourceSpaces;
     procedure DoPostTransactionInstall;
     procedure DoPostTransactionUnInstall;
-    procedure CreateCodeSystems;
+    procedure CreateUnii;
+    procedure CreateObservations;
+    procedure CreateObservationCodes;
+    procedure CreateObservationQueue;
+    procedure CreateAuthorizations;
+    procedure CreateAuthorizationSessions;
+    procedure CreateConnections;
+    procedure CreateAsyncTasks;
+    procedure CreateClientRegistrations;
+    procedure CreatePseudoData;
     procedure runScript(s : String);
   public
     Constructor create(conn : TKDBConnection; txpath : String);
@@ -106,20 +133,25 @@ Type
     procedure Install(scim : TSCIMServer);
     Procedure Uninstall;
     Procedure Upgrade(version : integer);
-    Property TextIndexing : boolean read FTextIndexing write FTextIndexing;
-
+    property callback : TInstallerCallback read Fcallback write Fcallback;
   end;
 
 implementation
 
-Function ForeignKeySql(Conn: TKDBConnection; Const sSlaveTable, sSlaveField, sMasterTable, sMasterField, sIndexName : String; b2 : Boolean = false) : String;
+Function ForeignKeySql(Conn: TKDBConnection; Const sSlaveTable, sSlaveField, sMasterTable, sMasterField, sIndexName : String) : String;
 Begin
-  if b2 Then
-    Result := 'ALTER TABLE '+sSlaveTable+' ADD CONSTRAINT '+sIndexName+' '+
-            'FOREIGN KEY ( '+sSlaveField+' ) REFERENCES '+sMasterTable+' ( '+sMasterField+' )'
-  Else
-    Result := 'ALTER TABLE '+sSlaveTable+' ADD CONSTRAINT '+sIndexName +' '+
-            'FOREIGN KEY ( '+sSlaveField+' ) REFERENCES '+sMasterTable+' ( '+sMasterField+' )';
+  if conn.Owner.Platform = kdbSQLite then
+    result := ''
+  else
+    Result := 'ALTER TABLE '+sSlaveTable+' ADD CONSTRAINT '+sIndexName+' '+ 'FOREIGN KEY ( '+sSlaveField+' ) REFERENCES '+sMasterTable+' ( '+sMasterField+' )';
+End;
+
+Function InlineForeignKeySql(Conn: TKDBConnection; Const sSlaveTable, sSlaveField, sMasterTable, sMasterField, sIndexName : String) : String;
+Begin
+  if conn.Owner.Platform <> kdbSQLite then
+    result := ''
+  else
+    result := 'FOREIGN KEY('+sSlaveField+') REFERENCES '+sMasterTable+'('+sMasterField+')';
 End;
 
 
@@ -146,6 +178,7 @@ begin
        ' Created '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+',  '+#13#10+
        ' Expiry '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+',  '+#13#10+
        ' Closed '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+',  '+#13#10+
+       InlineForeignKeySql(FConn, 'Sessions', 'UserKey', 'Users', 'UserKey', 'FK_Session_UserKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_Sessions', 'SessionKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL('Create INDEX SK_Sessions_Id ON Sessions (Provider, Id, Name)');
   FConn.ExecSQL('Create INDEX SK_Sessions_Name ON Sessions (Name, Created)');
@@ -164,7 +197,7 @@ begin
        ' Code nchar(200) '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' Display nchar(200) '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        PrimaryKeyType(FConn.owner.Platform, 'PK_Tags', 'TagKey')+') '+CreateTableInfo(FConn.owner.platform));
-  FConn.ExecSQL('Create Unique INDEX SK_Tags_Uri ON Tags (Kind, Uri, Code)');
+//  this is dsiabled because of a case sensitivity issue... FConn.ExecSQL('Create Unique INDEX SK_Tags_Uri ON Tags (Kind, Uri, Code)');
   // pre-registering common tags
   FConn.ExecSQL('Insert into Tags (Tagkey, Kind, Uri, Code, Display) values (1,  1, ''http://hl7.org/fhir/v3/Confidentiality'', ''U'', ''Confidentiality = none'')');
   FConn.ExecSQL('Insert into Tags (Tagkey, Kind, Uri, Code, Display) values (2,  1, ''http://hl7.org/fhir/v3/Confidentiality'', ''L'', ''Confidentiality = Low'')');
@@ -248,6 +281,89 @@ Begin
   FConn.ExecSQL('Insert into Config (ConfigKey, Value) values (8, '''+FHIR_GENERATED_VERSION+''')');
 End;
 
+procedure TFHIRDatabaseInstaller.CreateAuthorizations;
+begin
+  FConn.ExecSQL('CREATE TABLE Authorizations( '+#13#10+
+       ' AuthorizationKey '+DBKeyType(FConn.owner.platform)+'   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  // internal primary key
+       ' Uuid             char(36)                              '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  // GUID used externally
+       ' PatientKey       '+DBKeyType(FConn.owner.platform)+'   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // id of resource changed
+       ' PatientId        char(64)                              '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // id of resource changed
+       ' ConsentKey       '+DBKeyType(FConn.owner.platform)+'   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // id of resource changed
+       ' SessionKey       '+DBKeyType(FConn.owner.platform)+'   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // id of resource changed
+       ' Status           int                                   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+      // whether added or deleted
+       ' Expiry           '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+        // observation.effectiveTime Stated (null = range)
+       ' JWT              '+DBBlobType(FConn.owner.platform)+'   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // id of resource changed
+       InlineForeignKeySql(FConn, 'Authorizations', 'PatientKey', 'Ids', 'ResourceKey', 'FK_Authorizations_PatKey')+
+       InlineForeignKeySql(FConn, 'Authorizations', 'ConsentKey', 'Ids', 'ResourceKey', 'FK_Authorizations_ConsKey')+
+       InlineForeignKeySql(FConn, 'Authorizations', 'SessionKey', 'Sessions', 'SessionKey', 'FK_Authorizations_SessionKey')+
+       PrimaryKeyType(FConn.owner.Platform, 'PK_Authorizations', 'AuthorizationKey')+') '+CreateTableInfo(FConn.owner.platform));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Authorizations', 'PatientKey', 'Ids', 'ResourceKey', 'FK_Authorizations_PatKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Authorizations', 'ConsentKey', 'Ids', 'ResourceKey', 'FK_Authorizations_ConsKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Authorizations', 'SessionKey', 'Sessions', 'SessionKey', 'FK_Authorizations_SessionKey'));
+  FConn.ExecSQL('Create INDEX SK_Authorizations_Uuid ON Authorizations (Uuid)');
+end;
+
+procedure TFHIRDatabaseInstaller.CreateAuthorizationSessions;
+begin
+  FConn.ExecSQL('CREATE TABLE AuthorizationSessions( '+#13#10+
+       ' AuthorizationSessionKey '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' AuthorizationKey        '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' DateTime                '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+    //
+       ' Message                 nchar(255)                               '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' SessionKey              '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+   //
+       InlineForeignKeySql(FConn, 'AuthorizationSessions', 'AuthorizationKey', 'Authorizations', 'AuthorizationKey', 'FK_AuthorizationSessions_AuthKey')+
+       InlineForeignKeySql(FConn, 'AuthorizationSessions', 'SessionKey', 'Sessions', 'SessionKey', 'FK_AuthorizationSessions_SessKey')+
+       PrimaryKeyType(FConn.owner.Platform, 'PK_AuthorizationSessions', 'AuthorizationSessionKey')+') '+CreateTableInfo(FConn.owner.platform));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'AuthorizationSessions', 'AuthorizationKey', 'Authorizations', 'AuthorizationKey', 'FK_AuthorizationSessions_AuthKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'AuthorizationSessions', 'SessionKey', 'Sessions', 'SessionKey', 'FK_AuthorizationSessions_SessKey'));
+  FConn.ExecSQL('Create INDEX SK_Authorizations_AKey ON AuthorizationSessions (AuthorizationKey)');
+end;
+
+procedure TFHIRDatabaseInstaller.CreateClientRegistrations;
+begin
+  FConn.ExecSQL('CREATE TABLE ClientRegistrations ( '+#13#10+
+       ' ClientKey         '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' DateRegistered    '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+    //
+       ' SessionRegistered '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+    //
+       ' SoftwareId        nchar(128)                               '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+    //
+       ' SoftwareVersion   nchar(128)                               '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' Uri               nchar(255)                               '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' LogoUri           nchar(255)                               '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' Name              nchar(255)                               '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' PatientContext    int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Mode              int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Secret            nchar(36)                                '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' JwksUri           nchar(255)                               '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' Issuer            nchar(255)                               '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' SoftwareStatement '+DBBlobType(FConn.owner.platform)+'     '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' PublicKey         '+DBBlobType(FConn.owner.platform)+'     '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' Scopes            '+DBBlobType(FConn.owner.platform)+'     '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' Redirects         '+DBBlobType(FConn.owner.platform)+'     '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       InlineForeignKeySql(FConn, 'ClientRegistrations', 'SessionRegistered', 'Sessions', 'SessionKey', 'FK_ClientRegistrations_SessionKey')+
+       PrimaryKeyType(FConn.owner.Platform, 'PK_ClientRegistrations', 'ClientKey')+') '+CreateTableInfo(FConn.owner.platform));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'ClientRegistrations', 'SessionRegistered', 'Sessions', 'SessionKey', 'FK_ClientRegistrations_SessionKey'));
+  FConn.ExecSQL('Insert into ClientRegistrations (ClientKey, DateRegistered, Name, Mode, PatientContext) values (1, '+DBGetDate(FConn.Owner.Platform)+', ''Web Interface'', 0, 0)');
+end;
+
+procedure TFHIRDatabaseInstaller.CreatePseudoData;
+begin
+  FConn.ExecSQL('CREATE TABLE PseudoData ( '+#13#10+
+       ' PseudoDataKey  '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' ResourceType   int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+    //
+       ' Id             nchar(64)                                '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+    //
+       ' Given          nchar(32)                                '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+    //
+       ' Family         nchar(32)                                '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' Line           nchar(255)                               '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' City           nchar(32)                                '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' State          nchar(10)                                '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' PostCode       int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Telecom        nchar(20)                                '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       ' Photo          '+DBBlobType(FConn.owner.platform)+'     '+ColCanBeNull(FConn.owner.platform, True )+', '+#13#10+  //
+       PrimaryKeyType(FConn.owner.Platform, 'PK_PseudoData', 'PseudoDataKey')+') '+CreateTableInfo(FConn.owner.platform));
+  FConn.ExecSQL('Create INDEX SK_PseudoData ON PseudoData (ResourceType, Id)');
+end;
+
+
 procedure TFHIRDatabaseInstaller.CreateClosureEntries;
 begin
   FConn.ExecSQL('CREATE TABLE ClosureEntries ( '+#13#10+
@@ -256,6 +372,9 @@ begin
        ' SubsumesKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' SubsumedKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' IndexedVersion int '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'ClosureEntries', 'ClosureKey',  'Closures', 'ClosureKey', 'FK_ClosureEntries_ConceptKey')+
+       InlineForeignKeySql(FConn, 'ClosureEntries', 'SubsumesKey', 'Concepts', 'ConceptKey', 'FK_ClosureEntries_SubsumesKey')+
+       InlineForeignKeySql(FConn, 'ClosureEntries', 'SubsumedKey', 'Concepts', 'ConceptKey', 'FK_ClosureEntries_SubsumedKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_ClosureEntries', 'ClosureEntryKey')+') '+CreateTableInfo(FConn.owner.platform));
 
   FConn.ExecSQL('Create INDEX SK_ClosureEntries_Subsumes ON ClosureEntries (ClosureKey, SubsumesKey)');
@@ -277,12 +396,23 @@ begin
   FConn.ExecSQL('Create INDEX SK_Closure_Name ON Closures (Name)');
 end;
 
-procedure TFHIRDatabaseInstaller.CreateCodeSystems;
+procedure TFHIRDatabaseInstaller.CreateUnii;
 begin
-  runScript('tx_db.sql');
-  runScript('us-state-codes.sql');
-  runScript('area-codes.sql');
-  runScript('country-codes.sql');
+  FConn.ExecSQL('CREATE TABLE Unii ('+#13#10+
+  	'UniiKey int NOT NULL,'+#13#10+
+  	'Code nchar(20) NOT NULL,'+#13#10+
+  	'Display nchar(255) NULL,'+#13#10+
+    PrimaryKeyType(FConn.owner.Platform, 'PK_Unii', 'UniiKey')+') '+CreateTableInfo(FConn.owner.platform));
+
+  FConn.ExecSQL('CREATE TABLE UniiDesc ('+#13#10+
+   	'UniiDescKey int NOT NULL, '+#13#10+
+  	'UniiKey int NOT NULL, '+#13#10+
+  	'Type nchar(20) NOT NULL, '+#13#10+
+ 	  'Display nchar(255) NULL, '+#13#10+
+       InlineForeignKeySql(FConn, 'UniiDesc', 'UniiKey',  'Unii', 'UniiKey', 'FK_UniiDesc_UniiKey')+
+    PrimaryKeyType(FConn.owner.Platform, 'PK_UniiDesc', 'UniiDescKey')+') '+CreateTableInfo(FConn.owner.platform));
+
+  FConn.ExecSQL(ForeignKeySql(FConn, 'UniiDesc', 'UniiKey',  'Unii', 'UniiKey', 'FK_UniiDesc_UniiKey'));
 end;
 
 procedure TFHIRDatabaseInstaller.CreateConcepts;
@@ -296,6 +426,22 @@ begin
   FConn.ExecSQL('Create INDEX SK_Concepts_Name ON Concepts (URL, Code)');
 end;
 
+procedure TFHIRDatabaseInstaller.CreateConnections;
+begin
+  FConn.ExecSQL('CREATE TABLE Connections( '+#13#10+
+       ' ConnectionKey   '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' SourceUrl          nchar(255)                               '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Expiry          '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+    //
+       ' Status          int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Consent         char(64)                                 '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+   //
+       ' AuthToken       char(64)                                 '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+   //
+       ' Patient         char(64)                                 '+ColCanBeNull(FConn.owner.platform, True)+ ', '+#13#10+   //
+       ' JWT             '+DBBlobType(FConn.owner.platform)+'                                    '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+   //
+       PrimaryKeyType(FConn.owner.Platform, 'PK_Connections', 'ConnectionKey')+') '+CreateTableInfo(FConn.owner.platform));
+end;
+
+
+
 procedure TFHIRDatabaseInstaller.CreateNotificationQueue;
 begin
   FConn.ExecSQL('CREATE TABLE NotificationQueue ( '+#13#10+
@@ -308,6 +454,8 @@ begin
        ' ErrorCount int                                          '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+
        ' Abandoned '+     DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+
        ' Handled '+       DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'NotificationQueue', 'SubscriptionKey','Ids', 'ResourceKey', 'FK_NotificationQ_SubVerKey')+
+       InlineForeignKeySql(FConn, 'NotificationQueue', 'ResourceVersionKey',    'Versions', 'ResourceVersionKey', 'FK_NotificationQ_ResVerKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_NotificationQueue', 'NotificationQueueKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL(ForeignKeySql(FConn, 'NotificationQueue', 'SubscriptionKey','Ids', 'ResourceKey', 'FK_NotificationQ_SubVerKey'));
   FConn.ExecSQL(ForeignKeySql(FConn, 'NotificationQueue', 'ResourceVersionKey',    'Versions', 'ResourceVersionKey', 'FK_NotificationQ_ResVerKey'));
@@ -321,7 +469,6 @@ begin
        ' Client nchar(48) NOT NULL, '+#13#10+
        ' Scope nchar(255) NOT NULL, '+#13#10+
        ' Redirect nchar(255) NOT NULL, '+#13#10+
-       ' ClientState nchar(255) NOT NULL, '+#13#10+
        ' Patient nchar(64) NULL, '+#13#10+
        ' Status int NOT NULL, '+#13#10+
        ' DateAdded '+DBDateTimeType(FConn.owner.platform)+' NOT NULL, '+#13#10+
@@ -329,12 +476,76 @@ begin
        ' DateChosen '+DBDateTimeType(FConn.owner.platform)+' NULL, '+#13#10+
        ' DateTokenAccessed '+DBDateTimeType(FConn.owner.platform)+' NULL, '+#13#10+
        ' SessionKey '+DBKeyType(FConn.owner.platform)+' NULL, '+#13#10+
+       ' ClientState '+DBBlobType(FConn.owner.platform)+' NOT NULL, '+#13#10+
        ' Rights '+DBBlobType(FConn.owner.platform)+' Null, '+#13#10+
        ' Jwt '+DBBlobType(FConn.owner.platform)+' Null, '+#13#10+
+       InlineForeignKeySql(FConn, 'OAuthLogins', 'SessionKey', 'Sessions', 'SessionKey', 'FK_OUathLogins_SessionKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_OAuthLogins', 'Id')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL(ForeignKeySql(FConn, 'OAuthLogins', 'SessionKey', 'Sessions', 'SessionKey', 'FK_OUathLogins_SessionKey'));
 end;
 
+
+procedure TFHIRDatabaseInstaller.CreateObservations;
+begin
+  FConn.ExecSQL('CREATE TABLE Observations( '+#13#10+
+       ' ObservationKey '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  // internal primary key
+       ' ResourceKey    '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // id of resource this came from
+       ' SubjectKey     '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+      // id of resource this observation is about
+       ' DateTime       '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+        // observation.effectiveTime Stated (null = range)
+       ' DateTimeMin    '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // observation.effectiveTime Min
+       ' DateTimeMax    '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // observation.effectiveTime Max
+       ' Value          '+DBFloatType(FConn.owner.platform)+'    '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+                 // stated value (if available)
+       ' ValueUnit      '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+             // stated units (if available)
+       ' Canonical      '+DBFloatType(FConn.owner.platform)+'    '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+             // canonical value (if units)
+       ' CanonicalUnit  '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+         // canonical units (if canonical value)
+       ' ValueConcept   '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+          // if observation is a concept (or a data missing value)
+       ' IsComponent    int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+          // if observation is a concept (or a data missing value)
+       ' CodeList       nchar(30)                                '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+          // roll up of observations as an optimization for grouping
+       InlineForeignKeySql(FConn, 'Observations', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_Observations_ResKey')+
+       InlineForeignKeySql(FConn, 'Observations', 'SubjectKey', 'Ids', 'ResourceKey', 'FK_Observations_SubjKey')+
+       InlineForeignKeySql(FConn, 'Observations', 'ValueUnit', 'Concepts', 'ConceptKey', 'FK_Observations_ValueUnitKey')+
+       InlineForeignKeySql(FConn, 'Observations', 'CanonicalUnit', 'Concepts', 'ConceptKey', 'FK_Observations_CanonicalUnitKey')+
+       InlineForeignKeySql(FConn, 'Observations', 'ValueConcept', 'Concepts', 'ConceptKey', 'FK_Observations_ValueConceptKey')+
+       PrimaryKeyType(FConn.owner.Platform, 'PK_Observations', 'ObservationKey')+') '+CreateTableInfo(FConn.owner.platform));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Observations', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_Observations_ResKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Observations', 'SubjectKey', 'Ids', 'ResourceKey', 'FK_Observations_SubjKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Observations', 'ValueUnit', 'Concepts', 'ConceptKey', 'FK_Observations_ValueUnitKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Observations', 'CanonicalUnit', 'Concepts', 'ConceptKey', 'FK_Observations_CanonicalUnitKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Observations', 'ValueConcept', 'Concepts', 'ConceptKey', 'FK_Observations_ValueConceptKey'));
+  FConn.ExecSQL('Create INDEX SK_Obs_Dt1 ON Observations (SubjectKey, IsComponent, DateTimeMin)');
+  FConn.ExecSQL('Create INDEX SK_Obs_Dt2 ON Observations (SubjectKey, IsComponent, DateTimeMax)');
+  FConn.ExecSQL('Create INDEX SK_Obs_Dt3 ON Observations (DateTimeMin)');
+  FConn.ExecSQL('Create INDEX SK_Obs_Dt4 ON Observations (DateTimeMax)');
+  FConn.ExecSQL('Create INDEX SK_Obs_CL ON Observations (CodeList)');
+end;
+
+procedure TFHIRDatabaseInstaller.CreateObservationCodes;
+begin
+  FConn.ExecSQL('CREATE TABLE ObservationCodes( '+#13#10+
+       ' ObservationCodeKey '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // internal primary key
+       ' ObservationKey     '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // primary key from Observations Table
+       ' ConceptKey         '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // primary key from concept table
+       ' Source             int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // 1 = Observation.category, 2 = Observation.code, 3= Observation.component.code
+       InlineForeignKeySql(FConn, 'ObservationCodes', 'ObservationKey', 'Observations', 'ObservationKey', 'FK_ObservationCodes_ObsKey')+
+       InlineForeignKeySql(FConn, 'ObservationCodes', 'ConceptKey', 'Concepts', 'ConceptKey', 'FK_ObservationCodes_ConceptKey')+
+       PrimaryKeyType(FConn.owner.Platform, 'PK_ObservationCodes', 'ObservationCodeKey')+') '+CreateTableInfo(FConn.owner.platform));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'ObservationCodes', 'ObservationKey', 'Observations', 'ObservationKey', 'FK_ObservationCodes_ObsKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'ObservationCodes', 'ConceptKey', 'Concepts', 'ConceptKey', 'FK_ObservationCodes_ConceptKey'));
+  FConn.ExecSQL('Create INDEX SK_ObsC_Dt1 ON ObservationCodes (ObservationKey, Source, ConceptKey)');
+  FConn.ExecSQL('Create INDEX SK_ObsC_Dt2 ON ObservationCodes (Source, ConceptKey, ObservationKey)');
+end;
+
+
+procedure TFHIRDatabaseInstaller.CreateObservationQueue;
+begin
+  FConn.ExecSQL('CREATE TABLE ObservationQueue( '+#13#10+
+       ' ObservationQueueKey '+DBKeyType(FConn.owner.platform)+'   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  // internal primary key
+       ' ResourceKey    '+DBKeyType(FConn.owner.platform)+'   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+     // id of resource changed
+       ' Status         int                                   '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+      // whether added or deleted
+       InlineForeignKeySql(FConn, 'Observations', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_ObservationQueue_ResKey')+
+       PrimaryKeyType(FConn.owner.Platform, 'PK_ObservationQueue', 'ObservationQueueKey')+') '+CreateTableInfo(FConn.owner.platform));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'Observations', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_ObservationQueue_ResKey'));
+end;
 
 procedure TFHIRDatabaseInstaller.CreateResourceCompartments;
 begin
@@ -344,6 +555,9 @@ begin
        ' TypeKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+ // resource type key for the compartment type
        ' Id nchar('+inttostr(ID_LENGTH)+') '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+                    // field two of composite id for compartment - compartment id
        ' CompartmentKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+   // key for the resource that creates this compartment
+       InlineForeignKeySql(FConn, 'Compartments', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_CompartmentResource_ResKey')+
+       InlineForeignKeySql(FConn, 'Compartments', 'TypeKey', 'Types', 'ResourceTypeKey', 'FK_CompartmentResource_TypeKey')+
+       InlineForeignKeySql(FConn, 'Compartments', 'CompartmentKey', 'Ids', 'ResourceKey', 'FK_Compartment_ResKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_Compartments', 'ResourceCompartmentKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL(ForeignKeySql(FConn, 'Compartments', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_CompartmentResource_ResKey'));
   FConn.ExecSQL(ForeignKeySql(FConn, 'Compartments', 'TypeKey', 'Types', 'ResourceTypeKey', 'FK_CompartmentResource_TypeKey'));
@@ -363,10 +577,13 @@ Begin
        ' originalId nchar(200) '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' MasterResourceKey int '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' MostRecent '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       ' ForTesting int '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' Deleted int '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'Ids', 'ResourceTypeKey', 'Types', 'ResourceTypeKey', 'FK_ResType_TypeKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_Ids', 'ResourceKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL(ForeignKeySql(FConn, 'Ids', 'ResourceTypeKey', 'Types', 'ResourceTypeKey', 'FK_ResType_TypeKey'));
   FConn.ExecSQL('Create Unique INDEX SK_Ids_Id ON Ids (ResourceTypeKey, Id)');
+  FConn.ExecSQL('Create INDEX SK_Ids_Master ON Ids (MasterResourceKey)');
   FConn.ExecSQL('Create INDEX SK_Ids_TypeMaster ON Ids (ResourceTypeKey, MasterResourceKey)');
   FConn.ExecSQL('Create INDEX SK_Ids_DelTypeMaster ON Ids (ResourceTypeKey, Deleted, MasterResourceKey)');
 End;
@@ -384,11 +601,15 @@ Begin
        ' Secure int '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' SessionKey int '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' AuditKey int '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       ' ForTesting int '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' Tags '+DBBlobType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' XmlContent '+DBBlobType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' XmlSummary '+DBBlobType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' JsonContent '+DBBlobType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' JsonSummary '+DBBlobType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'Versions', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_ResKey_IdKey')+
+       InlineForeignKeySql(FConn, 'Versions', 'AuditKey', 'Ids', 'ResourceKey', 'FK_ResKey_AuditKey')+
+//       InlineForeignKeySql(FConn, 'Ids', 'MostRecent', 'Versions', 'ResourceVersionKey', 'FK_ResCurrent_VersionKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_Versions', 'ResourceVersionKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL(ForeignKeySql(FConn, 'Versions', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_ResKey_IdKey'));
   FConn.ExecSQL(ForeignKeySql(FConn, 'Versions', 'AuditKey', 'Ids', 'ResourceKey', 'FK_ResKey_AuditKey'));
@@ -404,6 +625,8 @@ Begin
        ' ResourceVersionKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' TagKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' Display nchar(200) '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'VersionTags', 'ResourceVersionKey', 'Versions', 'ResourceVersionKey', 'FK_VerTag_VerKey')+
+       InlineForeignKeySql(FConn, 'VersionTags', 'TagKey', 'Tags', 'TagKey', 'FK_VerTag_TagKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_VersionTags', 'ResourceTagKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL('Create UNIQUE INDEX SK_VersionTags_ResTag1 ON VersionTags (ResourceVersionKey, TagKey)');
   FConn.ExecSQL('Create UNIQUE INDEX SK_VersionTags_ResTag2 ON VersionTags (TagKey, ResourceVersionKey)');
@@ -458,7 +681,11 @@ Begin
        ' ResourceVersionKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' SortValue nchar(128) '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' Score1 int '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
-       ' Score2 int '+ColCanBeNull(FConn.owner.platform, True)+') '+CreateTableInfo(FConn.owner.platform));
+       ' Score2 int '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'SearchEntries', 'SearchKey', 'Searches', 'SearchKey', 'FK_Search_Search')+
+       InlineForeignKeySql(FConn, 'SearchEntries', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_Search_ResKey')+
+       InlineForeignKeySql(FConn, 'SearchEntries', 'ResourceVersionKey', 'Versions', 'ResourceVersionKey', 'FK_Search_ResVerKey')+
+       PrimaryKeyType(FConn.owner.Platform, 'PK_SearchEntries', 'SearchKey, ResourceKey, ResourceVersionKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL('Create UNIQUE INDEX SK_SearchesSearchEntries ON SearchEntries (SearchKey, SortValue, ResourceKey)');
   FConn.ExecSQL('Create INDEX SK_SearchesResourceKey ON SearchEntries (ResourceKey)');
   FConn.ExecSQL(ForeignKeySql(FConn, 'SearchEntries', 'SearchKey', 'Searches', 'SearchKey', 'FK_Search_Search'));
@@ -472,13 +699,39 @@ begin
        ' SubscriptionQueueKey '+   DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' ResourceKey '+        DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' ResourceVersionKey '+ DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
+       ' ResourcePreviousKey '+ DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+
        ' Operation                  int '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' Entered '+       DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' Handled '+       DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'SubscriptionQueue', 'ResourceKey',        'Ids', 'ResourceKey',             'FK_SubscriptionQ_ResKey')+
+       InlineForeignKeySql(FConn, 'SubscriptionQueue', 'ResourceVersionKey', 'Versions', 'ResourceVersionKey', 'FK_SubscriptionQ_ResVerKey')+
+       InlineForeignKeySql(FConn, 'SubscriptionQueue', 'ResourcePreviousKey','Versions', 'ResourceVersionKey', 'FK_SubscriptionQ_ResPrevKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_SubscriptionQueue', 'SubscriptionQueueKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL(ForeignKeySql(FConn, 'SubscriptionQueue', 'ResourceKey',        'Ids', 'ResourceKey',             'FK_SubscriptionQ_ResKey'));
   FConn.ExecSQL(ForeignKeySql(FConn, 'SubscriptionQueue', 'ResourceVersionKey', 'Versions', 'ResourceVersionKey', 'FK_SubscriptionQ_ResVerKey'));
+  FConn.ExecSQL(ForeignKeySql(FConn, 'SubscriptionQueue', 'ResourcePreviousKey','Versions', 'ResourceVersionKey', 'FK_SubscriptionQ_ResPrevKey'));
   FConn.ExecSQL('Create INDEX SK_SubscriptionsQueue_Reload ON SubscriptionQueue (Handled)');
+end;
+
+procedure TFHIRDatabaseInstaller.CreateAsyncTasks;
+begin
+  FConn.ExecSQL('CREATE TABLE AsyncTasks ( '+#13#10+
+       ' TaskKey     '+DBKeyType(FConn.owner.platform)+'      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Id          nchar(36)                                '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' SourceUrl   nchar(255)                               '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Format      int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Status      int                                      '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+  //
+       ' Message     nchar(255)                               '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+  //
+       ' Created     '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+    //
+       ' Finished    '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+    //
+       ' Expires     '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+    //
+       ' Deleted     '+DBDateTimeType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+    //
+       ' Count       int                                      '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+   //
+       ' Downloads   int                                      '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+   //
+       ' Names       '+DBBlobType(FConn.owner.platform)+'     '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+   //
+       ' Outcome     '+DBBlobType(FConn.owner.platform)+'     '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+   //
+       PrimaryKeyType(FConn.owner.Platform, 'PK_AsyncTasks', 'TaskKey')+') '+CreateTableInfo(FConn.owner.platform));
+  FConn.ExecSQL('Create INDEX SK_AsyncTasksId ON AsyncTasks (Id)');
 end;
 
 procedure TFHIRDatabaseInstaller.CreateResourceIndexEntries;
@@ -494,9 +747,17 @@ Begin
        ' Value2 nchar(210) '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' Flag '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, false)+', '+#13#10+
        ' Target '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       ' SrcTesting int '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
+       ' TgtTesting int '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' Concept '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
        ' Extension nchar(5) '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
-       ' Xhtml '+DBBlobType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       ' Xhtml '+DBTextBlobType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, True)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'IndexEntries', 'IndexKey', 'Indexes', 'IndexKey', 'FK_IndexEntry_IndexKey')+
+       InlineForeignKeySql(FConn, 'IndexEntries', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_IndexEntry_ResKey')+
+       InlineForeignKeySql(FConn, 'IndexEntries', 'SpaceKey', 'Spaces', 'SpaceKey', 'FK_IndexEntry_SpaceKey')+
+       InlineForeignKeySql(FConn, 'IndexEntries', 'Target', 'Ids', 'ResourceKey', 'FK_IndexEntry_TargetKey')+
+       InlineForeignKeySql(FConn, 'IndexEntries', 'Concept', 'Concepts', 'ConceptKey', 'FK_IndexEntry_ConceptKey')+
+       InlineForeignKeySql(FConn, 'IndexEntries', 'Parent', 'IndexEntries', 'EntryKey', 'FK_IndexEntry_ParentKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_IndexEntries', 'EntryKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL(ForeignKeySql(FConn, 'IndexEntries', 'IndexKey', 'Indexes', 'IndexKey', 'FK_IndexEntry_IndexKey'));
   FConn.ExecSQL(ForeignKeySql(FConn, 'IndexEntries', 'ResourceKey', 'Ids', 'ResourceKey', 'FK_IndexEntry_ResKey'));
@@ -537,6 +798,8 @@ begin
        ' ValueSetMemberKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' ValueSetKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
        ' ConceptKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'ValueSetMembers', 'ValueSetKey', 'ValueSets', 'ValueSetKey', 'FK_ValueSetMembers_ValueSetKey')+
+       InlineForeignKeySql(FConn, 'ValueSetMembers', 'ConceptKey', 'Concepts', 'ConceptKey', 'FK_ValueSetMembers_ConceptKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_ValueSetMembers', 'ValueSetMemberKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL('Create INDEX SK_ValueSetMembers_Members ON ValueSetMembers (ValueSetKey, ConceptKey)');
   FConn.ExecSQL('Create INDEX SK_ValueSetMembers_Owners ON ValueSetMembers (ConceptKey, ValueSetKey)');
@@ -548,7 +811,7 @@ procedure TFHIRDatabaseInstaller.CreateValueSets;
 begin
   FConn.ExecSQL('CREATE TABLE ValueSets ( '+#13#10+
        ' ValueSetKey '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, False)+',  '+#13#10+
-       ' URL nchar(200) '+ColCanBeNull(FConn.owner.platform, False)+', '+
+       ' URL nchar(255) '+ColCanBeNull(FConn.owner.platform, False)+', '+
        ' NeedsIndexing int '+ColCanBeNull(FConn.owner.platform, False)+', '+
        ' Error nchar(200) '+ColCanBeNull(FConn.owner.platform, True)+', '+
        PrimaryKeyType(FConn.owner.Platform, 'PK_ValueSets', 'ValueSetKey')+') '+CreateTableInfo(FConn.owner.platform));
@@ -576,6 +839,7 @@ Begin
        ' Parent       '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+
        ' Value        nchar(255) '+                         ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+
        ' SortBy       '+DBKeyType(FConn.owner.platform)+' '+ColCanBeNull(FConn.owner.platform, true)+', '+#13#10+
+       InlineForeignKeySql(FConn, 'UserIndexes', 'UserKey', 'Users', 'UserKey', 'FK_UserIndexes_UserKey')+
        PrimaryKeyType(FConn.owner.Platform, 'PK_UserIndexes', 'UserIndexKey')+') '+CreateTableInfo(FConn.owner.platform));
   FConn.ExecSQL(ForeignKeySql(FConn, 'UserIndexes', 'UserKey', 'Users', 'UserKey', 'FK_UserIndexes_UserKey'));
   FConn.ExecSQL('Create INDEX SK_UserIndexes_IndexNameValue ON UserIndexes (IndexName, Value)');
@@ -591,17 +855,29 @@ end;
 
 procedure TFHIRDatabaseInstaller.DoPostTransactionInstall;
 begin
-  if TextIndexing then
-  begin
-    FConn.ExecSQL('CREATE FULLTEXT CATALOG FHIR as DEFAULT');
-    FConn.ExecSQL('Create FULLTEXT INDEX on IndexEntries (Xhtml TYPE COLUMN Extension) KEY INDEX PK_IndexEntries');
+  try
+
+    if FConn.owner.platform = kdbMySQL then
+    begin
+//      FConn.ExecSQL('ALTER TABLE IndexEntries MODIFY Xhtml LONGTEXT;');
+      FConn.ExecSQL('ALTER TABLE IndexEntries ADD FULLTEXT INDEX `PK_IndexEntries` (Xhtml);');
+    end;
+    if FConn.owner.platform = kdbSQLServer then
+    begin
+      FConn.ExecSQL('CREATE FULLTEXT CATALOG FHIR as DEFAULT');
+      FConn.ExecSQL('Create FULLTEXT INDEX on IndexEntries (Xhtml TYPE COLUMN Extension) KEY INDEX PK_IndexEntries');
+    end;
+
+  except
+    // well, we ignore this; it fails on SQLServer Express, in which case _text search parameter won't work
   end;
 end;
 
 procedure TFHIRDatabaseInstaller.DoPostTransactionUnInstall;
 begin
   try
-    FConn.ExecSQL('DROP FULLTEXT CATALOG FHIR');
+    if FConn.owner.platform = kdbSQLServer  then
+      FConn.ExecSQL('DROP FULLTEXT CATALOG FHIR');
   except
   end;
 end;
@@ -665,38 +941,85 @@ procedure TFHIRDatabaseInstaller.Install(scim : TSCIMServer);
 begin
   FConn.StartTransact;
   try
+    if assigned(CallBack) then Callback(40, 'Create Users');
     CreateUsers;
+    if assigned(CallBack) then Callback(41, 'Create UserIndexes');
     CreateUserIndexes;
     scim.defineSystem(FConn);
+    if assigned(CallBack) then Callback(42, 'Create ResourceSessions');
     CreateResourceSessions;
+    if assigned(CallBack) then Callback(43, 'Create OAuthLogins');
     CreateOAuthLogins;
 
-    CreateCodeSystems;
+    if assigned(CallBack) then Callback(44, 'Create Unii');
+    CreateUnii;
 
+    if assigned(CallBack) then Callback(45, 'Create Closures');
     CreateClosures;
+    if assigned(CallBack) then Callback(46, 'Create Concepts');
     CreateConcepts;
+    if assigned(CallBack) then Callback(47, 'Create ValueSets');
     CreateValueSets;
+    if assigned(CallBack) then Callback(48, 'Create ValueSetMembers');
     CreateValueSetMembers;
+    if assigned(CallBack) then Callback(49, 'Create ClosureEntries');
     CreateClosureEntries;
 
+    if assigned(CallBack) then Callback(50, 'Create ResourceTags');
     CreateResourceTags;
+    if assigned(CallBack) then Callback(51, 'Create ResourceTypes');
     CreateResourceTypes;
+    if assigned(CallBack) then Callback(52, 'Create ResourceConfig');
     CreateResourceConfig;
+    if assigned(CallBack) then Callback(53, 'Create Resources');
     CreateResources;
+    if assigned(CallBack) then Callback(54, 'Create ResourceCompartments');
     CreateResourceCompartments;
+    if assigned(CallBack) then Callback(55, 'Create ResourceVersions');
     CreateResourceVersions;
+    if assigned(CallBack) then Callback(56, 'Create ResourceVersionsTags');
     CreateResourceVersionsTags;
+    if assigned(CallBack) then Callback(57, 'Create ResourceIndexes');
     CreateResourceIndexes;
+    if assigned(CallBack) then Callback(58, 'Create ResourceSpaces');
     CreateResourceSpaces;
+    if assigned(CallBack) then Callback(59, 'Create ResourceIndexEntries');
     CreateResourceIndexEntries;
+    if assigned(CallBack) then Callback(60, 'Create ResourceSearches');
     CreateResourceSearches;
+    if assigned(CallBack) then Callback(61, 'Create ResourceSearchEntries');
     CreateResourceSearchEntries;
+    if assigned(CallBack) then Callback(62, 'Create SubscriptionQueue');
     CreateSubscriptionQueue;
+    if assigned(CallBack) then Callback(63, 'Create NotificationQueue');
     CreateNotificationQueue;
+    if assigned(CallBack) then Callback(64, 'Create WebSocketsQueue');
     CreateWebSocketsQueue;
 
+    if assigned(CallBack) then Callback(65, 'Create ResourceSpaces');
     DefineResourceSpaces;
+    if assigned(CallBack) then Callback(66, 'Create Indexes');
     DefineIndexes;
+    if assigned(CallBack) then Callback(67, 'Create Observations');
+    CreateObservations;
+    if assigned(CallBack) then Callback(68, 'Create ObservationCodes');
+    CreateObservationCodes;
+    if assigned(CallBack) then Callback(69, 'Create ObservationQueue');
+    CreateObservationQueue;
+    if assigned(CallBack) then Callback(70, 'Create Authorizations');
+    CreateAuthorizations;
+    if assigned(CallBack) then Callback(71, 'Create AuthorizationSessions');
+    CreateAuthorizationSessions;
+    if assigned(CallBack) then Callback(72, 'Create Connections');
+    CreateConnections;
+    if assigned(CallBack) then Callback(74, 'Create AsyncTasks');
+    CreateAsyncTasks;
+    if assigned(CallBack) then Callback(75, 'Create ClientRegistrations');
+    CreateClientRegistrations;
+    if assigned(CallBack) then Callback(75, 'Create PseudoData');
+    CreatePseudoData;
+    if assigned(CallBack) then Callback(76, 'Commit');
+
     FConn.Commit;
   except
     on e:exception do
@@ -706,6 +1029,7 @@ begin
       raise;
     end;
   end;
+  if assigned(CallBack) then Callback(68, 'Do Post Install');
   DoPostTransactionInstall;
 end;
 
@@ -716,7 +1040,7 @@ var
 begin
   lines := TStringList.create;
   try
-    lines.Text := FileToString(IncludeTrailingPathDelimiter(Ftxpath)+s, TEncoding.ANSI);
+    lines.Text := replaceColumnWrappingChars(FileToString(IncludeTrailingPathDelimiter(Ftxpath)+s, TEncoding.ANSI), FConn.Owner.Platform);
     sql := '';
     for l in lines do
       if l.Trim = 'GO' then
@@ -736,81 +1060,68 @@ end;
 procedure TFHIRDatabaseInstaller.Uninstall;
 var
   meta : TKDBMetaData;
+  step : integer;
+  procedure drop(name : String);
+  begin
+    inc(step);
+    if assigned(CallBack) then Callback(step, 'Check Delete '+name);
+    if meta.hasTable(name) then
+      FConn.DropTable(name);
+  end;
 begin
+  if assigned(CallBack) then Callback(5, 'Check for existing tables');
+  step := 5;
   meta := FConn.FetchMetaData;
   try
     FConn.StartTransact;
     try
       if meta.hasTable('Ids') then
+      try
         if FConn.owner.platform = kdbMySQL then
           FConn.execsql('ALTER TABLE Ids DROP FOREIGN KEY FK_ResCurrent_VersionKey')
-        else
+        else if FConn.owner.platform = kdbSQLServer then
           FConn.execsql('ALTER TABLE Ids DROP CONSTRAINT FK_ResCurrent_VersionKey');
+      except
+      end;
 
-      if meta.hasTable('WebSocketsQueue') then
-        FConn.DropTable('WebSocketsQueue');
-      if meta.hasTable('NotificationQueue') then
-        FConn.DropTable('NotificationQueue');
-      if meta.hasTable('SubscriptionQueue') then
-        FConn.DropTable('SubscriptionQueue');
-      if meta.hasTable('SearchEntries') then
-        FConn.DropTable('SearchEntries');
-      if meta.hasTable('Searches') then
-        FConn.DropTable('Searches');
-      if meta.hasTable('IndexEntries') then
-        FConn.DropTable('IndexEntries');
-      if meta.hasTable('Indexes') then
-        FConn.DropTable('Indexes');
-      if meta.hasTable('Spaces') then
-        FConn.DropTable('Spaces');
+      drop('Connections');
+      drop('AuthorizationSessions');
+      drop('Authorizations');
+      drop('ObservationCodes');
+      drop('Observations');
+      drop('ObservationQueue');
+      drop('WebSocketsQueue');
+      drop('NotificationQueue');
+      drop('SubscriptionQueue');
+      drop('SearchEntries');
+      drop('Searches');
+      drop('IndexEntries');
+      drop('Indexes');
+      drop('Spaces');
 
-      if meta.hasTable('VersionTags') then
-        FConn.DropTable('VersionTags');
-      if meta.hasTable('Versions') then
-        FConn.DropTable('Versions');
-      if meta.hasTable('Compartments') then
-        FConn.DropTable('Compartments');
-      if meta.hasTable('Ids') then
-        FConn.DropTable('Ids');
-      if meta.hasTable('Config') then
-        FConn.DropTable('Config');
-      if meta.hasTable('Types') then
-        FConn.DropTable('Types');
-      if meta.hasTable('Tags') then
-        FConn.DropTable('Tags');
-      if meta.hasTable('OAuthLogins') then
-        FConn.DropTable('OAuthLogins');
-      if meta.hasTable('Sessions') then
-        FConn.DropTable('Sessions');
-      if meta.hasTable('UserIndexes') then
-        FConn.DropTable('UserIndexes');
-      if meta.hasTable('Users') then
-        FConn.DropTable('Users');
+      drop('VersionTags');
+      drop('Versions');
+      drop('Compartments');
+      drop('Ids');
+      drop('Config');
+      drop('Types');
+      drop('Tags');
+      drop('OAuthLogins');
+      drop('ClientRegistrations');
+      drop('Sessions');
+      drop('UserIndexes');
+      drop('Users');
 
-      if meta.hasTable('ClosureEntries') then
-        FConn.DropTable('ClosureEntries');
-      if meta.hasTable('ValueSetMembers') then
-        FConn.DropTable('ValueSetMembers');
-      if meta.hasTable('ValueSets') then
-        FConn.DropTable('ValueSets');
-      if meta.hasTable('Closures') then
-        FConn.DropTable('Closures');
-      if meta.hasTable('Concepts') then
-        FConn.DropTable('Concepts');
+      drop('ClosureEntries');
+      drop('ValueSetMembers');
+      drop('ValueSets');
+      drop('Closures');
+      drop('Concepts');
 
-
-      if meta.hasTable('UniiDesc') then
-        FConn.DropTable('UniiDesc');
-      if meta.hasTable('Unii') then
-        FConn.DropTable('Unii');
-      if meta.hasTable('cvx') then
-        FConn.DropTable('cvx');
-      if meta.hasTable('USStateCodes') then
-        FConn.DropTable('USStateCodes');
-      if meta.hasTable('AreaCodes') then
-        FConn.DropTable('AreaCodes');
-      if meta.hasTable('CountryCodes') then
-        FConn.DropTable('CountryCodes');
+      drop('UniiDesc');
+      drop('Unii');
+      drop('AsyncTasks');
+      drop('PseudoData');
 
       FConn.Commit;
     except
@@ -825,6 +1136,7 @@ begin
     meta.free;
   end;
   try
+    if assigned(CallBack) then Callback(35, 'Post Uninstall check');
     DoPostTransactionUnInstall;
   finally
     // nothing
@@ -833,19 +1145,57 @@ end;
 
 
 procedure TFHIRDatabaseInstaller.Upgrade(version : integer);
-var
-  m : TKDBMetaData;
-  t : TKDBTable;
 begin
-  if version > ServerDBVersion then
-    raise Exception.Create('Database Version mismatch (found='+inttostr(version)+', can handle 1-'+inttostr(ServerDBVersion)+'): you must re-install the database or change which version of the server you are running');
+  FConn.StartTransact;
+  try
+    if version > ServerDBVersion then
+      raise Exception.Create('Database Version mismatch (found='+inttostr(version)+', can handle 12-'+inttostr(ServerDBVersion)+'): you must re-install the database or change which version of the server you are running');
+    if (version < 12) then
+      raise Exception.Create('Database must be rebuilt');
+    if (version < 13) then
+    begin
+      Fconn.ExecSQL('ALTER TABLE dbo.Observations ADD	IsComponent int NULL');
+      Fconn.ExecSQL('ALTER TABLE dbo.Observations ADD	CodeList nchar(30) NULL');
+    end;
 
-  if version < 7 then
-    raise Exception.Create('Database must be recreated due to a breaking change to the database schema (-mount or -remount)');  // 7 was a breaking change
-  if version < 8 then
-    Fconn.ExecSQL('ALTER TABLE Types ADD ImplementationGuide char(64) NULL');
+    if (version < 14) then
+      CreateAuthorizations
+    else
+    begin
+      if (version < 15) then
+      begin
+        Fconn.ExecSQL('Drop index SK_Authorizations_Hash on Authorizations');
+        Fconn.ExecSQL('ALTER TABLE dbo.Authorizations Drop Column Hash');
+        Fconn.ExecSQL('ALTER TABLE dbo.Authorizations ADD	Uuid char(36) NULL');
+      end;
+      if (version < 16) then
+        Fconn.ExecSQL('ALTER TABLE dbo.Authorizations ADD	PatientId char(64) NULL');
+    end;
+    if (version < 17) then
+    begin
+     CreateAuthorizationSessions;
+     CreateConnections;
+    end;
+    if (version < 18) then
+      CreateAsyncTasks;
+    if (version < 19) then
+      CreateClientRegistrations;
+    if (version < 20) then
+      CreatePseudoData;
+    if (version < 21) then
+      Fconn.ExecSQL('ALTER TABLE dbo.ClientRegistrations ADD PatientContext int NULL');
+    if (version < 22) then
+    begin
+      Fconn.ExecSQL('ALTER TABLE dbo.AsyncTasks ADD Request char(255) NULL');
+      Fconn.ExecSQL('ALTER TABLE dbo.AsyncTasks ADD TransactionTime '+DBDateTimeType(FConn.Owner.Platform)+' NULL');
+    end;
 
-  Fconn.ExecSQL('update Config set value = '+inttostr(ServerDBVersion)+' where ConfigKey = 5');
+    Fconn.ExecSQL('update Config set value = '+inttostr(ServerDBVersion)+' where ConfigKey = 5');
+    FConn.commit;
+  except
+    FConn.rollback;
+    raise;
+  end;
 end;
 
 end.

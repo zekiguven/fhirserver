@@ -1,10 +1,39 @@
 unit HTMLPublisher;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
   SysUtils,
-  EncodeSupport,
+  EncodeSupport, TextUtilities,
   AdvObjects,
   FHIRBase,
   FHIRParserBase,
@@ -18,6 +47,7 @@ Type
     FBaseURL: String;
     FLang: String;
     FVersion: String;
+    FLogId: String;
   public
     Constructor Create; Override;
     Destructor Destroy; Override;
@@ -42,13 +72,14 @@ Type
 
     procedure StartTable(borders : boolean; clss : String = '');
     procedure StartTableRow;
-    procedure StartRowFlip(i : integer);
+    procedure StartRow(bgcolor : string = '');
     procedure StartTableCell(span : integer = 1);
     procedure EndTableCell;
     procedure EndTableRow;
     procedure EndTable;
     procedure AddTableCellURL(text, url : String; hint : String = '');
     procedure AddTableCell(text : String; bold : boolean = false);
+    procedure AddTableCellHint(text, hint : String);
 
     procedure StartList(ordered : boolean = false);
     procedure EndList(ordered : boolean = false);
@@ -56,10 +87,15 @@ Type
     procedure EndListItem;
     procedure StartBlockQuote;
     procedure EndBlockQuote;
+    procedure startDiv;
+    procedure endDiv;
 
     procedure StartForm(method, action : String);
-    procedure TextInput(name : String; length : integer = 20);
-    procedure checkbox(name, value, text : String);
+    procedure TextInput(name : String; length : integer = 20); overload;
+    procedure TextInput(name, value : String; length : integer = 20); overload;
+    procedure TextInput(name, value, text : String; length : integer = 20); overload;
+    procedure Memo(name, value, text : String); overload;
+    procedure checkbox(name : String; value : boolean; text : String);
     procedure hiddenInput(name, value : String);
     procedure Submit(name : String);
     procedure EndForm;
@@ -70,6 +106,7 @@ Type
     Property BaseURL : String read FBaseURL write FBaseURL;
     Property Lang : String read FLang write FLang;
     Property Version : String read FVersion write FVersion;
+    Property LogId : String read FLogId write FLogid;
   end;
 
 
@@ -89,6 +126,15 @@ procedure THtmlPublisher.AddTableCell(text: String; bold: boolean);
 begin
   StartTableCell;
   addtext(text, bold, false);
+  EndTableCell;
+end;
+
+procedure THtmlPublisher.AddTableCellHint(text, hint: String);
+begin
+  StartTableCell;
+  FBuilder.Append('<span title="'+FormatTextToXML(hint, xmlAttribute)+'">');
+  addtext(text, false, false);
+  FBuilder.Append('</span>');
   EndTableCell;
 end;
 
@@ -114,7 +160,7 @@ end;
 
 procedure THtmlPublisher.AddTextPlain(text: String);
 begin
-  FBuilder.Append(EncodeXML(text, xmlText));
+  FBuilder.Append(FormatTextToXml(text, xmlText));
 end;
 
 procedure THtmlPublisher.AddTitle(text: String);
@@ -122,9 +168,17 @@ begin
   AddText(text, true, false);
 end;
 
-procedure THtmlPublisher.checkbox(name, value, text: String);
+procedure THtmlPublisher.checkbox(name : String; value : boolean; text : String);
 begin
-  FBuilder.Append('<input type="checkbox" name="'+name+'" value="'+value+'""/> '+text);
+  if value then
+    FBuilder.Append('<input type="checkbox" name="'+name+'" checked value="1"/> '+text)
+  else
+    FBuilder.Append('<input type="checkbox" name="'+name+'" value="1"/> '+text);
+end;
+
+procedure THtmlPublisher.endDiv;
+begin
+  FBuilder.Append('</div>')
 end;
 
 constructor THtmlPublisher.Create;
@@ -141,7 +195,7 @@ end;
 
 procedure THtmlPublisher.Done;
 begin
-  FBuilder.Append(TFHIRXhtmlComposer.footer(BaseURL, lang));
+  FBuilder.Append(TFHIRXhtmlComposer.footer(BaseURL, lang, logid));
 end;
 
 procedure THtmlPublisher.EndBlockQuote;
@@ -229,6 +283,11 @@ begin
   FBuilder.Append('<hr/>'#13#10);
 end;
 
+procedure THtmlPublisher.Memo(name, value, text: String);
+begin
+  FBuilder.Append(text+'<textArea name="'+name+'">'#13#10+value+'</textArea>');
+end;
+
 function THtmlPublisher.output: String;
 begin
   result := FBuilder.ToString;
@@ -249,6 +308,11 @@ end;
 procedure THtmlPublisher.StartBlockQuote;
 begin
   FBuilder.Append('<blockquote>');
+end;
+
+procedure THtmlPublisher.startDiv;
+begin
+  FBuilder.Append('<div>')
 end;
 
 procedure THtmlPublisher.StartForm(method, action: String);
@@ -279,9 +343,12 @@ begin
   FBuilder.Append('<pre>'#13#10);
 end;
 
-procedure THtmlPublisher.StartRowFlip(i: integer);
+procedure THtmlPublisher.StartRow(bgcolor : string = '');
 begin
-  FBuilder.Append('<tr>')
+  if (bgcolor <> '') then
+    FBuilder.Append('<tr style="background-color: '+bgcolor+'">')
+  else
+    FBuilder.Append('<tr>')
 end;
 
 procedure THtmlPublisher.StartTable(borders: boolean; clss : String);
@@ -312,6 +379,11 @@ begin
   FBuilder.Append('<input type="submit" value="'+name+'"/>');
 end;
 
+procedure THtmlPublisher.TextInput(name, value: String; length: integer);
+begin
+  FBuilder.Append('<input type="text" name="'+name+'" value="'+value+'" size="'+inttostr(length)+'"/>');
+end;
+
 procedure THtmlPublisher.TextInput(name: String; length: integer);
 begin
   FBuilder.Append('<input type="text" name="'+name+'" size="'+inttostr(length)+'"/>');
@@ -320,7 +392,7 @@ end;
 procedure THtmlPublisher.URL(text, url, hint: String);
 begin
   if (hint <> '') then
-    FBuilder.Append('<a href="'+url+'" title="'+EncodeXML(hint, xmlAttribute)+'">')
+    FBuilder.Append('<a href="'+url+'" title="'+FormatTextToXml(hint, xmlAttribute)+'">')
   else
     FBuilder.Append('<a href="'+url+'">');
   AddTextPlain(text);
@@ -336,7 +408,7 @@ begin
       begin
         FBuilder.Append('<'+node.Name);
         for i := 0 to node.Attributes.Count - 1 do
-          FBuilder.Append(' '+node.Attributes[i].Name+'="'+EncodeXML(node.Attributes[i].value, xmlAttribute)+'"');
+          FBuilder.Append(' '+node.Attributes[i].Name+'="'+FormatTextToXml(node.Attributes[i].value, xmlAttribute)+'"');
         if node.ChildNodes.Count = 0 then
           FBuilder.Append('/>')
         else
@@ -350,8 +422,13 @@ begin
     fhntText:
       AddTextPlain(node.Content);
     fhntComment:
-      FBuilder.Append('<!-- '+EncodeXML(node.Content, xmlText)+' -->');
+      FBuilder.Append('<!-- '+FormatTextToXml(node.Content, xmlText)+' -->');
   end;
+end;
+
+procedure THtmlPublisher.TextInput(name, value, text: String; length: integer);
+begin
+  FBuilder.Append('<input type="text" name="'+name+'" value="'+value+'" size="'+inttostr(length)+'"/> '+text);
 end;
 
 end.

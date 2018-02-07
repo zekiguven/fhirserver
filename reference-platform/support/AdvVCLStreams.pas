@@ -32,8 +32,9 @@ Interface
 
 
 Uses
-  AdvObjects, Windows,
-  Classes, ActiveX,
+  {$IFDEF MACOS} OSXUtils, {$ELSE} Windows, ActiveX, {$ENDIF}
+  AdvObjects,
+  Classes,
   AdvStreams;
 
 
@@ -67,6 +68,7 @@ Type
 
     Public
       Constructor Create; Overload; Virtual;
+      Constructor Create(Stream : TAdvStream); Overload; Virtual;
       Destructor Destroy; Override;
 
       Function Read(Var aBuffer; iCount: LongInt): LongInt; Override;
@@ -76,9 +78,23 @@ Type
       Property Stream : TAdvStream Read GetStream Write SetStream;
   End;
 
+  // dealing with changes to the Stream Interface:
+  {$IFDEF VER260}
+  TStreamDWord = longint;
+  TStreamFixedUInt = longint;
+  PStreamFixedUInt = plongint;
+  TStreamLargeUInt = largeint;
+  {$ELSE}
+  TStreamDWord = DWord; // or longint
+  TStreamFixedUInt = FixedUInt;  // or longint
+  PStreamFixedUInt = PFixedUInt; // or plongint
+  TStreamLargeUInt = LargeUInt; // or largeint
+  {$ENDIF}
+
+  {$IFDEF MSWINDOWS}
   TAdvStreamAdapter = Class(TStreamAdapter)
     Public
-      Function Stat(Out statstg: TStatStg; grfStatFlag: DWord): HResult; Override; Stdcall;
+      Function Stat(Out statstg: TStatStg; grfStatFlag: TStreamDWord): HResult; Override; Stdcall;
   End;
 
   TAdvIStreamAdapter = Class(TAdvObject, IStream)
@@ -92,20 +108,21 @@ Type
       Constructor Create; Override;
       Destructor Destroy; Override;
 
-      function Seek(dlibMove: Largeint; dwOrigin: DWORD; out libNewPosition: LargeUInt): HResult; stdcall;
-      function SetSize(libNewSize: LargeUInt): HResult; stdcall;
-      function CopyTo(stm: IStream; cb: LargeUInt; out cbRead: LargeUInt; out cbWritten: LargeUInt): HResult; stdcall;
-      function Commit(grfCommitFlags: DWORD): HResult; stdcall;
+      function Seek(dlibMove: Largeint; dwOrigin: TStreamDWord; out libNewPosition: TStreamLargeUInt): HResult; stdcall;
+      function SetSize(libNewSize: TStreamLargeUInt): HResult; stdcall;
+      function CopyTo(stm: IStream; cb: TStreamLargeUInt; out cbRead: TStreamLargeUInt; out cbWritten: TStreamLargeUInt): HResult; stdcall;
+      function Commit(grfCommitFlags: TStreamDWord): HResult; stdcall;
       function Revert: HResult; stdcall;
-      function LockRegion(libOffset: LargeUInt; cb: LargeUInt; dwLockType: DWORD): HResult; stdcall;
-      function UnlockRegion(libOffset: LargeUInt; cb: LargeUInt; dwLockType: DWORD): HResult; stdcall;
-      function Stat(out statstg: TStatStg; grfStatFlag: DWORD): HResult; stdcall;
+      function LockRegion(libOffset: TStreamLargeUInt; cb: TStreamLargeUInt; dwLockType: TStreamDWord): HResult; stdcall;
+      function UnlockRegion(libOffset: TStreamLargeUInt; cb: TStreamLargeUInt; dwLockType: TStreamDWord): HResult; stdcall;
+      function Stat(out statstg: TStatStg; grfStatFlag: TStreamDWord): HResult; stdcall;
       function Clone(out stm: IStream): HResult; stdcall;
-      function Read(pv: Pointer; cb: FixedUInt; pcbRead: PFixedUInt): HResult; stdcall;
-      function Write(pv: Pointer; cb: FixedUInt; pcbWritten: PFixedUInt): HResult; stdcall;
+      function Read(pv: Pointer; cb: TStreamFixedUInt; pcbRead: PStreamFixedUInt): HResult; stdcall;
+      function Write(pv: Pointer; cb: TStreamFixedUInt; pcbWritten: PStreamFixedUInt): HResult; stdcall;
 
       Property Stream: TAdvAccessStream Read GetStream Write SetStream;
   End;
+  {$ENDIF}
 
   TStream = Classes.TStream;
 
@@ -139,7 +156,7 @@ End;
 
 Function TAdvVCLStream.GetStream: TStream;
 Begin
-  Assert(Condition(Assigned(FStream), 'GetStream', 'No VCL Stream available.'));
+  Assert(CheckCondition(Assigned(FStream), 'GetStream', 'No VCL Stream available.'));
 
   Result := FStream;
 End;
@@ -158,6 +175,12 @@ Begin
   FStream := Nil;
 End;
 
+
+constructor TVCLStream.Create(Stream: TAdvStream);
+begin
+  Create;
+  FStream := Stream;
+end;
 
 Destructor TVCLStream.Destroy;
 Begin
@@ -233,7 +256,8 @@ Begin
   Result := iCount;
 End;
 
-Function TAdvStreamAdapter.Stat(Out statstg: TStatStg; grfStatFlag: DWord): HResult;
+{$IFDEF MSWINDOWS}
+Function TAdvStreamAdapter.Stat(Out statstg: TStatStg; grfStatFlag: TStreamDWord): HResult;
 Begin
   // TStreamAdapter.stat does not clear the STATSTG structure.
   // http://qc.embarcadero.com/wc/qcmain.aspx?d=45528
@@ -258,10 +282,10 @@ Begin
 End;
 
 
-Function TAdvIStreamAdapter.Read(pv: Pointer; cb: FixedUInt; pcbRead: PFixedUInt): HResult;
+Function TAdvIStreamAdapter.Read(pv: Pointer; cb: TStreamFixedUInt; pcbRead: PStreamFixedUInt): HResult;
 
 Var
-  iReadable : FixedUInt;
+  iReadable : TStreamFixedUInt;
 Begin
   Try
     If pv = Nil Then
@@ -285,7 +309,7 @@ Begin
   End;
 End;
 
-Function TAdvIStreamAdapter.Write(pv: Pointer; cb: FixedUInt; pcbWritten: PFixedUInt): HResult;
+Function TAdvIStreamAdapter.Write(pv: Pointer; cb: TStreamFixedUInt; pcbWritten: PStreamFixedUInt): HResult;
 Begin
   Try
     If pv = Nil Then
@@ -306,7 +330,7 @@ Begin
 End;
 
 
-Function TAdvIStreamAdapter.Seek(dlibMove: Largeint; dwOrigin: DWORD; out libNewPosition: LargeUInt): HResult;
+Function TAdvIStreamAdapter.Seek(dlibMove: Largeint; dwOrigin: TStreamDWORD; out libNewPosition: TStreamLargeUInt): HResult;
 Var
   iNewPos: Integer;
 Begin
@@ -343,7 +367,7 @@ Begin
 End;
 
 
-Function TAdvIStreamAdapter.SetSize(libNewSize: LargeUInt): HResult;
+Function TAdvIStreamAdapter.SetSize(libNewSize: TStreamLargeUInt): HResult;
 Begin
   Try
     Stream.Size := LongInt(libNewSize);
@@ -358,7 +382,7 @@ Begin
 End;
 
 
-Function TAdvIStreamAdapter.Stat(out statstg: TStatStg; grfStatFlag: DWORD): HResult;
+Function TAdvIStreamAdapter.Stat(out statstg: TStatStg; grfStatFlag: TStreamDWORD): HResult;
 Begin
   Result := S_OK;
   Try
@@ -376,7 +400,7 @@ Begin
 End;
 
 
-Function TAdvIStreamAdapter.UnlockRegion(libOffset: LargeUInt; cb: LargeUInt; dwLockType: DWORD): HResult;
+Function TAdvIStreamAdapter.UnlockRegion(libOffset: TStreamLargeUInt; cb: TStreamLargeUInt; dwLockType: TStreamDWORD): HResult;
 Begin
   Result := STG_E_INVALIDFUNCTION;
 End;
@@ -388,13 +412,13 @@ Begin
 End;
 
 
-Function TAdvIStreamAdapter.Commit(grfCommitFlags: DWORD): HResult;
+Function TAdvIStreamAdapter.Commit(grfCommitFlags: TStreamDWORD): HResult;
 Begin
   Result := S_OK;
 End;
 
 
-Function TAdvIStreamAdapter.CopyTo(stm: IStream; cb: LargeUInt; out cbRead: LargeUInt; out cbWritten: LargeUInt): HResult;
+Function TAdvIStreamAdapter.CopyTo(stm: IStream; cb: TStreamLargeUInt; out cbRead: TStreamLargeUInt; out cbWritten: TStreamLargeUInt): HResult;
 Const
   MaxBufSize = 1024 * 1024;  // 1mb
 Var
@@ -462,7 +486,7 @@ Begin
 End;
 
 
-Function TAdvIStreamAdapter.LockRegion(libOffset: LargeUInt; cb: LargeUInt; dwLockType: DWORD): HResult;
+Function TAdvIStreamAdapter.LockRegion(libOffset: TStreamLargeUInt; cb: TStreamLargeUInt; dwLockType: TStreamDWORD): HResult;
 Begin
   Result := STG_E_INVALIDFUNCTION;
 End;
@@ -480,6 +504,7 @@ Begin
   Result := FStream;
 End;
 
+{$ENDIF}
 
 
 End. // AdvVCLStreams //

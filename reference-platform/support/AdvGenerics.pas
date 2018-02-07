@@ -1,9 +1,38 @@
 unit AdvGenerics;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
-  Types, RTLConsts, Windows, SysUtils, Generics.Collections, Generics.Defaults,
+  Classes, Types, RTLConsts, {$IFDEF MACOS} OSXUtils, {$ELSE} Windows, {$ENDIF} SysUtils, Generics.Collections, Generics.Defaults,
   AdvObjects;
 
 Type
@@ -63,6 +92,9 @@ Type
     procedure Grow(ACount: Integer);
     procedure GrowCheck(ACount: Integer); inline;
     procedure DoDelete(Index: Integer; Notification: TCollectionNotification);
+    procedure MySort(var Values: array of T; const Comparer: IComparer<T>; Index, Count: Integer);
+    procedure QuickSort(var Values: array of T; const Comparer: IComparer<T>; L, R: Integer);
+    procedure DoQuickSort(var Values: array of T; const Comparer: IComparer<T>; L, R: Integer);
   protected
     function DoGetEnumerator: TEnumerator<T>; override;
     procedure Notify(const Item: T; Action: TCollectionNotification); virtual;
@@ -110,6 +142,7 @@ Type
 
     procedure Exchange(Index1, Index2: Integer);
     procedure Move(CurIndex, NewIndex: Integer);
+    procedure Replace(old, new : T);
 
     function First: T;
     function Last: T;
@@ -180,6 +213,7 @@ Type
     FItems: TItemArray;
     FCount: Integer;
     FGrowThreshold: Integer;
+    FSortedKeys : TStringList;
 
     procedure SetCapacity(ACapacity: Integer);
     procedure Rehash(NewCapPow2: Integer);
@@ -216,6 +250,7 @@ Type
     function ContainsValue(const Value: T): Boolean;
     function ToArray: TArray<TAdvPair<T>>; override; final;
 
+    procedure addAll(other : TAdvMap<T>);
     property Items[const Key: String]: T read GetItem write SetItem; default;
     property Count: Integer read FCount;
     property IsEmpty : Boolean read GetEmpty;
@@ -296,9 +331,11 @@ Type
     FValueCollection: TValueCollection;
     function GetKeys: TKeyCollection;
     function GetValues: TValueCollection;
+    function GetSortedKeys: TStringList;
   public
     function GetEnumerator: TAdvPairEnumerator; reintroduce;
     property Keys: TKeyCollection read GetKeys;
+    property SortedKeys : TStringList read GetSortedKeys;
     property Values: TValueCollection read GetValues;
     property OnKeyNotify: TCollectionNotifyEvent<String> read FOnKeyNotify write FOnKeyNotify;
     property OnValueNotify: TCollectionNotifyEvent<T> read FOnValueNotify write FOnValueNotify;
@@ -716,6 +753,17 @@ begin
     Delete(Result);
 end;
 
+procedure TAdvList<T>.Replace(old, new: T);
+var
+  i : integer;
+begin
+  i := IndexOf(old);
+  if i = -1 then
+    raise Exception.Create('Item not found to delete');
+  Insert(i, new);
+  Delete(i+1);
+end;
+
 procedure TAdvList<T>.DoDelete(Index: Integer; Notification: TCollectionNotification);
 var
   oldItem: T;
@@ -861,6 +909,61 @@ begin
   FItems[NewIndex] := temp;
 end;
 
+procedure TAdvList<T>.DoQuickSort(var Values: array of T; const Comparer: IComparer<T>; L, R: Integer);
+Var
+  I, J, K : Integer;
+  temp : T;
+Begin
+  Repeat
+    I := L;
+    J := R;
+    K := (L + R) Shr 1;
+
+    Repeat
+      While Comparer.Compare(Values[I], Values[K]) > 0 Do
+        Inc(I);
+
+      While Comparer.Compare(Values[J], Values[K]) < 0 Do
+        Dec(J);
+
+      If I <= J Then
+      Begin
+        temp := Values[i];
+        Values[i] := Values[j];
+        Values[j] := temp;
+
+        // Keep K as the index of the original middle element as it might get exchanged.
+        If I = K Then
+          K := J
+        Else If J = K Then
+          K := I;
+
+        Inc(I);
+        Dec(J);
+      End;
+    Until I > J;
+
+    If L < J Then
+      DoQuickSort(Values, Comparer, L, J);
+
+    L := I;
+  Until I >= R;
+End;
+
+procedure TAdvList<T>.QuickSort(var Values: array of T; const Comparer: IComparer<T>; L, R: Integer);
+Begin
+  If R-L > 1 Then
+    DoQuickSort(Values, Comparer, l, R);
+end;
+
+
+procedure TAdvList<T>.MySort(var Values: array of T; const Comparer: IComparer<T>; Index, Count: Integer);
+begin
+  if Count <= 1 then
+    Exit;
+  QuickSort(Values, Comparer, Index, Index + Count - 1);
+end;
+
 procedure TAdvList<T>.Reverse;
 var
   tmp: T;
@@ -880,12 +983,12 @@ end;
 
 procedure TAdvList<T>.Sort;
 begin
-  TArray.Sort<T>(FItems, FComparer, 0, Count);
+  MySort(FItems, FComparer, 0, Count);
 end;
 
 procedure TAdvList<T>.Sort(const AComparer: IComparer<T>);
 begin
-  TArray.Sort<T>(FItems, AComparer, 0, Count);
+  MySort(FItems, AComparer, 0, Count);
 end;
 
 // no ownership on the array - it cannot be kept alive after the list is freed
@@ -1115,6 +1218,7 @@ begin
   Clear;
   FKeyCollection.Free;
   FValueCollection.Free;
+  FSortedKeys.Free;
   inherited;
 end;
 
@@ -1193,6 +1297,7 @@ begin
   FItems[gap].Value := Default(T);
   Dec(FCount);
 
+  FreeAndNil(FSortedKeys);
   KeyNotify(Key, Notification);
   ValueNotify(Result, Notification);
 end;
@@ -1254,6 +1359,7 @@ begin
   FItems[Index].Value := Value;
   Inc(FCount);
 
+  FreeAndNil(FSortedKeys);
   KeyNotify(Key, cnAdded);
   ValueNotify(Value, cnAdded);
 end;
@@ -1281,6 +1387,14 @@ begin
     Destroy;
 end;
 
+
+procedure TAdvMap<T>.addAll(other: TAdvMap<T>);
+var
+  s : String;
+begin
+  for s in other.Keys do
+    AddOrSetValue(s, other[s].link);
+end;
 
 procedure TAdvMap<T>.AddOrSetValue(const Key: String; const Value: T);
 var
@@ -1328,6 +1442,20 @@ begin
   if FKeyCollection = nil then
     FKeyCollection := TKeyCollection.Create(Self);
   Result := FKeyCollection;
+end;
+
+function TAdvMap<T>.GetSortedKeys: TStringList;
+var
+  p : TAdvPair<T>;
+begin
+  if FSortedKeys = nil then
+  begin
+    FSortedKeys := TStringList.Create;
+    for p in self do
+      FSortedKeys.AddObject(p.Key, p.Value);
+    FSortedKeys.Sort;
+  end;
+  result := FSortedKeys;
 end;
 
 function TAdvMap<T>.GetValues: TValueCollection;

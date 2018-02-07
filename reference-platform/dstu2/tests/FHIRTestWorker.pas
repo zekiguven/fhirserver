@@ -62,13 +62,13 @@ Type
   TTestingWorkerContext = class (TBaseWorkerContext)
   public
     function expand(vs : TFhirValueSet) : TFHIRValueSet; override;
-    function supportsSystem(system : string) : boolean; override;
-    function validateCode(system, code, display : String) : TValidationResult; overload; override;
-    function validateCode(system, code, version : String; vs : TFhirValueSet) : TValidationResult; overload; override;
+    function supportsSystem(system, version: string) : boolean; override;
+    function validateCode(system, version, code, display : String) : TValidationResult; overload; override;
+    function validateCode(system, version, code : String; vs : TFhirValueSet) : TValidationResult; overload; override;
     function validateCode(code : TFHIRCoding; vs : TFhirValueSet) : TValidationResult; overload; override;
     function validateCode(code : TFHIRCodeableConcept; vs : TFhirValueSet) : TValidationResult; overload; override;
 
-    class function Use : TWorkerContext;
+    class function Use : TFHIRWorkerContext;
     class procedure closeUp;
   end;
 
@@ -94,13 +94,13 @@ begin
   raise EFHIRPath.create('Not done yet');
 end;
 
-function TTestingWorkerContext.supportsSystem(system: string): boolean;
+function TTestingWorkerContext.supportsSystem(system, version: string): boolean;
 begin
   raise EFHIRPath.create('Not done yet');
 end;
 
 
-class function TTestingWorkerContext.Use: TWorkerContext;
+class function TTestingWorkerContext.Use: TFHIRWorkerContext;
 begin
   if GWorkerContext = nil then
   begin
@@ -112,12 +112,12 @@ begin
   result := GWorkerContext.link;
 end;
 
-function TTestingWorkerContext.validateCode(system, code, version: String; vs: TFhirValueSet): TValidationResult;
+function TTestingWorkerContext.validateCode(system, version, code: String; vs: TFhirValueSet): TValidationResult;
 begin
   raise EFHIRPath.create('Not done yet');
 end;
 
-function TTestingWorkerContext.validateCode(system, code, display: String): TValidationResult;
+function TTestingWorkerContext.validateCode(system, version, code, display: String): TValidationResult;
 begin
   raise EFHIRPath.create('Not done yet');
 end;

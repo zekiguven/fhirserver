@@ -42,6 +42,8 @@ uses
 
 const
   TAG_FHIR_SYSTEM = 'http://healthintersections.com.au/fhir/tags';
+  TAG_TEST_SYSTEM = TAG_FHIR_SYSTEM;
+  TAG_TEST_CODE = 'for-testing';
 //  TAG_FHIR_SYSTEM_PROFILES = 'http://healthintersections.com.au/fhir/profiles'; // code will be a uri
 
 //  TAG_READONLY = 'read-only';
@@ -69,6 +71,7 @@ type
     // operational stuff to do with transaction scope management
     property TransactionId : String read FTransactionId write FTransactionId;
     property ConfirmedStored : boolean read FConfirmedStored write FConfirmedStored;
+    function describe : String; override;
   end;
 
   TFHIRTagList = class (TAdvObject)
@@ -92,7 +95,10 @@ type
     function hasTag(category : TFHIRTagCategory; system, code : String) : boolean;
     function addTag(key : integer; kind : TFHIRTagCategory; system, code, display : String) : TFHIRTag;
     procedure add(tag : TFHIRTag);
+    function hasTestingTag : boolean;
+    procedure forceTestingTag;
     function asHeader : String;
+    function describe : String;
   end;
 
 implementation
@@ -101,6 +107,11 @@ uses
   FHIRUtilities;
 
 { TFHIRTag }
+
+function TFHIRTag.describe: String;
+begin
+  result := inttostr(ord(FCategory))+':'+system+'::'+code;
+end;
 
 function TFHIRTag.Link: TFHIRTag;
 begin
@@ -126,6 +137,15 @@ begin
       tcSecurity: meta.securityList.RemoveCoding(t.system, t.code);
       tcProfile: meta.profileList.removeUri(t.code);
     end;
+end;
+
+function TFHIRTagList.describe: String;
+var
+  item : TFHIRTag;
+begin
+  result := '';
+  for item in FList do
+    result := result +', '+item.describe;
 end;
 
 Destructor TFHIRTagList.Destroy;
@@ -166,7 +186,6 @@ end;
 
 function TFHIRTagList.asHeader: String;
 begin
-  raise Exception.Create('Not Done Yet');
 end;
 
 function TFHIRTagList.GetCount: Integer;
@@ -187,6 +206,12 @@ begin
     end;
 end;
 
+procedure TFHIRTagList.forceTestingTag;
+begin
+  if not hasTestingTag then
+    addTag(0, tcTag, TAG_TEST_SYSTEM, TAG_TEST_CODE, 'For Testing Only');
+end;
+
 function TFHIRTagList.GetTag(index: integer): TFHIRTag;
 begin
   result := FList[index];
@@ -195,6 +220,11 @@ end;
 function TFHIRTagList.hasTag(category : TFHIRTagCategory; system, code: String): boolean;
 begin
   result := findTag(category, system, code) <> nil;
+end;
+
+function TFHIRTagList.hasTestingTag: boolean;
+begin
+  result := hasTag(tcTag, TAG_TEST_SYSTEM, TAG_TEST_CODE);
 end;
 
 function TFHIRTagList.json: TArray<byte>;
@@ -209,7 +239,7 @@ begin
     vs := TAdvVCLStream.Create;
     try
       vs.Stream := s;
-      json := TJSONWriter.Create;
+      json := TJSONWriterDirect.Create;
       try
         json.Stream := vs.link;
         json.Start;

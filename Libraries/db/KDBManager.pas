@@ -1,5 +1,3 @@
-{! 1 !}
-{0.00-041  27 Oct 04 11:15  [21370]  User: Grahame Grieve    relax assertions}
 
 { Cross platform Database implementation }
 
@@ -21,9 +19,38 @@
 
 unit KDBManager;
 
+
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
 // This section used by scripting system
 
-{!Wrapper uses KClasses,Classes,KProcs,KDate,AdvFilers,AdvObjects,AdvIterators, MSSEWrap, MSSEWrap_Wrapper}
+{!Wrapper uses KClasses,Classes,KProcs,AdvFilers,AdvObjects,AdvIterators, MSSEWrap, MSSEWrap_Wrapper}
 
 // script access at this level is strictly controlled.
 // until further notice, connection managers cannot be created directly in scripts.
@@ -41,20 +68,12 @@ unit KDBManager;
 interface
 
 uses
-  StringSupport,
-  AdvExceptions,
-  kCritSct,
-  KSettings,
-  KDBLogging,
-  Classes,
-  Contnrs,
-  IniFiles,
-  KDBDialects,
-  SysUtils,
-  DateAndTime,
-  KDate,
-  GuidSupport,
-  AdvObjects, AdvGenerics;
+  SysUtils, SyncObjs, Classes, Contnrs, IniFiles, Generics.Collections,
+  kCritSct, KSettings,
+
+  StringSupport, GuidSupport,
+  AdvExceptions, AdvObjects, AdvGenerics,
+  KDBLogging, KDBDialects, DateSupport;
 
 {!Script Hide}
 const
@@ -74,7 +93,7 @@ type
   // mean that the provider is supported by all 3 of compiler, application, and system
   // access is odbc but settings are done differently
   TKDBProvider = (kdbpUnknown,    kdbpDSN,        kdbpODBC,     kdbpFirebird,    kdbpDBIsam,
-                  kdbpDBXpress,   kdbpSoapClient, kdbpMySQL,    kdbpAccess);
+                  kdbpDBXpress,   kdbpSoapClient, kdbpMySQL,    kdbpAccess,      kdbpSQLite);
 
   TKDBProviderSet = set of TKDBProvider;
 
@@ -102,6 +121,7 @@ type
     FNullable: Boolean;
   public
     constructor Create(name : String); overload;
+    function Link : TKDBColumn; overload;
     property Name : String read FName write FName;
     property DataType : TKDBColumnType read FDataType write FDataType;
     property Length : Integer read FLength write FLength;
@@ -149,6 +169,7 @@ type
   public
     constructor Create; override;
     destructor Destroy; override;
+    function Link : TKDBTable; overload;
     property Columns : TAdvList<TKDBColumn> read FColumns;
     property Indexes : TAdvList<TKDBIndex> read FIndexes;
     Property Relationships : TAdvList<TKDBRelationship> read FRelationships;
@@ -180,6 +201,7 @@ type
 
   TKDBManager = class;
   TOnChangeConnectionCount = procedure (oSender : TKDBManager) of Object;
+  TKDBBoundParam = class (TAdvObject);
 
   {!Script Show}
 
@@ -193,8 +215,7 @@ type
   Private
     FOwner: TKDBManager;
     FNoFree : Boolean;
-    FCachedObjects : array of TObject;
-    FBoundItems : TStringList;
+    FBoundItems : TAdvMap<TKDBBoundParam>;
     FUsage : String;
     FUsed : TDateTime;
     FTables : TStrings;
@@ -211,15 +232,14 @@ type
     FTerminated: Boolean;
     FTransactionId: String;
     function GetTables : TStrings;
-    procedure ClearCache; // call this on fetchnext and terminate
     function LookupInternal(ATableName, AKeyField, AKeyValue, AValueField, ADefault: String; bAsString: Boolean): String;
+    function GetColBlobAsString(ACol: Integer): String;
+    function GetColBlobAsStringByName(AName: String): String;
   Protected
     // caching for blobs, for use by concrete implementations
-    function GetBlob(ACol: Integer; var VBlob: TMemoryStream): Boolean;
-    procedure CacheBlob(ACol: Integer; ABlob: TMemoryStream);
-    procedure KeepBoundObj(sName : String; AObj : TObject);
+    procedure KeepBoundObj(sName : String; AObj : TKDBBoundParam);
 
-    // worker routines for descendents to override
+    // worker routines for descendants to override
     procedure StartTransactV; virtual; abstract;
     procedure CommitV; virtual; abstract;
     procedure RollbackV; virtual; abstract;
@@ -239,24 +259,24 @@ type
     procedure BindKeyV(AParamName: String; AParamValue: Integer); virtual; abstract;
     procedure BindDoubleV(AParamName: String; AParamValue: Double); virtual; abstract;
     procedure BindStringV(AParamName: String; AParamValue: String); virtual; abstract;
-    procedure BindTimeStampV(AParamName: String; AParamValue: KDate.TTimeStamp); virtual; abstract;
-    procedure BindBlobV(AParamName: String; AParamValue: TMemoryStream); virtual; abstract;
+    procedure BindTimeStampV(AParamName: String; AParamValue: DateSupport.TTimeStamp); virtual; abstract;
+    procedure BindDateTimeExV(AParamName: String; AParamValue: TDateTimeEx); virtual; abstract;
+    procedure BindBlobV(AParamName: String; AParamValue: TBytes); virtual; abstract;
     procedure BindNullV(AParamName: String); virtual; abstract;
     function GetColCountV: Integer; Virtual; Abstract;
     function GetColStringV(ACol: Word): String; Virtual; Abstract;
     function GetColIntegerV(ACol: Word): Integer; Virtual; Abstract;
     function GetColInt64V(ACol: Word): Int64; Virtual; Abstract;
     function GetColDoubleV(ACol: Word): Double; Virtual; Abstract;
-    function GetColMemoryV(ACol: Word): TMemoryStream; Virtual; Abstract;
     function GetColBlobV(ACol: Word): TBytes; Virtual; Abstract;
     function GetColNullV(ACol: Word): Boolean; Virtual; Abstract;
-    function GetColTimestampV(ACol: Word): KDate.TTimestamp; Virtual; Abstract;
+    function GetColTimestampV(ACol: Word): DateSupport.TTimestamp; Virtual; Abstract;
+    function GetColDateTimeExV(ACol: Word): TDateTimeEx; Virtual; Abstract;
     function GetColTypeV(ACol: Word): TKDBColumnType; Virtual; Abstract;
     function GetColKeyV(ACol: Word): Integer; Virtual; Abstract;
     function GetRowsAffectedV: Integer; Virtual; Abstract;
     function FetchMetaDataV : TKDBMetaData; Virtual; Abstract;
     procedure ListTablesV(AList : TStrings); virtual; abstract;
-    function CheckConnection : Integer; virtual; abstract;
     function DatabaseSizeV : int64; virtual; abstract;
     Function TableSizeV(sName : String):int64; virtual; abstract;
     function SupportsSizingV : Boolean; virtual; abstract;
@@ -315,22 +335,20 @@ type
     function GetColInteger(ACol: Integer): Integer;
     function GetColInt64(ACol: Integer): Int64;
     function GetColDouble(ACol: Integer): Double;
-    function GetColMemory(ACol: Integer): TMemoryStream;
     function GetColBlob(ACol: Integer): TBytes;
     function GetColNull(ACol: Integer): Boolean;
-    function GetColTimestamp(ACol: Integer): KDate.TTimestamp;
-    function GetColDateAndTime(ACol: Integer): TDateAndTime;
+    function GetColTimestamp(ACol: Integer): DateSupport.TTimestamp;
+    function GetColDateTimeEx(ACol: Integer): TDateTimeEx;
     function GetColType(ACol: Integer): TKDBColumnType;
     function GetRowsAffected: Integer;
 
     function GetColStringByName(AName: String): String;
-    function GetColMemoryByName(AName: String): TMemoryStream;
     function GetColBlobByName(AName: String): TBytes;
     function GetColIntegerByName(AName: String): Integer;
     function GetColInt64ByName(AName: String): Int64;
     function GetColDoubleByName(AName: String): Double;
-    function GetColTimeStampByName(AName: String): KDate.TTimestamp;
-    function GetColDateAndTimeByName(AName: String): TDateAndTime;
+    function GetColTimeStampByName(AName: String): DateSupport.TTimestamp;
+    function GetColDateTimeExByName(AName: String): TDateTimeEx;
     function GetColTypeByName(AName: String): TKDBColumnType;
     function GetColNullByName(AName: String): Boolean;
 
@@ -515,19 +533,24 @@ type
     }
     procedure BindString(AParamName: String; AParamValue: String);
 
+    {@member BindStringOrNull
+      Bind a String value to a named parameter, or null
+    }
+    procedure BindStringOrNull(AParamName: String; AParamValue: String);
+
     {@member BindTimeStamp
       Bind a TTimeStamp value to a named parameter. You can call this
       after using an SQL statement like this:
         insert into table (field) values (:t)
     }
-    procedure BindTimeStamp(AParamName: String; AParamValue: KDate.TTimeStamp);
+    procedure BindTimeStamp(AParamName: String; AParamValue: DateSupport.TTimeStamp);
 
     {@member BindDateAndTime
       Bind a DateTime value to a named parameter. You can call this
       after using an SQL statement like this:
         insert into table (field) values (:t)
     }
-    procedure BindDateAndTime(AParamName: String; AParamValue: TDateAndTime);
+    procedure BindDateTimeEx(AParamName: String; AParamValue: TDateTimeEx);
 
     {!Script Hide}
     {@member BindBlob
@@ -541,7 +564,7 @@ type
       pointed to in the binary does not change until after execute is
       called.
     }
-    procedure BindBlob(AParamName: String; AParamValue: TMemoryStream);
+    procedure BindBlob(AParamName: String; AParamValue: TBytes);
     {!Script Show}
 
     {@member BindBlobFromString
@@ -551,14 +574,6 @@ type
       use this for Blob fields
     }
     procedure BindBlobFromString(AParamName: String; AParamValue: String);
-
-    {@member BindBlobFromBytes
-      Bind a Binary value to a named parameter. But present a bytes for binding
-      You can call this after using an SQL statement like this:
-        insert into table (field) values (:t)
-      use this for Blob fields
-    }
-    procedure BindBlobFromBytes(AParamName: String; AParamValue: TBytes);
 
     {@member BindIntegerFromBoolean
       Bind an integer from a boolean value. Database value will be 1 if true
@@ -600,23 +615,21 @@ type
     Get Column ACol(index) as a Double (Float)
     }
     property ColDouble    [ACol: Integer]: Double Read GetColDouble;
-    {@member ColMemory
-    Get Column ACol(index) as a blob
-    }
-    property ColMemory    [ACol: Integer]: TMemoryStream Read GetColMemory;
+
     {@member ColMemory
     Get Column ACol(index) as a blob
     }
     property ColBlob    [ACol: Integer]: TBytes Read GetColBlob;
+    property ColBlobAsString [ACol: Integer]: String Read GetColBlobAsString;
     {@member ColTimestamp
     Get Column ACol(index) as a TTimestamp
     }
-    property ColTimestamp [ACol: Integer]: KDate.TTimestamp Read GetColTimestamp;
+    property ColTimestamp [ACol: Integer]: DateSupport.TTimestamp Read GetColTimestamp;
 
-    {@member ColDateAndTime
+    {@member ColDateTimeEx
     Get Column ACol(index) as a DateAndTime
     }
-    property ColDateAndTime [ACol: Integer]: TDateAndTime Read GetColDateAndTime;
+    property ColDateTimeEx [ACol: Integer]: TDateTimeEx Read GetColDateTimeEx;
 
     {!Script Hide}
     property ColKeyByName       [AName: String]: Integer Read GetColKeyByName;
@@ -642,16 +655,14 @@ type
     property ColDoubleByName    [AName: String]: Double Read GetColDoubleByName;
     {@member ColMemoryByName
       Get Column "AName" as a Blob}
-    property ColMemoryByName    [AName: String]: TMemoryStream Read GetColMemoryByName;
-    {@member ColMemoryByName
-      Get Column "AName" as a Blob}
     property ColBlobByName    [AName: String]: TBytes Read GetColBlobByName;
+    property ColBlobAsStringByName[AName: String]: String Read GetColBlobAsStringByName;
     {@member ColTimeStampByName
       Get Column "AName" as a TTimeStamp}
-    property ColTimeStampByName [AName: String]: KDate.TTimeStamp Read GetColTimeStampByName;
-    {@member ColDateAndTimeByName
-      Get Column "AName" as a TDateAndTime}
-    property ColDateAndTimeByName [AName: String]: TDateAndTime Read GetColDateAndTimeByName;
+    property ColTimeStampByName [AName: String]: DateSupport.TTimeStamp Read GetColTimeStampByName;
+    {@member ColDateTimeExByName
+      Get Column "AName" as a TDateTimeEx}
+    property ColDateTimeExByName [AName: String]: TDateTimeEx Read GetColDateTimeExByName;
     {@member ColCount
       Number of columns in current result set
     }
@@ -668,13 +679,14 @@ type
     {@member SQL
       The SQL string to execute
     }
-    property SQL: String Read FSQl Write FSql;
-
+    property SQL: String Read FSql Write FSql;
   end;
+
+  TKDBConnectionProc = reference to Procedure (conn : TKDBConnection);
 
   TKDBManager = class(TAdvObject)
   Private
-    FSemaphore: TSemaphore;
+    FSemaphore : TSemaphore;
     FWaitCreate : boolean;
     FConnections : TAdvList<TKDBConnection>;
     FAvail: TAdvList<TKDBConnection>;
@@ -685,6 +697,7 @@ type
     FServerIsAvailable : Boolean;
     FLastServerGood : TDateTime;
     FLastServerError : String;
+    FThreadWaitCount : integer;
 
     FMaxConnCount : Integer;
     FName : string;
@@ -695,6 +708,7 @@ type
     procedure Error(AConn : TKDBConnection; AException: Exception; AErrMsg : string);
     function GetCurrentUse: Integer;
     procedure SetMaxConnCount(const Value: Integer);
+    procedure CheckWait;
   Protected
     FLock : TCriticalSection;
 
@@ -702,6 +716,7 @@ type
     function GetDBPlatform: TKDBPlatform; Virtual; Abstract;
     function GetDBProvider: TKDBProvider; Virtual; Abstract;
     function GetDBDetails: String; Virtual; Abstract;
+    function GetDriver: String; Virtual; Abstract;
     procedure init; virtual;
   Public
     constructor Create(AName : String; AMaxConnCount: Integer); overload;
@@ -712,8 +727,8 @@ type
 
     procedure ExecSQL(ASql, AName : String);
     function GetConnection(const AUsage: String): TKDBConnection;
+    procedure connection(usage : String; proc : TKDBConnectionProc);
     procedure SaveSettings(ASettings : TSettingsAdapter); virtual; abstract;
-    function CheckConnection : Integer;
 
     property MaxConnCount : Integer Read FMaxConnCount write SetMaxConnCount;
     property CurrConnCount: Integer Read GetCurrentCount;
@@ -723,6 +738,7 @@ type
     property Platform: TKDBPlatform read GetDBPlatform;
     property Provider : TKDBProvider read GetDBProvider;
     property DBDetails: String read GetDBDetails;
+    Property Driver : String read GetDriver;
     function GetConnSummary : String;
     property Tag : integer read FTag write FTag;
 
@@ -750,7 +766,7 @@ type
   private
     FLock : TCriticalSection;
     FHooks : TAdvList<TKDBHook>;
-    FList : TAdvList<TKDBManager>;
+    FList : TList<TKDBManager>;
     procedure AddConnMan(AConnMan : TKDBManager);
     procedure RemoveConnMan(AConnMan : TKDBManager);
     function GetConnMan(i : Integer):TKDBManager;
@@ -778,8 +794,7 @@ function KDBManagers : TKDBManagerList;
 implementation
 
 uses
-  AdvFactories,
-  Windows,
+//  Windows,
   ThreadSupport,
   ErrorSupport;
 
@@ -810,65 +825,33 @@ begin
   FTag := 0;
   FSQL := '';
   FTerminated := true;
-  SetLength(FCachedObjects, 20); //small but rearely exceeded
-  for i := Low(FCachedObjects) to High(FCachedObjects) do
-    begin
-    FCachedObjects[i] := nil;
-    end;
   FInTransaction := false;
-  FBoundItems := TStringList.create(true);
-  FBoundItems.sorted := true;
-  FBoundItems.Duplicates := dupError;
+  FBoundItems := TAdvMap<TKDBBoundParam>.create;
   FTables := TStringList.create;
 end;
 
 destructor TKDBConnection.Destroy;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.Destroy';
 begin
-  ClearCache;
   FBoundItems.free;
   FTables.free;
   inherited;
 end;
 
-procedure TKDBConnection.BindBlobFromString(AParamName, AParamValue: String);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.BindBinaryFromString';
-var
-  LMem: TMemoryStream;
-  b : TBytes;
+procedure TKDBConnection.BindBlob(AParamName: String; AParamValue: TBytes);
 begin
-
-  b := TEncoding.UTF8.GetBytes(AParamValue);
-  LMem := TMemoryStream.Create;
-  KeepBoundObj(AParamName, lMem);
-  if AParamValue <> '' then
-    begin
-    LMem.Write(b[0], length(b));
-    LMem.position := 0;
-    end;
-  BindBlob(AParamName, LMem);
+  BindBlobV(AParamName, AParamValue);
 end;
 
-procedure TKDBConnection.BindBlobFromBytes(AParamName : String; AParamValue: TBytes);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.BindBinaryFromString';
+procedure TKDBConnection.BindBlobFromString(AParamName, AParamValue: String);
 var
-  LMem: TMemoryStream;
+  b : TBytes;
 begin
-
-  LMem := TMemoryStream.Create;
-  KeepBoundObj(AParamName, lMem);
-  if Length(AParamValue) > 0 then
-    begin
-    LMem.Write(AParamValue[0], length(AParamValue));
-    LMem.position := 0;
-    end;
-  BindBlob(AParamName, LMem);
+  b := TEncoding.UTF8.GetBytes(AParamValue);
+  BindBlob(AParamName, b);
 end;
 
 procedure TKDBConnection.BindIntegerFromBoolean(AParamName: String; AParamValue: Boolean);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.BindIntegerFromBoolean';
 begin
-
   if AParamValue then
     begin
     BindInteger(AParamName, 1);
@@ -879,29 +862,7 @@ begin
     end;
 end;
 
-procedure TKDBConnection.CacheBlob(ACol: Integer; ABlob: TMemoryStream);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.CacheBlob';
-var
-  i, j: integer;
-begin
-  if ACol >= length(FCachedObjects) then
-    begin
-    i := length(FCachedObjects);
-    SetLength(FCachedObjects, ACol+4);
-    for j := i to High(FCachedObjects) do
-      begin
-      FCachedObjects[j] := nil;
-      end;
-    end;
-  if FCachedObjects[ACol] <> nil then
-    begin
-    FCachedObjects[ACol].free;
-    end;
-  FCachedObjects[ACol] := ABlob;
-end;
-
 function TKDBConnection.CountSQL(ASql: String): Cardinal;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.CountSQL';
 begin
 
   FSQL := ASql;
@@ -918,13 +879,11 @@ begin
 end;
 
 procedure TKDBConnection.Error(AException: Exception; AErrMsg : string ='');
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.Error';
 begin
   FOwner.Error(self, AException, AErrMsg);
 end;
 
 function TKDBConnection.ExecSQL(ASql: String; rows : integer) : integer;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.ExecSQL.1';
 begin
 
   FSQL := ASql;
@@ -940,8 +899,9 @@ begin
 end;
 
 Function TKDBConnection.ExecSQL(ASql: String) : integer;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.ExecSQL';
 begin
+  if asql = '' then
+    exit;
 
   FSQL := ASql;
   Prepare;
@@ -954,7 +914,6 @@ begin
 end;
 
 procedure TKDBConnection.ExecSQLBatch(ASql: array of String);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.ExecSQLBatch';
 var
   i: Integer;
 begin
@@ -982,94 +941,56 @@ begin
   end;
 end;
 
-function TKDBConnection.GetBlob(ACol: Integer; var VBlob: TMemoryStream): Boolean;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetBlob';
-begin
-  Result := (ACol < Length(FCachedObjects)) and assigned(FCachedObjects[ACol]);
-  if Result then
-    begin
-    VBlob := FCachedObjects[ACol] as TMemoryStream;
-    end;
-end;
-
 function TKDBConnection.GetColDoubleByName(AName: String): Double;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColDoubleByName';
 begin
   result := GetColDouble(ColByName(AName));
 end;
 
 function TKDBConnection.GetColInt64ByName(AName: String): Int64;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColInt64ByName';
 begin
   result := GetColInt64(ColByName(AName));
 end;
 
 function TKDBConnection.GetColIntegerByName(AName: String): Integer;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColIntegerByName';
 begin
   result := GetColInteger(ColByName(AName));
 end;
 
 function TKDBConnection.GetColKeyByName(AName: String): Integer;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColKeyByName';
 begin
   result := GetColKey(ColByName(AName));
 end;
 
-function TKDBConnection.GetColMemoryByName(AName: String): TMemoryStream;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColMemoryByName';
-begin
-  result := GetColMemory(ColByName(AName));
-end;
-
 function TKDBConnection.GetColNullByName(AName: String): Boolean;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColNullByName';
 begin
   result := GetColNull(ColByName(AName));
 end;
 
 function TKDBConnection.GetColStringByName(AName: String): String;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColStringByName';
 begin
   result := GetColString(ColByName(AName));
 end;
 
-function TKDBConnection.GetColTimeStampByName(AName: String): KDate.TTimestamp;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColTimeStampByName';
+function TKDBConnection.GetColTimeStampByName(AName: String): DateSupport.TTimestamp;
 begin
   result := GetColTimestamp(ColByName(AName));
 end;
 
-function TKDBConnection.GetColDateAndTimeByName(AName: String): TDateAndTime;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColTimeStampByName';
+function TKDBConnection.GetColDateTimeExByName(AName: String): TDateTimeEx;
 begin
-  result := TDateAndTime.Create;
-  Result.Timestamp := GetColTimestamp(ColByName(AName));
+  result := TDateTimeEx.fromTS(GetColTimestamp(ColByName(AName)));
 end;
 
 function TKDBConnection.GetColTypeByName(AName: String): TKDBColumnType;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColTypeByName';
 begin
   result := GetColType(ColByName(AName));
 end;
 
 procedure TKDBConnection.Release;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.Release';
 begin
   FOwner.Release(self);
 end;
 
-procedure TKDBConnection.ClearCache;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.ClearCache';
-var
-  i : integer;
-begin
-  for i := low(FCachedObjects) to High(FCachedObjects) do
-    begin
-    FCachedObjects[i].free;
-    FCachedObjects[i] := nil;
-    end;
-end;
 
 function TKDBConnection.Lookup(ATableName, AKeyField, AKeyValue, AValueField, ADefault: String): String;
 begin
@@ -1082,7 +1003,6 @@ begin
 end;
 
 function TKDBConnection.LookupInternal(ATableName, AKeyField, AKeyValue, AValueField, ADefault: String; bAsString : Boolean): String;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.Lookup';
 var
   FVal : Double;
 begin
@@ -1137,32 +1057,26 @@ begin
 end;
 
 procedure TKDBConnection.Prepare;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.Prepare';
 begin
   FTerminated := false;
   FBoundItems.Clear;
-  ClearCache;
   inc(FPrepareCount);
   PrepareV;
 end;
 
 function TKDBConnection.FetchNext: Boolean;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.FetchNext';
 begin
   inc(FRowCount);
-  ClearCache;
   result := FetchNextV;
 end;
 
 procedure TKDBConnection.Terminate;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.Terminate';
 begin
   FTerminated := true;
   TerminateV;
 end;
 
 procedure TKDBConnection.StartTransact;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.StartTransact';
 begin
   StartTransactV;
   FInTransaction := true;
@@ -1170,7 +1084,6 @@ begin
 end;
 
 procedure TKDBConnection.Commit;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.Commit';
 begin
   // order here is important.
   // if the commit fails, then a rollback is required, so we are still in the transaction
@@ -1179,25 +1092,14 @@ begin
 end;
 
 procedure TKDBConnection.Rollback;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.Rollback';
 begin
   FInTransaction := False;
   RollbackV;
 end;
 
-procedure TKDBConnection.KeepBoundObj(sName : String; AObj : TObject);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.KeepBoundObj';
-var
-  i : integer;
+procedure TKDBConnection.KeepBoundObj(sName : String; AObj : TKDBBoundParam);
 begin
-  i := FBoundItems.indexof(sName);
-  if i <> -1 then
-    begin
-    FBoundItems.Objects[i].Free;
-    FBoundItems.Objects[i] := aObj;
-    end
-  else
-    FBoundItems.AddObject(sName, AObj);
+  FBoundItems.AddOrSetValue(sName, aObj);
 end;
 
 function TKDBConnection.link: TKDBConnection;
@@ -1206,17 +1108,12 @@ begin
 end;
 
 function TKDBConnection.GetTables : TStrings;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetTables';
 begin
   FTables.Clear;
   ListTables(FTables);
   result := FTables;
 end;
 
-procedure TKDBConnection.BindBlob(AParamName: String; AParamValue: TMemoryStream);
-begin
-  BindBlobV(AParamName, AParamValue);
-end;
 
 procedure TKDBConnection.BindDouble(AParamName: String; AParamValue: Double);
 begin
@@ -1246,6 +1143,14 @@ end;
 procedure TKDBConnection.BindString(AParamName, AParamValue: String);
 begin
   BindStringV(AParamName, AParamValue);
+end;
+
+procedure TKDBConnection.BindStringOrNull(AParamName, AParamValue: String);
+begin
+  if AParamValue = '' then
+    BindNull(aParamName)
+  else
+    BindString(aParamName, AParamValue);
 end;
 
 procedure TKDBConnection.BindTimeStamp(AParamName: String; AParamValue: TTimeStamp);
@@ -1293,8 +1198,17 @@ begin
   result := GetColBlobV(ACol);
 end;
 
+function TKDBConnection.GetColBlobAsString(ACol: Integer): String;
+begin
+  result := TEncoding.UTF8.GetString(ColBlob[aCol]);
+end;
+
+function TKDBConnection.GetColBlobAsStringByName(AName: String): String;
+begin
+  result := TEncoding.UTF8.GetString(ColBlobByName[AName]);
+end;
+
 function TKDBConnection.GetColBlobByName(AName: String): TBytes;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBConnection.GetColBlobByName';
 begin
   result := GetColBlob(ColByName(AName));
 end;
@@ -1324,10 +1238,6 @@ begin
   result := GetColKeyV(ACol);
 end;
 
-function TKDBConnection.GetColMemory(ACol: Integer): TMemoryStream;
-begin
-  result := GetColMemoryV(ACol);
-end;
 
 function TKDBConnection.GetColNull(ACol: Integer): Boolean;
 begin
@@ -1344,10 +1254,9 @@ begin
   result := GetColTimestampV(ACol);
 end;
 
-function TKDBConnection.GetColDateAndTime(ACol: Integer): TDateAndTime;
+function TKDBConnection.GetColDateTimeEx(ACol: Integer): TDateTimeEx;
 begin
-  result := TDateAndTime.Create;
-  result.TimeStamp := GetColTimestampV(ACol);
+  result := GetColDateTimeExV(ACol);
 end;
 
 function TKDBConnection.GetColType(ACol: Integer): TKDBColumnType;
@@ -1381,9 +1290,9 @@ begin
 
 end;
 
-procedure TKDBConnection.BindDateAndTime(AParamName: String; AParamValue: TDateAndTime);
+procedure TKDBConnection.BindDateTimeEx(AParamName: String; AParamValue: TDateTimeEx);
 begin
-  BindTimeStampV(aParamName, AParamValue.TimeStamp);
+  BindDateTimeExV(aParamName, AParamValue);
 end;
 
 function TKDBConnection.DatabaseSize : int64;
@@ -1413,7 +1322,7 @@ begin
 
   FLock := TCriticalSection.create;
   FDBLogger := TKDBLogger.create;
-  FSemaphore := TSemaphore.Create(0);
+  FSemaphore := TSemaphore.Create(nil, 0, 4{ $FFFF}, '');
   FWaitCreate := false;
 
   FConnections := TAdvList<TKDBConnection>.create;
@@ -1422,7 +1331,6 @@ begin
 
   FClosing := false;
   GManagers.AddConnMan(self);
-  Free; // special case - can't free if it's linked in the manager, so manually undo that
   init;
 end;
 
@@ -1431,15 +1339,11 @@ begin
 end;
 
 destructor TKDBManager.Destroy;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.Destroy';
 begin
 
   FClosing := true;
-  Link; // see note above
-  Link;
   if GManagers <> nil then
-
-  GManagers.RemoveConnMan(self);
+    GManagers.RemoveConnMan(self);
 
 
   FAvail.free;
@@ -1452,7 +1356,6 @@ begin
 end;
 
 function TKDBManager.GetCurrentCount: Integer;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.GetCurrentCount';
 begin
   FLock.Enter;
   try
@@ -1462,15 +1365,35 @@ begin
   end;
 end;
 
+procedure TKDBManager.CheckWait;
+begin
+  if FWaitCreate then
+  begin
+    FLock.Lock;
+    try
+      inc(FThreadWaitCount);
+    finally
+      FLock.Unlock;
+    end;
+    try
+      if FSemaphore.WaitFor(DEFAULT_CONNECTION_WAIT_LENGTH) = wrError then
+        raise EKDBException.Create('['+Name+'] KDBManager Wait Failed - ' + ErrorAsString(GetLastError));
+    finally
+      FLock.Lock;
+      try
+        dec(FThreadWaitCount);
+      finally
+        FLock.Unlock;
+      end;
+    end;
+  end;
+end;
+
 function TKDBManager.GetConnection(const AUsage: String): TKDBConnection;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.GetConnection';
 var
   LCreateNew: Boolean;
 begin
-  if FWaitCreate and (FSemaphore.Wait(DEFAULT_CONNECTION_WAIT_LENGTH) = wrError) then
-    begin
-    raise EKDBException.Create('['+Name+'] KDBManager Wait Failed - ' + ErrorAsString(GetLastError));
-    end;
+  CheckWait;
   result := PopAvail;
   if not assigned(result) then
     begin
@@ -1507,7 +1430,7 @@ begin
       result.FNoFree := true;
       FLock.Enter;
       try
-        FWaitCreate := (FMaxConnCount > 0) and (FConnections.Count > FMaxConnCount div 2);
+        FWaitCreate := (FMaxConnCount > 0) and (FConnections.Count = FMaxConnCount);
       finally
         FLock.Leave;
       end;
@@ -1533,10 +1456,10 @@ begin
 end;
 
 procedure TKDBManager.Release(AConn : TKDBConnection);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.Release';
 var
   LDispose : boolean;
   LIndex : integer;
+  s : String;
 begin
 
   FDBLogger.RecordUsage(AConn.Usage, AConn.FUsed, AConn.FRowCount, AConn.FPrepareCount, nil, '');
@@ -1547,17 +1470,24 @@ begin
     FInUse.Delete(LIndex);
     FLastServerGood := now;
     FServerIsAvailable := true;
+    s := AConn.FUsage;
     AConn.FUsage := '';
     AConn.FUsed := 0;
     if LDispose then
       begin
       FConnections.Remove(AConn);
-      FWaitCreate := (FMaxConnCount > 0) and (FConnections.count > FMaxConnCount div 2);
+      FWaitCreate := (FMaxConnCount > 0) and (FConnections.count = FMaxConnCount);
       end
     else
       begin
       FAvail.Add(AConn.Link);
-      FSemaphore.Release;
+      try
+        if FThreadWaitCount > 0 then
+         FSemaphore.Release;
+      except
+        on e : exception do
+          Writeln('Error releasing semaphore for '+s+': '+e.message+' for '+s);
+      end;
       end;
   finally
     FLock.Leave;
@@ -1576,11 +1506,10 @@ begin
 end;
 
 procedure TKDBManager.Error(AConn : TKDBConnection; AException: Exception; AErrMsg : string);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.Error';
 var
   LIndex : integer;
+  s : String;
 begin
-
   FDBLogger.RecordUsage(AConn.Usage, AConn.FUsed, AConn.FRowCount, AConn.FPrepareCount, AException, AErrMsg);
 
   FLock.Enter; // must lock because of the debugger
@@ -1592,12 +1521,18 @@ begin
       end;
     FConnections.Remove(AConn);
     FWaitCreate := (FMaxConnCount > 0) and (FConnections.count > FMaxConnCount div 2);
-    FSemaphore.Release;
     if FAvail.Count = 0 then
     begin
       FServerIsAvailable := false;
       FLastServerError := AException.message;
     End;
+    try
+      if FThreadWaitCount > 0 then
+        FSemaphore.Release;
+    except
+      on e : exception do
+        raise Exception.Create('Error (2) releasing semaphore for '+AConn.Usage+': '+e.message+'. please report this error to grahameg@gmail.com (original error = "'+AException.Message+'"');
+    end;
   finally
     FLock.Leave;
   end;
@@ -1606,7 +1541,6 @@ begin
 end;
 
 function TKDBManager.GetConnSummary: String;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.GetConnSummary:';
 var
   i : integer;
 begin
@@ -1615,7 +1549,7 @@ begin
   try
     for i := 0 to FInUse.Count - 1 do
       begin
-      StringAppend(result, (FInUse[i] as TKDBConnection).FUsage+' '+DescribePeriod(now - (FInUse[i] as TKDBConnection).FUsed)+' ('+(FInUse[i] as TKDBConnection).SQL+')', ',');
+      StringAppend(result, (FInUse[i] as TKDBConnection).FUsage+' '+DescribePeriod(now - (FInUse[i] as TKDBConnection).FUsed)+' ('+(FInUse[i] as TKDBConnection).SQL+')', #13#10);
       end;
     if result <> '' then
       begin
@@ -1631,7 +1565,6 @@ begin
 end;
 
 function TKDBManager.GetCurrentUse: Integer;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.GetCurrentUse:';
 begin
   FLock.Enter;
   try
@@ -1647,7 +1580,6 @@ begin
 end;
 
 function TKDBManager.PopAvail: TKDBConnection;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.PopAvail:';
 begin
   FLock.Enter;
   try
@@ -1666,7 +1598,6 @@ begin
 end;
 
 procedure TKDBManager.ExecSQL(ASql, AName : String);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.ExecSQL';
 var
   LConn : TKDBConnection;
 begin
@@ -1680,24 +1611,6 @@ begin
       LConn.Error(e);
       recordStack(e);
       raise;
-      end;
-  end;
-end;
-
-Function TKDBManager.CheckConnection : Integer;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManager.ExecSQL';
-var
-  LConn : TKDBConnection;
-begin
-  LConn := GetConnection('CheckConnection');
-  try
-    Result := LConn.CheckConnection;
-    LConn.Release;
-  except
-    on e:exception do
-      begin
-      LConn.Error(e);
-      Result := CONNECTION_FAIL;
       end;
   end;
 end;
@@ -1764,19 +1677,34 @@ begin
   end;
 end;
 
+procedure TKDBManager.connection(usage: String; proc: TKDBConnectionProc);
+var
+  conn : TKDBConnection;
+begin
+  conn := GetConnection(usage);
+  try
+    proc(conn);
+    conn.Release;
+  except
+    on e : exception do
+    begin
+      conn.Error(e);
+      raise;
+    end;
+  end;
+end;
+
 { TKDBManagerList }
 
 constructor TKDBManagerList.create;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.create';
 begin
   inherited create;
   FLock := TCriticalSection.create;
   FHooks := TAdvList<TKDBHook>.create;
-  FList := TAdvList<TKDBManager>.create;
+  FList := TList<TKDBManager>.create;
 end;
 
 destructor TKDBManagerList.destroy;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.destroy';
 begin
   FLock.free;
   FHooks.free;
@@ -1794,13 +1722,12 @@ begin
 end;
 
 procedure TKDBManagerList.AddConnMan(AConnMan : TKDBManager);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.AddConnMan';
 var
   i : integer;
 begin
   Lock;
   try
-    FList.Add(AConnMan.Link);
+    FList.Add(AConnMan);
     for i := 0 to FHooks.count -1 do
       FHooks[i].FHook(AConnMan, true);
   finally
@@ -1809,7 +1736,6 @@ begin
 end;
 
 procedure TKDBManagerList.RemoveConnMan(AConnMan : TKDBManager);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.RemoveConnMan';
 var
   i : integer;
 begin
@@ -1824,7 +1750,6 @@ begin
 end;
 
 function TKDBManagerList.GetConnMan(i : Integer):TKDBManager;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.GetConnMan';
 begin
   result := FList[i];
 end;
@@ -1848,25 +1773,21 @@ begin
 end;
 
 procedure TKDBManagerList.Lock;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.Lock';
 begin
   FLock.Enter;
 end;
 
 procedure TKDBManagerList.UnLock;
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.UnLock';
 begin
   FLock.Leave;
 end;
 
 procedure TKDBManagerList.RegisterHook(AName : String; AHook : TKDBManagerEvent);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.RegisterHook';
 begin
   FHooks.Add(TKDBHook.create(AName, AHook));
 end;
 
 procedure TKDBManagerList.UnRegisterHook(AName : String);
-const ASSERT_LOCATION = ASSERT_UNIT+'.TKDBManagerList.UnRegisterHook';
 var
   i : integer;
 begin
@@ -1911,6 +1832,11 @@ begin
     begin
     result := result +' [not Null]';
     end;
+end;
+
+function TKDBColumn.Link: TKDBColumn;
+begin
+  result := TKDBColumn(Inherited Link);
 end;
 
 function CommaText(list : TAdvList<TKDBColumn>) : String;
@@ -1994,6 +1920,11 @@ begin
   result := false;
   for c in FColumns do
     result := result or (c.Name = name);
+end;
+
+function TKDBTable.Link: TKDBTable;
+begin
+  result := TKDBTable(inherited link);
 end;
 
 { TKDBMetaData }

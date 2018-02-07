@@ -4,15 +4,15 @@ unit kCritSct;
 Copyright (c) 2001-2013, Kestral Computing Pty Ltd (http://www.kestral.com.au)
 All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification, 
+Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
 
- * Redistributions of source code must retain the above copyright notice, this 
+ * Redistributions of source code must retain the above copyright notice, this
    list of conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright notice, 
-   this list of conditions and the following disclaimer in the documentation 
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
    and/or other materials provided with the distribution.
- * Neither the name of HL7 nor the names of its contributors may be used to 
+ * Neither the name of HL7 nor the names of its contributors may be used to
    endorse or promote products derived from this software without specific 
    prior written permission.
 
@@ -35,14 +35,20 @@ interface
 // Do not change the uses clause of this unit without consulting NDM
 
 uses
-  Windows;
+  {$IFDEF MACOS}
+  OSXUtils,
+  {$ELSE}
+  Windows,
+  {$ENDIF}
+  SyncObjs;
 
-{--- CLR types - dealing with CLR and win32 differences ----}
 const
   NO_THREAD = 0;
 
 type
   Thread = Cardinal;
+
+  TCriticalSectionProcedure = reference to procedure;
 
   TCriticalSection = class(TObject)
   Private
@@ -85,6 +91,7 @@ type
     procedure changeName(aName : String);
 
 
+    procedure exec(proc : TCriticalSectionProcedure); overload;
     // debugging support
     property Category: String Read FCategory Write FCategory;
     class function CurrentCount: Integer;
@@ -100,40 +107,6 @@ type
     property EntryCount: Integer Read FEntryCount;
     property LockThread: Thread Read FLockThread;
   end;
-
-{$IFNDEF CLR}
-  TWaitResult = (wrSignaled, wrTimeout, wrAbandoned, wrError);
-
-  // Event Object: Linux OK
-  TEvent = class(TObject)
-  Private
-    FLastError: Integer;
-    Event: THandle;
-  Public
-    constructor Create(AutoReset: Boolean; Name: String);
-    destructor Destroy; Override;
-    function Wait(timeout: Cardinal): Boolean;
-    function WaitRes(timeout: Cardinal): TWaitResult;
-    procedure Signal;
-    procedure UnSignal;
-
-    property LastError: Integer Read FLastError;
-    property Handle: THandle Read event; // exposed for call to WaitForMultipleEvents
-  end;
-
-  TSemaphore = class(TObject)
-  Private
-    FSem: THandle;
-  Public
-    constructor Create(CurrCount: Integer);
-    destructor Destroy; Override;
-    function Wait(timeout: Cardinal): TWaitResult;
-    procedure Release;
-    property Handle: THandle Read FSem;
-  end;
-
-function WaitForEvents(list: array of TEvent; TimeOut: Cardinal; WaitAll: Boolean): DWord;
-  {$ENDIF}
 
 Function CriticalSectionChecksPass(Var sMessage : String) : Boolean;
 
@@ -324,6 +297,16 @@ begin
   Lock(AName);
 end;
 
+procedure TCriticalSection.exec(proc: TCriticalSectionProcedure);
+begin
+  lock;
+  try
+    proc;
+  finally
+    unlock;
+  end;
+end;
+
 procedure TCriticalSection.Leave;
 begin
   UnLock;
@@ -348,106 +331,6 @@ begin
      IntToStr(FEntryCount)+' '+IntToStr(FLockThread)+' ';
   for i := 0 to High(FLockName) do
     result := result + '/' + FLockName[i];
-end;
-
-{ TEvent }
-constructor TEvent.Create(AutoReset: Boolean; Name: String);
-begin
-  inherited Create;
-  event := CreateEvent(NIL, not AutoReset, False, NIL {unnamed event});
-end;
-
-destructor TEvent.Destroy;
-begin
-  closehandle(event);
-  inherited Destroy;
-end;
-
-function TEvent.WaitRes(timeout: Cardinal): TWaitResult;
-begin
-  case WaitForSingleObject(Handle, Timeout) of
-    WAIT_ABANDONED:
-      Result := wrAbandoned;
-    WAIT_OBJECT_0:
-      Result := wrSignaled;
-    WAIT_TIMEOUT:
-      Result := wrTimeout;
-    WAIT_FAILED:
-      begin
-      Result := wrError;
-      FLastError := GetLastError;
-      end;
-    else
-      Result := wrError;
-    end;
-end;
-
-function TEvent.Wait(timeout: Cardinal): Boolean;
-begin
-  Result := WaitRes(TimeOut) = wrSignaled;
-end;
-
-procedure TEvent.Signal;
-begin
-  SetEvent(event);
-end;
-
-procedure TEvent.UnSignal;
-begin
-  ResetEvent(event);
-end;
-
-function WaitForEvents(list: array of TEvent; TimeOut: Cardinal; WaitAll: Boolean): DWord;
-var
-  WaitObjectList: array [0..MAXIMUM_WAIT_OBJECTS - 1] of DWord;
-  i, j: Integer;
-begin
-  j := 0;
-  for i := 0 to High(List) do
-    begin
-    if (list[i] <> NIL) then
-      begin
-      WaitObjectList[j] := list[i].event;
-      inc(j);
-      end;
-    end;
-  Result := WaitForMultipleObjects(j, @WaitObjectList, WaitAll, TimeOut);
-end;
-
-{ TSemaphore }
-
-constructor TSemaphore.Create(CurrCount: Integer);
-begin
-  inherited Create;
-  FSem := CreateSemaphore(NIL, CurrCount, $FFFF, NIL); // arbitrarily large number
-end;
-
-destructor TSemaphore.Destroy;
-begin
-  closehandle(FSem);
-  inherited Destroy;
-end;
-
-function TSemaphore.Wait(timeout: Cardinal): TWaitResult;
-var
-  r: Cardinal;
-begin
-  r := WaitForSingleObject(FSem, timeout);
-  case r of
-    WAIT_OBJECT_0:
-      Result := wrSignaled;
-    WAIT_TIMEOUT:
-      Result := wrTimeOut;
-    WAIT_ABANDONED:
-      Result := wrAbandoned;
-    else
-      Result := wrError;
-    end;
-end;
-
-procedure TSemaphore.Release;
-begin
-  releaseSemaphore(FSem, 1, NIL);
 end;
 
 Function CriticalSectionChecksPass(Var sMessage : String) : Boolean;

@@ -38,7 +38,7 @@ interface
 
 uses
   SysUtils, Classes,
-  StringSupport, kCritSct,
+  StringSupport, kCritSct, TextUtilities,
   AdvObjects, AdvGenerics, AdvStringMatches, AdvBuffers, ADvMemories,
   AdvObjectLists, AdvNameBuffers,
   AdvFiles, AdvVclStreams, AdvZipReaders, AdvZipParts,
@@ -107,7 +107,7 @@ Type
   end;
 
 
-  TBaseWorkerContext = class abstract (TWorkerContext)
+  TBaseWorkerContext = class abstract (TFHIRWorkerContext)
   protected
     FLock : TCriticalSection;
     FProfiles : TProfileManager;
@@ -147,7 +147,7 @@ Type
 
   TProfileUtilities = class (TAdvObject)
   private
-    context : TWorkerContext;
+    context : TFHIRWorkerContext;
     messages : TFhirOperationOutcomeIssueList;
     procedure log(message : String);
     function fixedPath(contextPath, pathSimple : String) : String;
@@ -168,7 +168,7 @@ Type
     function findEndOfElement(context : TFhirStructureDefinitionDifferential; cursor : integer) : integer; overload;
     function findEndOfElement(context : TFhirStructureDefinitionSnapshot; cursor : integer) : integer; overload;
     function orderMatches(diff, base : TFHIRBoolean) : boolean;
-    function discriiminatorMatches(diff, base : TFhirStringList) : boolean;
+    function discriiminatorMatches(diff, base : TFhirElementDefinitionSlicingDiscriminatorList) : boolean;
     function ruleMatches(diff, base : TFhirResourceSlicingRulesEnum) : boolean;
     function summariseSlicing(slice : TFhirElementDefinitionSlicing) : String;
     procedure updateFromSlicing(dst, src : TFhirElementDefinitionSlicing);
@@ -179,7 +179,7 @@ Type
     function overWriteWithCurrent(profile,
       usage: TFHIRElementDefinition): TFHIRElementDefinition;
   public
-    Constructor create(context : TWorkerContext; messages : TFhirOperationOutcomeIssueList);
+    Constructor create(context : TFHIRWorkerContext; messages : TFhirOperationOutcomeIssueList);
     Destructor Destroy; override;
     {
        * Given a base (snapshot) profile structure, and a differential profile, generate a snapshot profile
@@ -202,7 +202,7 @@ implementation
 
 { TProfileUtilities }
 
-constructor TProfileUtilities.create(context : TWorkerContext; messages : TFhirOperationOutcomeIssueList);
+constructor TProfileUtilities.create(context : TFHIRWorkerContext; messages : TFhirOperationOutcomeIssueList);
 begin
   inherited Create;
   self.context := context;
@@ -242,8 +242,8 @@ begin
     s := d.Path.substring(d.Path.lastIndexOf('.')+1)
   else
     s := d.Path;
-  if (d.type_List.Count > 0) and (d.type_List[0].profileList.Count > 0) then
-    result := '.' + s + '['+d.type_List[0].profileList[0].value+']'
+  if (d.type_List.Count > 0) and (d.type_List[0].profile <> '') then
+    result := '.' + s + '['+d.type_List[0].profile+']'
   else
     result := '.' + s;
 end;
@@ -253,11 +253,12 @@ var
   c : TFHIRCoding;
   s : TFHIRString;
   cc : TFhirElementDefinitionConstraint;
+  ex : TFhirElementDefinitionExample;
 begin
   result := profile.Clone;
   try
-    if (usage.NameElement <> nil) then
-      result.Name := usage.Name;
+    if (usage.sliceNameElement <> nil) then
+      result.sliceName := usage.sliceName;
     if (usage.Label_Element <> nil) then
       result.Label_ := usage.Label_;
     for c in usage.codeList do
@@ -267,8 +268,8 @@ begin
       result.Definition := usage.Definition;
     if (usage.ShortElement <> nil) then
       result.Short := usage.Short;
-    if (usage.CommentsElement <> nil) then
-      result.Comments := usage.Comments;
+    if (usage.CommentElement <> nil) then
+      result.Comment := usage.Comment;
     if (usage.RequirementsElement <> nil) then
       result.Requirements := usage.Requirements;
     for s in usage.aliasList do
@@ -282,8 +283,8 @@ begin
       result.Fixed := usage.Fixed;
     if (usage.PatternElement <> nil) then
       result.Pattern := usage.Pattern;
-    if (usage.ExampleElement <> nil) then
-      result.Example := usage.Example;
+    for ex in usage.exampleList do
+      result.ExampleList.add(ex.clone);
     if (usage.MinValueElement <> nil) then
       result.MinValue := usage.MinValue;
     if (usage.MaxValueElement <> nil) then
@@ -343,13 +344,13 @@ begin
         result.elementList.add(outcome);
         inc(baseCursor);
       end
-      else if (diffMatches.Count = 1) and (slicingHandled or ((diffMatches[0].slicing = nil) and not (isExtension(diffMatches[0]) and (diffMatches[0].name = '')))) then
+      else if (diffMatches.Count = 1) and (slicingHandled or ((diffMatches[0].slicing = nil) and not (isExtension(diffMatches[0]) and (diffMatches[0].slicename = '')))) then
       begin // one matching element in the differential
         log(cpath+': single match in the differential at '+inttostr(diffCursor));
         template := nil;
-        if (diffMatches[0].type_List.Count = 1) and (diffMatches[0].type_List[0].profileList.count > 0) and (diffMatches[0].type_List[0].Code <> 'Reference') then
+        if (diffMatches[0].type_List.Count = 1) and (diffMatches[0].type_List[0].profile <> '') and (diffMatches[0].type_List[0].Code <> 'Reference') then
         begin
-          p := diffMatches[0].type_List[0].profileList[0].value;
+          p := diffMatches[0].type_List[0].profile;
           sd := context.fetchResource(frtStructureDefinition, p) as TFhirStructureDefinition;
           try
             if (sd <> nil) then
@@ -375,7 +376,7 @@ begin
         outcome := updateURLs(url, template);
         outcome.path := fixedPath(contextPath, outcome.path);
         updateFromBase(outcome, currentBase);
-        outcome.name := diffMatches[0].Name;
+        outcome.slicename := diffMatches[0].sliceName;
         outcome.slicing := nil;
         updateFromDefinition(outcome, diffMatches[0], profileName, trimDifferential, url);
         if (outcome.path.endsWith('[x]')) and (outcome.type_List.Count = 1 ) and (outcome.type_List[0].code <> '') then
@@ -419,7 +420,7 @@ begin
         if (not unbounded(currentBase)) and (not isSlicedToOneOnly(diffMatches[0])) then
           // you can only slice an element that doesn't repeat if the sum total of your slices is limited to 1
           // (but you might do that in order to split up constraints by type)
-          raise Exception.create('Attempt to a slice an element that does not repeat: '+currentBase.path+'/'+currentBase.name+' from '+contextName);
+          raise Exception.create('Attempt to a slice an element that does not repeat: '+currentBase.path+'/'+currentBase.slicename+' from '+contextName);
         if (diffMatches[0].slicing = nil) and (not isExtension(currentBase)) then // well, the diff has set up a slice, but hasn't defined it. this is an error
           raise Exception.create('differential does not have a slice: '+currentBase.path);
 
@@ -439,7 +440,7 @@ begin
 
         // differential - if the first one in the list has a name, we'll process it. Else we'll treat it as the base definition of the slice.
         start := 0;
-        if (diffMatches[0].name = '') then
+        if (diffMatches[0].slicename = '') then
         begin
           updateFromDefinition(outcome, diffMatches[0], profileName, trimDifferential, url);
           if (outcome.type_List.Count = 0) then
@@ -530,12 +531,12 @@ begin
           outcome.slicing := nil;
           if (not outcome.path.startsWith(resultPathBase)) then
             raise Exception.create('Adding wrong path');
-          if (diffMatches[diffpos].name = '') and (diffMatches[diffpos].slicing <> nil) then
+          if (diffMatches[diffpos].slicename = '') and (diffMatches[diffpos].slicing <> nil) then
           begin
             inc(diffpos);
             // todo: check slicing details match
           end;
-          if (diffpos < diffMatches.Count) and (diffMatches[diffpos].name = outcome.name) then
+          if (diffpos < diffMatches.Count) and (diffMatches[diffpos].slicename = outcome.slicename) then
           begin
             // if there's a diff, we update the outcome with diff
             // no? updateFromDefinition(outcome, diffMatches.get(diffpos), profileName, pkp, closed, url);
@@ -573,7 +574,7 @@ begin
         begin
           diffItem := diffMatches[diffpos];
           for baseItem in baseMatches do
-            if (baseItem.name = diffItem.name) then
+            if (baseItem.slicename = diffItem.slicename) then
               raise Exception.create('Named items are out of order in the slice');
           outcome := updateURLs(url, original.clone());
           outcome.path := fixedPath(contextPath, outcome.path);
@@ -602,7 +603,7 @@ function TProfileUtilities.summariseSlicing(slice : TFhirElementDefinitionSlicin
 var
   b : TStringBuilder;
   first : boolean;
-  d : TFhirString;
+  d : TFhirElementDefinitionSlicingDiscriminator;
 begin
   b := TStringBuilder.Create;
   try
@@ -725,13 +726,14 @@ var
   value : TFhirElement;
   coding : TFhirCoding;
 begin
+  result := nil;
   if stack.Contains(definition) then
     exit; // prevent recursion
   stack.Add(definition.Link);
   try
     props := item.createPropertyList(true);
     try
-      children := getChildMap(profile, definition.name, definition.path, definition.ContentReference);
+      children := getChildMap(profile, definition.slicename, definition.path, definition.ContentReference);
       try
         if children.Count = 0 then
         begin
@@ -754,8 +756,8 @@ begin
                 item.setProperty(prop.Name, ed.pattern.link)
               else if (ed.defaultValue <> nil) then
                 item.setProperty(prop.Name, ed.defaultValue.link)
-              else if (ed.example <> nil) then
-                item.setProperty(prop.Name, ed.example.link)
+              else if (ed.exampleList.count > 0) then
+                item.setProperty(prop.Name, ed.exampleList[0].link)
               else if (wantGenerate(prop.name, ed.path) or (ed.min <> '0')) then
               begin
                 case ed.type_List.Count of
@@ -798,20 +800,17 @@ begin
   if profile.snapshot = nil then
     raise Exception.Create('Unsuitable profile for creating a resource - no snapshot');
 
-  if profile.BaseType <> '' then
-    path := profile.baseType
-  else
-    path := profile.name;
+  path := profile.type_;
   estack := TAdvList<TFhirElementDefinition>.create;
   try
     result := CreateResourceByName(path);
     try
       populate(profile, result, profile.snapshot.elementList[0], estack);
-      if profile.baseType <> '' then
+      if profile.baseDefinition <> '' then
       begin
         if result.meta = nil then
           result.meta := TFhirMeta.Create;
-        result.meta.profileList.Append.value := profile.url;
+        result.meta.profileList.Add(TFHIRUri.Create(profile.url));
       end;
 
       result.Link;
@@ -841,8 +840,8 @@ end;
 function TProfileUtilities.getProfileForDataType(type_ : TFhirElementDefinitionType) : TFHIRStructureDefinition;
 begin
   result := nil;
-  if (type_.profileList.Count > 0) then
-    result := context.fetchResource(frtStructureDefinition, type_.profileList[0].StringValue) as TFhirStructureDefinition;
+  if (type_.profile <> '') then
+    result := context.fetchResource(frtStructureDefinition, type_.profile) as TFhirStructureDefinition;
   if (result = nil) then
     result := context.fetchResource(frtStructureDefinition, 'http://hl7.org/fhir/StructureDefinition/'+type_.code) as TFhirStructureDefinition;
   if (result = nil) then
@@ -865,8 +864,8 @@ begin
       else
         b.append(', ');
       b.append(type_.code);
-      if (type_.profileList.count > 1) then
-        b.append('{'+type_.profileList[0].StringValue+'}');
+      if (type_.profile <> '') then
+        b.append('{'+type_.profile+'}');
     end;
     result := b.toString();
   finally
@@ -918,7 +917,6 @@ function TProfileUtilities.updateURLs(url : String; element : TFhirElementDefini
 var
   defn : TFhirElementDefinition;
   t : TFhirElementDefinitionType;
-  tp : TFhirUri;
 begin
   if (element <> nil) then
   begin
@@ -927,11 +925,8 @@ begin
       TFHIRReference(defn.binding.valueSet).reference := url+TFHIRReference(defn.binding.valueSet).reference;
     for t in defn.type_List do
     begin
-      for tp in t.profileList do
-      begin
-        if (tp.value.startsWith('#')) then
-          tp.value := url+tp.value;
-      end;
+      if t.profile.startsWith('#') then
+        t.profile := url+t.profile;
     end;
   end;
   result := element;
@@ -975,7 +970,7 @@ begin
   inherited;
 end;
 
-function TProfileUtilities.discriiminatorMatches(diff, base : TFhirStringList) : boolean;
+function TProfileUtilities.discriiminatorMatches(diff, base : TFhirElementDefinitionSlicingDiscriminatorList) : boolean;
 var
   i : integer;
 begin
@@ -987,7 +982,7 @@ begin
   begin
     result := true;
     for i := 0 to diff.Count - 1 do
-      if (diff[i].value <> base[i].value) then
+      if (diff[i].type_ <> base[i].type_) or (diff[i].path <> base[i].path)  then
         result := false;
   end;
 end;
@@ -1130,13 +1125,14 @@ end;
 procedure TProfileUtilities.updateFromDefinition(dest, source : TFhirElementDefinition; pn : String; trimDifferential : boolean; purl :  String);
 var
   base, derived : TFhirElementDefinition;
-  isExtension, ok : boolean;
+  isExtension, ok, found : boolean;
   s : TFHIRString;
   expBase, expDerived, vsBase, vsDerived: TFHIRValueSet;
   ts, td : TFhirElementDefinitionType;
   b : TStringList;
   ms, md : TFhirElementDefinitionMapping;
   cs : TFhirElementDefinitionConstraint;
+  ex, exS : TFhirElementDefinitionExample;
 
 begin
   // we start with a clone of the base profile ('dest') and we copy from the profile ('source')
@@ -1153,7 +1149,7 @@ begin
     begin
       base.Definition := 'An Extension';
       base.Short := 'Extension';
-      base.comments := '';
+      base.comment := '';
       base.requirements := '';
       base.aliasList.clear();
       base.mappingList.clear();
@@ -1181,16 +1177,16 @@ begin
         derived.DefinitionElement.Tags[DERIVATION_EQUALS] := 'true';
     end;
 
-    if (derived.CommentsElement <> nil) then
+    if (derived.CommentElement <> nil) then
     begin
-      if (derived.comments.startsWith('...')) then
-        base.comments := base.comments+#13#10+derived.comments.substring(3)
-      else if not compareDeep(derived.commentsElement, base.commentsElement, false) then
-        base.CommentsElement := derived.CommentsElement.clone()
+      if (derived.comment.startsWith('...')) then
+        base.comment := base.comment+#13#10+derived.comment.substring(3)
+      else if not compareDeep(derived.commentElement, base.commentElement, false) then
+        base.CommentElement := derived.CommentElement.clone()
       else if (trimDifferential) then
-        derived.CommentsElement := nil
+        derived.CommentElement := nil
       else
-        derived.CommentsElement.Tags[DERIVATION_EQUALS] := 'true';
+        derived.CommentElement.Tags[DERIVATION_EQUALS] := 'true';
     end;
 
     if (derived.RequirementsElement <> nil) then
@@ -1274,14 +1270,18 @@ begin
         derived.pattern.Tags[DERIVATION_EQUALS] := 'true';
     end;
 
-    if (derived.Example <> nil) then
+    for ex in derived.exampleList do
     begin
-      if (not compareDeep(derived.example, base.example, false)) then
-        base.example := derived.example.clone()
+      found := false;
+      for exS in base.exampleList do
+        if (compareDeep(ex, exS, false)) then
+            found := true;
+      if (not found) then
+        base.exampleList.add(ex.clone())
       else if (trimDifferential) then
-        derived.example := nil
+        derived.exampleList.DeleteByReference(ex)
       else
-        derived.example.Tags[DERIVATION_EQUALS] := 'true';
+        ex.Tags[DERIVATION_EQUALS] := 'true';
     end;
 
     if (derived.MaxLengthElement <> nil) then
@@ -1477,14 +1477,16 @@ end;
 
 function TBaseWorkerContext.allResourceNames: TArray<String>;
 var
+  a : TFHIRResourceType;
   i : integer;
   s : string;
 begin
   FLock.Lock;
   try
-    SetLength(result, length(ALL_RESOURCE_TYPE_NAMES) + FCustomResources.Count);
-    for i := 0 to length(ALL_RESOURCE_TYPE_NAMES)-1 do
-      result[i] := ALL_RESOURCE_TYPE_NAMES[i];
+    SetLength(result, length(ALL_RESOURCE_TYPE_NAMES) - 1 + FCustomResources.Count);
+    for a := low(TFHIRResourceType) to high(TFHIRResourceType) do
+      if (a <> frtNull) then
+        result[ord(a)-1] := ALL_RESOURCE_TYPE_NAMES[a];
     i := length(ALL_RESOURCE_TYPE_NAMES);
     for s in FCustomResources.Keys do
     begin
@@ -1528,14 +1530,17 @@ end;
 
 function TBaseWorkerContext.getChildMap(profile: TFHIRStructureDefinition; element: TFhirElementDefinition): TFHIRElementDefinitionList;
 begin
-  result := FHIRUtilities.getChildMap(profile, element.name, element.path, element.contentReference);
+  result := FHIRUtilities.getChildMap(profile, element.slicename, element.path, element.contentReference);
 end;
 
 function TBaseWorkerContext.getCustomResource(name: String): TFHIRCustomResourceInformation;
 begin
   FLock.Lock;
   try
-    result := FCustomResources[name].Link;
+    if FCustomResources.TryGetValue(name, result) then
+      result.Link
+    else
+      result := nil;
   finally
     FLock.Unlock;
   end;

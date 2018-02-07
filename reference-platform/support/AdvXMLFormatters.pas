@@ -4,27 +4,27 @@ Unit AdvXMLFormatters;
 Copyright (c) 2001-2013, Kestral Computing Pty Ltd (http://www.kestral.com.au)
 All rights reserved.
 
-Redistribution and use in source and binary forms, with or without modification, 
+Redistribution and use in source and binary forms, with or without modification,
 are permitted provided that the following conditions are met:
 
- * Redistributions of source code must retain the above copyright notice, this 
+ * Redistributions of source code must retain the above copyright notice, this
    list of conditions and the following disclaimer.
- * Redistributions in binary form must reproduce the above copyright notice, 
-   this list of conditions and the following disclaimer in the documentation 
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
    and/or other materials provided with the distribution.
- * Neither the name of HL7 nor the names of its contributors may be used to 
-   endorse or promote products derived from this software without specific 
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
    prior written permission.
 
-THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
-ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
-WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
-IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
-NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 }
 
@@ -32,7 +32,7 @@ Interface
 
 
 Uses
-  SysUtils, StringSupport, EncodeSupport,
+  SysUtils, StringSupport, EncodeSupport, TextUtilities,
   AdvStringBuilders, AdvXMLEntities,
   AdvTextFormatters, AdvStringMatches;
 
@@ -47,6 +47,7 @@ Type
       FLastText : boolean;
       FPending : string;
       FNoDense : Boolean;
+    FCanonicalEntities: boolean;
 
       procedure updateForText(s : String);
       procedure commitPending;
@@ -59,9 +60,9 @@ Type
       Destructor Destroy; Override;
 
       Function Link : TAdvXMLFormatter;
-      Function Clone : TAdvXMLFormatter; 
+      Function Clone : TAdvXMLFormatter;
 
-      Procedure ProduceHeader; 
+      Procedure ProduceHeader;
 
       Procedure ProduceOpen(Const sName : String);
       Procedure ProduceClose(Const sName : String);
@@ -81,6 +82,7 @@ Type
       property Line : integer read FLine;
       property Col : integer read FCol;
       property NoDense : Boolean read FNoDense write FNoDense;
+      property CanonicalEntities : boolean read FCanonicalEntities write FCanonicalEntities;
   End;
 
 
@@ -140,7 +142,7 @@ End;
 
 Procedure TAdvXMLFormatter.ProduceOpen(Const sName : String);
 Begin 
-  Assert(Condition(sName <> '', 'ProduceOpen', 'Open tag name must be specified.'));
+  Assert(CheckCondition(sName <> '', 'ProduceOpen', 'Open tag name must be specified.'));
 
   commitPending;
 
@@ -171,7 +173,7 @@ end;
 
 Procedure TAdvXMLFormatter.ProduceClose(Const sName: String);
 Begin 
-  Assert(Condition(sName <> '', 'ProduceClose', 'Close tag name must be specified.'));
+  Assert(CheckCondition(sName <> '', 'ProduceClose', 'Close tag name must be specified.'));
 
   LevelUp;
 
@@ -188,11 +190,11 @@ End;
 
 Procedure TAdvXMLFormatter.ProduceTextNoEscapeEoln(Const sName, sValue: String);
 Begin
-  Assert(Condition(sName <> '', 'ProduceText', 'Tag name for text must be specified.'));
+  Assert(CheckCondition(sName <> '', 'ProduceText', 'Tag name for text must be specified.'));
   commitPending;
 
   FLastText := false;
-  ProducePretty('<' + sName + UseAttributes + '>' + EncodeXML(sValue, xmlText) + '</' + sName + '>');
+  ProducePretty('<' + sName + UseAttributes + '>' + FormatTextToXML(sValue, xmlText) + '</' + sName + '>');
 End;
 
 
@@ -219,11 +221,11 @@ End;
 
 Procedure TAdvXMLFormatter.ProduceText(Const sName, sValue: String);
 Begin
-  Assert(Condition(sName <> '', 'ProduceText', 'Tag name for text must be specified.'));
+  Assert(CheckCondition(sName <> '', 'ProduceText', 'Tag name for text must be specified.'));
 
   commitPending;
   FLastText := false;
-  ProducePretty('<' + sName + UseAttributes + '>' + EncodeXML(sValue, xmlText) + '</' + sName + '>');
+  ProducePretty('<' + sName + UseAttributes + '>' + FormatTextToXML(sValue, xmlText) + '</' + sName + '>');
 End;
 
 
@@ -236,7 +238,10 @@ Begin
 
   commitPending;
 
-  s := EncodeXML(sValue, xmlText, processing);
+  if CanonicalEntities then
+    s := FormatTextToXML(sValue, xmlCanonical)
+  else
+    s := FormatTextToXML(sValue, xmlText{, processing});
   Produce(s); // no pretty - might be a sequence of text
   updateForText(s);
   FLastText := true;
@@ -245,7 +250,7 @@ End;
 
 Procedure TAdvXMLFormatter.ProduceTag(Const sName: String);
 Begin 
-  Assert(Condition(sName <> '', 'ProduceTag', 'Tag name must be specified.'));
+  Assert(CheckCondition(sName <> '', 'ProduceTag', 'Tag name must be specified.'));
   commitPending;
 
   FLastText := false;
@@ -259,7 +264,10 @@ Begin
   commitPending;
 
   FLastText := false;
-  ProducePretty('<!--' + sComment + '-->');
+  if sComment.endsWith('-') then
+    ProducePretty('<!--' + sComment + ' -->')
+  else
+    ProducePretty('<!--' + sComment + '-->')
 End;
 
 
@@ -269,8 +277,10 @@ Var
 Begin
   Result := '';
   For iLoop := 0 To FAttributes.Count - 1 Do
-    Result := Result + SysUtils.Format(' %s="%s"', [FAttributes[iLoop].Name, EncodeXml(FAttributes[iLoop].Value, xmlAttribute)]);
-
+    if CanonicalEntities then
+      Result := Result + SysUtils.Format(' %s="%s"', [FAttributes[iLoop].Name, FormatTextToXML(FAttributes[iLoop].Value, xmlCanonical)])
+    else
+      Result := Result + SysUtils.Format(' %s="%s"', [FAttributes[iLoop].Name, FormatTextToXML(FAttributes[iLoop].Value, xmlAttribute)]);
   FAttributes.Clear;
 End;
 
@@ -302,7 +312,7 @@ End;
 
 procedure TAdvXMLFormatter.ProducePI(const sName, sText: String);
 begin
-  Assert(Condition(sName <> '', 'ProducePI', 'PI name must be specified.'));
+  Assert(CheckCondition(sName <> '', 'ProducePI', 'PI name must be specified.'));
   commitPending;
 
   FLastText := false;

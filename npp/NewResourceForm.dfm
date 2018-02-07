@@ -117,6 +117,9 @@ object ResourceNewForm: TResourceNewForm
     Align = alTop
     BevelOuter = bvNone
     TabOrder = 2
+    DesignSize = (
+      527
+      35)
     object Label2: TLabel
       Left = 10
       Top = 11
@@ -135,6 +138,7 @@ object ResourceNewForm: TResourceNewForm
       Top = 12
       Width = 55
       Height = 17
+      Anchors = [akTop, akRight]
       Caption = 'JSON'
       Checked = True
       TabOrder = 0
@@ -145,6 +149,7 @@ object ResourceNewForm: TResourceNewForm
       Top = 12
       Width = 45
       Height = 17
+      Anchors = [akTop, akRight]
       Caption = 'XML'
       TabOrder = 1
     end

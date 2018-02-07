@@ -1,14 +1,43 @@
 unit MPISearch;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
   SysUtils,
   ParseMap, StringSupport, EncodeSupport,
-  AdvObjects,
+  AdvObjects, AdvGenerics,
   KDBManager,
-  FHIRSupport,
-  FHIRIndexManagers, FHIRDataStore;
+  FHIRSupport, FHIRIndexBase,
+  FHIRIndexManagers;
 
 Type
   TMPICertainty = (mcNull, mcCertain, mcProbable, mcPossible);
@@ -17,11 +46,8 @@ Type
   private
     // inputs
     Fparams: TParseMap;
-    Frepository: TFHIRDataStore;
-    FcompartmentId: string;
     FConnection: TKDBConnection;
     FbaseURL: string;
-    Fcompartments: string;
     Ftypekey: integer;
     Findexes: TFHIRIndexInformation;
     Flink_: string;
@@ -35,12 +61,13 @@ Type
     FFirstName : String;
     FFamilyName : String;
     FIdentifier : String;
+    FSessionCompartments: TAdvList<TFHIRCompartmentId>;
+    FCompartment: TFHIRCompartmentId;
 
 
     procedure SetConnection(const Value: TKDBConnection);
     procedure Setindexes(const Value: TFHIRIndexInformation);
     procedure Setparams(const Value: TParseMap);
-    procedure Setrepository(const Value: TFHIRDataStore);
     procedure Setsession(const Value: TFHIRSession);
 
     function baseSQL(sort, score : String; certainty : TMPICertainty) : String;
@@ -52,17 +79,18 @@ Type
     procedure runProbableSearch3;
     procedure runPossibleSearch1;
     procedure runPossibleSearch2;
+    procedure SetCompartment(const Value: TFHIRCompartmentId);
+    procedure SetSessionCompartments(const Value: TAdvList<TFHIRCompartmentId>);
   public
     Destructor Destroy; override;
 
     property typekey : integer read Ftypekey write Ftypekey;
-    property compartmentId : string read FcompartmentId write FcompartmentId;
-    property compartments : string read Fcompartments write Fcompartments;
+    property compartment : TFHIRCompartmentId read FCompartment write SetCompartment;
+    property sessionCompartments : TAdvList<TFHIRCompartmentId> read FSessionCompartments write SetSessionCompartments;
     property baseURL : string read FbaseURL write FbaseURL;
     property lang : string read Flang write Flang;
     property params : TParseMap read Fparams write Setparams;
     property indexes : TFHIRIndexInformation read Findexes write Setindexes;
-    property repository : TFHIRDataStore read Frepository write Setrepository;
     property session : TFHIRSession read Fsession write Setsession;
     property Connection : TKDBConnection read FConnection write SetConnection;
     property key : String read FKey write FKey;
@@ -92,9 +120,10 @@ end;
 
 destructor TMPISearchProcessor.Destroy;
 begin
+  FSessionCompartments.Free;
+  FCompartment.Free;
   FConnection.Free;
   Findexes.Free;
-  Frepository.Free;
   Fsession.Free;
 
   inherited;
@@ -230,6 +259,12 @@ begin
   result := ' order by ResourceKey DESC';
 end;
 
+procedure TMPISearchProcessor.SetCompartment(const Value: TFHIRCompartmentId);
+begin
+  FCompartment.Free;
+  FCompartment := Value;
+end;
+
 procedure TMPISearchProcessor.SetConnection(const Value: TKDBConnection);
 begin
   FConnection.Free;
@@ -247,16 +282,17 @@ begin
   Fparams := Value;
 end;
 
-procedure TMPISearchProcessor.Setrepository(const Value: TFHIRDataStore);
-begin
-  Frepository.Free;
-  Frepository := Value;
-end;
 
 procedure TMPISearchProcessor.Setsession(const Value: TFHIRSession);
 begin
   Fsession.Free;
   Fsession := Value;
+end;
+
+procedure TMPISearchProcessor.SetSessionCompartments(const Value: TAdvList<TFHIRCompartmentId>);
+begin
+  FSessionCompartments.Free;
+  FSessionCompartments := Value;
 end;
 
 end.

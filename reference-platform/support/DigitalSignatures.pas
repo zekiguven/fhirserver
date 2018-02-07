@@ -1,5 +1,34 @@
 unit DigitalSignatures;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 {
@@ -18,9 +47,9 @@ developed and tested using XE5
 About XML:
 
 The hardest part of digital signatures is actually XML canonicalization.
-You can't use MSXML for this - it's too loose with the XML data. Instead,
+You can't use MS-XML for this - it's too loose with the XML data. Instead,
 this source uses the openXML provider. You can't change this here; You
-can use msxml elsewhere, but not in here. This is why the interface
+can use ms-xml elsewhere, but not in here. This is why the interface
 is entirely binary, and not based on a DOM.
 
 OpenSSL
@@ -43,13 +72,12 @@ certificate you nominate
 }
 
 uses
-  SysUtils, Classes,
+  SysUtils, Classes, {$IFNDEF VER260} System.NetEncoding, {$ENDIF}
   IdHashSHA, IdGlobal,
-  Xml.xmlintf, Xml.XMLDoc, Xml.adomxmldom,
   BytesSupport, StringSupport, EncodeSupport, EncdDecd,
   AdvObjects, AdvObjectLists,
-  XmlBuilder, AdvXmlBuilders,
-  IdSSLOpenSSLHeaders, libeay32, HMAC, XMLSupport, InternetFetcher;
+  MXml, XmlBuilder, AdvXmlBuilders,
+  IdSSLOpenSSLHeaders, libeay32, HMAC, InternetFetcher;
 
 Const
   NS_DS = 'http://www.w3.org/2000/09/xmldsig#';
@@ -92,9 +120,12 @@ Type
     destructor Destroy; override;
   end;
 
+  TSignatureLocationFinderMethod = reference to function (doc : TMXmlDocument) : TMXmlElement;
+
   TDigitalSigner = class (TAdvObject)
   private
-    FkeyFile: AnsiString;
+    FPublicKey: AnsiString;
+    FPrivateKey: AnsiString;
     FKeyPassword: AnsiString;
 //    FCertFile: AnsiString;
 
@@ -105,47 +136,48 @@ Type
     function signAlgorithmForMethod(method: TSignatureMethod): String;
 
     // xml routines
-    function loadXml(source: TBytes) : IXMLDocument;
-    function canonicaliseXml(method : TXmlCanonicalisationMethodSet; source : TBytes; var dom : IXMLDocument) : TBytes; overload;
-    function canonicaliseXml(method : TXmlCanonicalisationMethodSet; dom : IXMLNode) : TBytes; overload;
-    function canonicaliseXml(method : TXmlCanonicalisationMethodSet; dom : IXMLDocument) : TBytes; overload;
+    function loadXml(source: TBytes) : TMXmlDocument;
+    function canonicaliseXml(method : TXmlCanonicalisationMethodSet; source : TBytes; var dom : TMXmlDocument) : TBytes; overload;
+    function canonicaliseXml(method : TXmlCanonicalisationMethodSet; dom : TMXmlElement) : TBytes; overload;
+    function canonicaliseXml(method : TXmlCanonicalisationMethodSet; dom : TMXmlDocument) : TBytes; overload;
+    function canonicaliseXml(method : TXmlCanonicalisationMethodSet; source : TBytes) : TBytes; overload;
 
     // digest and signing routine
     function digest(source : TBytes; method : TSignatureMethod) : TBytes;
     function digestSHA1(source : TBytes) : TBytes;
     function digestSHA256(source : TBytes) : TBytes;
-    procedure checkDigest(ref : IXMLNode; doc : IXMLDocument);
+    procedure checkDigest(ref : TMXmlElement; doc : TMXmlDocument);
     function sign(src: TBytes; method: TSignatureMethod): TBytes;
     function signDSA(src: TBytes; method: TSignatureMethod): TBytes;
     function signRSA(src: TBytes; method: TSignatureMethod): TBytes;
 
     // key/ certificate management routines
-    function LoadKeyInfo(sig : IXmlNode) : TKeyInfo;
+    function LoadKeyInfo(sig : TMXmlElement) : TKeyInfo;
     function loadRSAKey: PRSA;
     function loadDSAKey: PDSA;
-    procedure AddKeyInfo(sig: IXmlNode; method : TSignatureMethod);
+    procedure AddKeyInfo(sig: TMXmlElement; method : TSignatureMethod);
 
     // source content management
     function resolveReference(url : string) : TBytes;
 
   public
+    Constructor Create; override;
+
     // certificate files, for signing
-    Property KeyFile : AnsiString read FkeyFile write FkeyFile;
+    Property PublicKey : AnsiString read FPublicKey write FPublicKey;
+    Property PrivateKey : AnsiString read FPrivateKey write FPrivateKey;
     Property KeyPassword : AnsiString read FKeyPassword write FKeyPassword;
 
-    function signEnveloped(xml : TBytes; method : TSignatureMethod; keyinfo : boolean) : TBytes;
+    // classic XML Enveloped Signature
+    function signEnveloped(xml : TBytes; method : TSignatureMethod; keyinfo : boolean) : TBytes; overload;
+    function signEnveloped(xml : TBytes; finder : TSignatureLocationFinderMethod; method : TSignatureMethod; keyinfo : boolean) : TBytes; overload;
+
+    function signDetached(xml : TBytes; refUrl : String; method : TSignatureMethod; canonicalization : string; keyinfo : boolean) : TBytes; overload;
+
     function signExternal(references : TDigitalSignatureReferenceList; method : TSignatureMethod; keyinfo : boolean) : TBytes;
     function verifySignature(xml : TBytes) : boolean;
   end;
 
-  TDigitalSignatureTests = class (TAdvObject)
-  private
-    class procedure testFile(filename : String);
-    class procedure testGen;
-    class procedure testValidate;
-  public
-    class procedure test;
-  end;
 
 implementation
 
@@ -239,7 +271,30 @@ begin
     raise Exception.Create('Canonicalization Method '+uri+' is not supported');
 end;
 
-function TDigitalSigner.canonicaliseXml(method : TXmlCanonicalisationMethodSet; source: TBytes; var dom : IXMLDocument): TBytes;
+function TDigitalSigner.canonicaliseXml(method: TXmlCanonicalisationMethodSet; source: TBytes): TBytes;
+var
+  xb : TAdvXmlBuilder;
+  dom : TMXmlDocument;
+begin
+  dom := loadXml(source);
+  try
+    xb := TAdvXmlBuilder.Create;
+    try
+      xb.Canonicalise := method;
+      xb.Start;
+      xb.WriteXml(dom.docElement);
+      xb.Finish;
+      result := TEncoding.UTF8.GetBytes(xb.Build);
+    finally
+      xb.Free;
+    end;
+  finally
+    dom.Free;
+  end;
+
+end;
+
+function TDigitalSigner.canonicaliseXml(method : TXmlCanonicalisationMethodSet; source: TBytes; var dom : TMXmlDocument): TBytes;
 var
   xb : TAdvXmlBuilder;
 begin
@@ -249,7 +304,7 @@ begin
   try
     xb.Canonicalise := method;
     xb.Start;
-    xb.WriteXmlDocument(dom);
+    xb.WriteXml(dom.docElement);
     xb.Finish;
     result := TEncoding.UTF8.GetBytes(xb.Build);
   finally
@@ -257,7 +312,7 @@ begin
   end;
 end;
 
-function TDigitalSigner.canonicaliseXml(method : TXmlCanonicalisationMethodSet; dom: IXMLNode): TBytes;
+function TDigitalSigner.canonicaliseXml(method : TXmlCanonicalisationMethodSet; dom: TMXmlElement): TBytes;
 var
   xb : TAdvXmlBuilder;
 begin
@@ -265,7 +320,7 @@ begin
   try
     xb.Canonicalise := method;
     xb.Start;
-    xb.WriteXml(dom, true);
+    xb.WriteXml(dom);
     xb.Finish;
     result := TEncoding.UTF8.GetBytes(xb.Build);
   finally
@@ -273,7 +328,7 @@ begin
   end;
 end;
 
-function TDigitalSigner.canonicaliseXml(method : TXmlCanonicalisationMethodSet; dom: IXMLDocument): TBytes;
+function TDigitalSigner.canonicaliseXml(method : TXmlCanonicalisationMethodSet; dom: TMXMLDocument): TBytes;
 var
   xb : TAdvXmlBuilder;
 begin
@@ -281,7 +336,7 @@ begin
   try
     xb.Canonicalise := method;
     xb.Start;
-    xb.WriteXmlDocument(dom);
+    xb.WriteXml(dom);
     xb.Finish;
     result := TEncoding.UTF8.GetBytes(xb.Build);
   finally
@@ -289,90 +344,107 @@ begin
   end;
 end;
 
-procedure TDigitalSigner.checkDigest(ref: IXMLNode; doc: IXMLDocument);
+procedure TDigitalSigner.checkDigest(ref: TMXmlElement; doc: TMXMLDocument);
 var
   bytes, digest : TBytes;
-  transforms, transform : IXMLNode;
+  transforms, transform : TMXmlElement;
   bEnv : boolean;
   i : integer;
 begin
   //Obtain the data object to be digested. (For example, the signature application may dereference the URI and execute Transforms provided by the signer in the Reference element, or it may obtain the content through other means such as a local cache.)
-  if ref.getAttribute('URI') = '' then
-    bytes := canonicaliseXml([xcmCanonicalise], doc)
+  if ref.attribute['URI'] = '' then
+    bytes := canonicaliseXml([xcmCanonicalise], doc.docElement)
   else
-    bytes := resolveReference(ref.getAttribute('URI'));
+    bytes := resolveReference(ref.attribute['URI']);
+  BytesToFile(bytes, 'c:\temp\cand.xml');
 
   // check the transforms
   bEnv := false;
-  transforms := getChildNode(ref, 'Transforms', NS_DS);
+  transforms := ref.elementNS(NS_DS, 'Transforms');
   if transforms <> nil then
-    for i := 0 to transforms.ChildNodes.Count - 1 do
+    for i := 0 to transforms.Children.Count - 1 do
     begin
-      transform := transforms.ChildNodes[i];
-      if (transform.NodeType = ntElement) and (transform.NodeName = 'Transform') then
-        if transform.GetAttribute('Algorithm') = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature' then
+      transform := transforms.Children[i];
+      if (transform.NodeType = ntElement) and (transform.Name = 'Transform') then
+        if transform.attribute['Algorithm'] = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature' then
           bEnv := true
         else
-          raise Exception.Create('Transform '+transform.GetAttribute('Algorithm')+' is not supported');
+          raise Exception.Create('Transform '+transform.attribute['Algorithm']+' is not supported');
     end;
   if (doc <> nil) and not bEnv then
     raise Exception.Create('Reference Transform is not http://www.w3.org/2000/09/xmldsig#enveloped-signature');
 
   //Digest the resulting data object using the DigestMethod specified in its Reference specification.
-  if getChildNode(ref, 'DigestMethod', NS_DS).GetAttribute('Algorithm') = 'http://www.w3.org/2000/09/xmldsig#sha1' then
+  if ref.elementNS(NS_DS, 'DigestMethod').attribute['Algorithm'] = 'http://www.w3.org/2000/09/xmldsig#sha1' then
     bytes := digestSHA1(bytes)
-  else if getChildNode(ref, 'DigestMethod', NS_DS).GetAttribute('Algorithm') = 'http://www.w3.org/2000/09/xmldsig#sha256' then
+  else if ref.elementNS(NS_DS, 'DigestMethod').attribute['Algorithm'] = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256' then
     bytes := digestSHA256(bytes)
   else
-    raise Exception.Create('Unknown Digest method '+getChildNode(ref, 'DigestMethod', NS_DS).GetAttribute('Algorithm'));
-  digest := unbase64(getChildNode(ref, 'DigestValue', NS_DS).Text);
+    raise Exception.Create('Unknown Digest method '+ref.elementNS(NS_DS, 'DigestMethod').attribute['Algorithm']);
+  digest := unbase64(ref.elementNS(NS_DS, 'DigestValue').Text);
 
   //Compare the generated digest value against DigestValue in the SignedInfo Reference; if there is any mismatch, validation fails.
   if not SameBytes(bytes, digest) then
-    raise Exception.Create('Digest mismatch on reference '+ref.getAttribute('URI'));
+    raise Exception.Create('Digest mismatch on reference '+ref.attribute['URI']);
 end;
 
 
+constructor TDigitalSigner.create;
+begin
+  inherited;
+  LoadEAYExtensions;
+  ERR_load_crypto_strings;
+  OpenSSL_add_all_algorithms;
+end;
+
 function TDigitalSigner.verifySignature(xml: TBytes): boolean;
 var
-  doc : IXMLDocument;
-  sig, si : IXMLNode;
+  doc : TMXmlDocument;
+  sig, si : TMXmlElement;
   can, v : TBytes;
   key : TKeyInfo;
   i : integer;
 begin
   doc := loadXml(xml);
-  if (doc.DocumentElement.NodeName = 'Signature') and (doc.DocumentElement.NamespaceURI = NS_DS) then
-    sig := doc.DocumentElement
-  else
-    sig := getChildNode(doc.DocumentElement, 'Signature', NS_DS);
-  if (sig = nil) then
-    raise Exception.Create('Signature not found');
-  si := getChildNode(sig, 'SignedInfo', NS_DS);
-  if (si = nil) then
-    raise Exception.Create('SignedInfo not found');
-  if (sig <> doc.DocumentElement) then
-    doc.DocumentElement.ChildNodes.Remove(sig)
-  else
-    doc := nil;
-
-  //k. now we follow the method:
-  // 1. Canonicalize the SignedInfo element based on the CanonicalizationMethod in SignedInfo.
-  can := canonicaliseXml(canoncalizationSet(getChildNode(si, 'CanonicalizationMethod', NS_DS).getAttribute('Algorithm')), si);
-
-  // 2. For each Reference in SignedInfo:
-  for i := 0 to si.ChildNodes.Count - 1 do
-    if (si.ChildNodes[i].NodeType = ntElement) and (si.ChildNodes[i].NodeName = 'Reference') then
-      checkDigest(si.ChildNodes[i], doc);
-
-  // 3. Obtain the keying information from KeyInfo or from an external source.
-  key := LoadKeyInfo(sig);
   try
-    // 4. Obtain the canonical form of the SignatureMethod using the CanonicalizationMethod and use the result (and previously obtained KeyInfo) to confirm the SignatureValue over the SignedInfo element.
-    v := unbase64(getChildNode(sig, 'SignatureValue').text);
-    result := key.checkSignature(can, v, signatureMethod(getChildNode(si, 'SignatureMethod', NS_DS).GetAttribute('Algorithm')));
+    if (doc.Name = 'Signature') and (doc.NamespaceURI = NS_DS) then
+      sig := doc.docElement
+    else
+      sig := doc.docElement.elementNS(NS_DS, 'Signature');
+    if (sig = nil) then
+      raise Exception.Create('Signature not found');
+    si := sig.elementNS(NS_DS, 'SignedInfo');
+    if (si = nil) then
+      raise Exception.Create('SignedInfo not found');
+    if (sig <> doc) then
+      doc.docElement.Children.Remove(sig)
+    else
+      doc := nil;
+
+    //k. now we follow the method:
+    // 1. Canonicalize the SignedInfo element based on the CanonicalizationMethod in SignedInfo.
+    si.Name := '';
+    si.LocalName := 'SignedInfo';
+    si.NamespaceURI := NS_DS;
+    can := canonicaliseXml(canoncalizationSet(si.elementNS(NS_DS, 'CanonicalizationMethod').attribute['Algorithm']), si);
+    BytesToFile(can, 'c:\temp\can.xml');
+
+    // 2. For each Reference in SignedInfo:
+    for i := 0 to si.children.Count - 1 do
+      if (si.children[i].NodeType = ntElement) and (si.children[i].Name = 'Reference') then
+        checkDigest(si.children[i], doc);
+
+    // 3. Obtain the keying information from KeyInfo or from an external source.
+    key := LoadKeyInfo(sig);
+    try
+      // 4. Obtain the canonical form of the SignatureMethod using the CanonicalizationMethod and use the result (and previously obtained KeyInfo) to confirm the SignatureValue over the SignedInfo element.
+      v := unbase64(sig.element('SignatureValue').text);
+      result := key.checkSignature(can, v, signatureMethod(si.elementNS(NS_DS, 'SignatureMethod').attribute['Algorithm']));
+    finally
+      key.Free;
+    end;
   finally
-    key.Free;
+    doc.free;
   end;
 end;
 
@@ -508,7 +580,7 @@ var
   fn, pp: PAnsiChar;
   pk: PRSA;
 begin
-  fn := PAnsiChar(FkeyFile);
+  fn := PAnsiChar(FPrivateKey);
   pp := PAnsiChar(FKeyPassword);
   bp := BIO_new(BIO_s_file());
   BIO_read_filename(bp, fn);
@@ -525,7 +597,7 @@ var
   fn, pp: PAnsiChar;
   pk: PDSA;
 begin
-  fn := PAnsiChar(FkeyFile);
+  fn := PAnsiChar(FPrivateKey);
   pp := PAnsiChar(FKeyPassword);
   bp := BIO_new(BIO_s_file());
   BIO_read_filename(bp, fn);
@@ -628,16 +700,57 @@ begin
     sdXmlDSASha1 : result := 'http://www.w3.org/2000/09/xmldsig#dsa-sha1';
     sdXmlRSASha1 : result := 'http://www.w3.org/2000/09/xmldsig#rsa-sha1';
     sdXmlDSASha256 : result := 'http://www.w3.org/2000/09/xmldsig#dsa-sha256';
-    sdXmlRSASha256 : result := 'http://www.w3.org/2000/09/xmldsig#rsa-sha256';
+    sdXmlRSASha256 : result := 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
   else
     raise Exception.Create('unknown method');
+  end;
+end;
+
+function TDigitalSigner.signDetached(xml : TBytes; refURL : String; method : TSignatureMethod; canonicalization : string; keyinfo : boolean) : TBytes;
+var
+  can, dig :  TBytes;
+  dom : TMXmlDocument;
+  sig, si, ref, trns: TMXmlElement;
+  s : String;
+begin
+  can := canonicaliseXml([xcmCanonicalise], xml);
+  dom := TMXmlDocument.CreateNS(ntDocument, NS_DS, 'Signature');
+  try
+    sig := dom.docElement;
+    sig.attribute['xmlns'] := NS_DS;
+    si := sig.addElementNS(NS_DS, 'SignedInfo');
+    if canonicalization <> '' then
+      si.addElementNS(NS_DS, 'CanonicalizationMethod').attribute['Algorithm'] := canonicalization
+    else
+      si.addElementNS(NS_DS, 'CanonicalizationMethod').attribute['Algorithm'] := 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
+    si.addElementNS(NS_DS, 'SignatureMethod').attribute['Algorithm'] := signAlgorithmForMethod(method);
+    ref := si.addElementNS(NS_DS, 'Reference');
+    if (refUrl <> '') then
+      ref.attribute['URI'] := refUrl;
+    trns := ref.addElementNS(NS_DS, 'Transforms');
+    trns.addElementNS(NS_DS, 'Transform').attribute['Algorithm'] := 'http://www.w3.org/2000/09/xmldsig#enveloped-signature';
+    ref.addElementNS(NS_DS, 'DigestMethod').attribute['Algorithm'] := digestAlgorithmForMethod(method);
+    dig := digest(can, method); // the method doesn't actually apply to this, but we figure that if the method specifies sha256, then it should be used here
+    ref.addElementNS(NS_DS, 'DigestValue').addText(String(EncodeBase64(@dig[0], length(dig))));
+    can := canonicaliseXml([xcmCanonicalise],si);
+    dig := sign(can, method);
+    s := base64(dig);
+    sig.addElementNS(NS_DS, 'SignatureValue').addText(s);
+
+    if keyinfo then
+      AddKeyInfo(sig, method);
+    s := dom.ToXml(false, true);
+    result := TEncoding.UTF8.GetBytes(s);
+  finally
+    dom.Free;
   end;
 end;
 
 function TDigitalSigner.digestAlgorithmForMethod(method : TSignatureMethod) : String;
 begin
   case method of
-    sdXmlDSASha256, sdXmlRSASha256 : result := 'http://www.w3.org/2000/09/xmldsig#sha256';
+    sdXmlDSASha256 : result := 'http://www.w3.org/2000/09/xmldsig#sha256';
+    sdXmlRSASha256 : result := 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256';
   else
     result := 'http://www.w3.org/2000/09/xmldsig#sha1';
   end;
@@ -645,34 +758,43 @@ end;
 
 
 function TDigitalSigner.signEnveloped(xml: TBytes; method : TSignatureMethod; keyinfo : boolean): TBytes;
+begin
+  result := signEnveloped(xml, function (doc : TMXmlDocument) : TMXmlElement begin result := doc.docElement end, method, keyInfo);
+end;
+
+function TDigitalSigner.signEnveloped(xml: TBytes; finder : TSignatureLocationFinderMethod; method : TSignatureMethod; keyinfo : boolean): TBytes;
 var
   can, dig :  TBytes;
-  dom : IXMLDocument;
-  sig, si, ref, trns: IXMLNode;
+  dom : TMXmlDocument;
+  sig, si, ref, trns: TMXmlElement;
   s : String;
 begin
-  can := canonicaliseXml([xcmCanonicalise],xml, dom);
-  sig := dom.DocumentElement.AddChild('Signature', NS_DS);
-  sig.DeclareNamespace('', NS_DS);
-  si := sig.addChild('SignedInfo');
-  si.addChild('CanonicalizationMethod').setAttribute('Algorithm', 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315');
-  si.addChild('SignatureMethod').setAttribute('Algorithm', signAlgorithmForMethod(method));
-  ref := si.AddChild('Reference');
-  ref.setAttribute('URI', '');
-  trns := ref.addChild('Transforms');
-  trns.addChild('Transform').SetAttribute('Algorithm', 'http://www.w3.org/2000/09/xmldsig#enveloped-signature');
-  ref.addChild('DigestMethod').setAttribute('Algorithm', digestAlgorithmForMethod(method));
-  dig := digest(can, method); // the method doesn't actually apply to this, but we figure that if the method specifies sha256, then it should be used here
-  ref.addChild('DigestValue').Text := String(EncodeBase64(@dig[0], length(dig)));
-  can := canonicaliseXml([xcmCanonicalise],si);
-  dig := sign(can, method);
-  s := base64(dig);
-  sig.AddChild('SignatureValue').Text := s;
+  can := canonicaliseXml([xcmCanonicalise], xml, dom);
+  try
+    sig := finder(dom).addElementNS(NS_DS, 'Signature');
+    sig.attribute['xmlns'] := NS_DS;
+    si := sig.addElementNS(NS_DS, 'SignedInfo');
+    si.addElementNS(NS_DS, 'CanonicalizationMethod').attribute['Algorithm'] := 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
+    si.addElementNS(NS_DS, 'SignatureMethod').attribute['Algorithm'] := signAlgorithmForMethod(method);
+    ref := si.addElementNS(NS_DS, 'Reference');
+    ref.attribute['URI'] := '';
+    trns := ref.addElementNS(NS_DS, 'Transforms');
+    trns.addElementNS(NS_DS, 'Transform').attribute['Algorithm'] := 'http://www.w3.org/2000/09/xmldsig#enveloped-signature';
+    ref.addElementNS(NS_DS, 'DigestMethod').attribute['Algorithm'] := digestAlgorithmForMethod(method);
+    dig := digest(can, method); // the method doesn't actually apply to this, but we figure that if the method specifies sha256, then it should be used here
+    ref.addElementNS(NS_DS, 'DigestValue').addText(String(EncodeBase64(@dig[0], length(dig))));
+    can := canonicaliseXml([xcmCanonicalise],si);
+    dig := sign(can, method);
+    s := base64(dig);
+    sig.addElementNS(NS_DS, 'SignatureValue').addText(s);
 
-  if keyinfo then
-    AddKeyInfo(sig, method);
-  dom.SaveToXML(s);
-  result := TEncoding.UTF8.GetBytes(s);
+    if keyinfo then
+      AddKeyInfo(sig, method);
+    s := dom.ToXml(false, true);
+    result := TEncoding.UTF8.GetBytes(s);
+  finally
+    dom.Free;
+  end;
 end;
 
 function bn2Base64(p : PBigNum) : String;
@@ -684,32 +806,32 @@ begin
   result := String(base64(b));
 end;
 
-procedure TDigitalSigner.AddKeyInfo(sig : IXmlNode; method : TSignatureMethod);
+procedure TDigitalSigner.AddKeyInfo(sig : TMXmlElement; method : TSignatureMethod);
 var
-  kv: IXMLNode;
+  kv: TMXmlElement;
   dkey : PDSA;
   rkey : PRSA;
 begin
   if method in [sdXmlDSASha1, sdXmlDSASha256] then
   begin
-    kv := sig.AddChild('KeyInfo').AddChild('KeyValue').AddChild('DSAKeyValue');
+    kv := sig.AddElement('KeyInfo').AddElement('KeyValue').AddElement('DSAKeyValue');
     dkey := LoadDSAKey;
     try
-      kv.AddChild('P').text := bn2Base64(dkey.p);
-      kv.AddChild('Q').text := bn2Base64(dkey.q);
-      kv.AddChild('G').text := bn2Base64(dkey.g);
-      kv.AddChild('Y').text := bn2Base64(dkey.pub_key);
+      kv.AddElement('P').AddText(bn2Base64(dkey.p));
+      kv.AddElement('Q').AddText(bn2Base64(dkey.q));
+      kv.AddElement('G').AddText(bn2Base64(dkey.g));
+      kv.AddElement('Y').AddText(bn2Base64(dkey.pub_key));
     finally
       DSA_free(dKey);
     end;
   end
   else
   begin
-    kv := sig.AddChild('KeyInfo').AddChild('KeyValue').AddChild('RSAKeyValue');
+    kv := sig.AddElement('KeyInfo').AddElement('KeyValue').AddElement('RSAKeyValue');
     rkey := loadRSAKey;
     try
-      kv.AddChild('Modulus').text := bn2Base64(rkey.n);
-      kv.AddChild('Exponent').text := bn2Base64(rkey.e);
+      kv.AddElement('Modulus').AddText(bn2Base64(rkey.n));
+      kv.AddElement('Exponent').AddText(bn2Base64(rkey.e));
     finally
       RSA_free(rkey);
     end;
@@ -718,86 +840,84 @@ end;
 
 function TDigitalSigner.signExternal(references: TDigitalSignatureReferenceList; method : TSignatureMethod; keyinfo : boolean): TBytes;
 var
-  doc : TXMLDocument;
-  sig, si, ref, trns : IXMLNode;
+  doc : TMXMLDocument;
+  sig, si, ref, trns : TMXmlElement;
   i : integer;
   reference : TDigitalSignatureReference;
   s, t : String;
   can, dig : TBytes;
 begin
-  doc := TXMLDocument.Create(nil);
-  doc.DOMVendor := OpenXML4Factory;
-  doc.Options := [doNamespaceDecl];
-  sig := doc.CreateElement('Signature', NS_DS);
-  sig.SetAttribute('xmlns', NS_DS);
-  si := sig.AddChild('SignedInfo');
-  si.AddChild('CanonicalizationMethod').SetAttribute('Algorithm', 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315');
-  si.addChild('SignatureMethod').setAttribute('Algorithm', signAlgorithmForMethod(method));
+  doc := TMXMLDocument.Create();
+  sig := doc.addElementNS(NS_DS, 'Signature');
+  sig.attribute['xmlns'] := NS_DS;
+  si := sig.AddElement('SignedInfo');
+  si.AddElement('CanonicalizationMethod').attribute['Algorithm'] := 'http://www.w3.org/TR/2001/REC-xml-c14n-20010315';
+  si.AddElement('SignatureMethod').attribute['Algorithm'] := signAlgorithmForMethod(method);
   for i := 0 to references.Count - 1 do
   begin
     reference := references[i];
-    ref := si.AddChild('Reference');
-    ref.setAttribute('URI', reference.URL);
+    ref := si.AddElement('Reference');
+    ref.attribute['URI'] := reference.URL;
     if reference.transforms.count > 0 then
     begin
-      trns := ref.addChild('Transforms');
+      trns := ref.AddElement('Transforms');
       for t in reference.transforms do
-        trns.addChild('Transform').SetAttribute('Algorithm', t);
+        trns.AddElement('Transform').attribute['Algorithm'] := t;
     end;
-    ref.addChild('DigestMethod').setAttribute('Algorithm', digestAlgorithmForMethod(method));
+    ref.AddElement('DigestMethod').attribute['Algorithm'] := digestAlgorithmForMethod(method);
     dig := digest(reference.content, method);
-    ref.addChild('DigestValue').Text := String(EncodeBase64(@dig[0], length(dig)));
+    ref.AddElement('DigestValue').Text := String(EncodeBase64(@dig[0], length(dig)));
   end;
   can := canonicaliseXml([xcmCanonicalise],si);
   dig := sign(can, method);
   s := base64(dig);
-  sig.AddChild('SignatureValue').Text := s;
+  sig.AddElement('SignatureValue').Text := s;
   if keyinfo then
     AddKeyInfo(sig, method);
   result := canonicaliseXml([xcmCanonicalise], sig);  // don't need to canonicalise the whole lot, but why not?
 end;
 
-function TDigitalSigner.LoadKeyInfo(sig: IXmlNode): TKeyInfo;
+function TDigitalSigner.LoadKeyInfo(sig: TMXmlElement): TKeyInfo;
 var
-  ki, kv, kd : IXMLNode;
+  ki, kv, kd : TMXmlElement;
   v : TBytes;
 //  p : pansichar;
 begin
   result := TKeyInfo.Create;
   try
-    ki := getChildNode(sig, 'KeyInfo', NS_DS);
+    ki := sig.elementNS(NS_DS, 'KeyInfo');
     if ki = nil then
       raise Exception.Create('No KeyInfo found in digital signature');
-    kv := getChildNode(ki, 'KeyValue', NS_DS);
+    kv := ki.elementNS(NS_DS, 'KeyValue');
     if kv = nil then
       raise Exception.Create('No KeyValue found in digital signature');
-    kd := getChildNode(kv, 'RSAKeyValue', NS_DS);
+    kd := kv.elementNS(NS_DS, 'RSAKeyValue');
     if kd <> nil then
     begin
       result.rsa := RSA_new;
-      v := unbase64(getChildNode(kd, 'Modulus', NS_DS).Text);
+      v := unbase64(kd.elementNS(NS_DS, 'Modulus').Text);
       result.rsa.n := BN_bin2bn(@v[0], length(v), nil);
-      v := unbase64(getChildNode(kd, 'Exponent', NS_DS).Text);
+      v := unbase64(kd.elementNS(NS_DS, 'Exponent').Text);
       result.rsa.e := BN_bin2bn(@v[0], length(v), nil);
     end
     else
     begin
-      kd := getChildNode(kv, 'DSAKeyValue', NS_DS);
+      kd := kv.elementNS(NS_DS, 'DSAKeyValue');
       if kd <> nil then
       begin
         result.dsa := DSA_new;
-        v := unbase64(getChildNode(kd, 'P', NS_DS).Text);
+        v := unbase64(kd.elementNS(NS_DS, 'P').Text);
         result.dsa.p := BN_bin2bn(@v[0], length(v), nil);
-        v := unbase64(getChildNode(kd, 'Q', NS_DS).Text);
+        v := unbase64(kd.elementNS(NS_DS, 'Q').Text);
         result.dsa.q := BN_bin2bn(@v[0], length(v), nil);
-        v := unbase64(getChildNode(kd, 'G', NS_DS).Text);
+        v := unbase64(kd.elementNS(NS_DS, 'G').Text);
         result.dsa.g := BN_bin2bn(@v[0], length(v), nil);
-        v := unbase64(getChildNode(kd, 'Y', NS_DS).Text);
+        v := unbase64(kd.elementNS(NS_DS, 'Y').Text);
         result.dsa.pub_key := BN_bin2bn(@v[0], length(v), nil);
 
-//        if getChildNode(kd, 'X', NS_DS) <> nil then
+//        if elementNS(kd, 'X', NS_DS) <> nil then
 //        begin
-//          v := unbase64(getChildNode(kd, 'X', NS_DS).Text);
+//          v := unbase64(elementNS(kd, 'X', NS_DS).Text);
 //          result.dsa.priv_key := BN_bin2bn(@v[0], length(v), nil);
 //        end;
       end
@@ -811,23 +931,9 @@ begin
   end;
 end;
 
-function TDigitalSigner.loadXml(source: TBytes): IXMLDocument;
-var
-  doc : TXMLDocument;
-  bs : TBytesStream;
+function TDigitalSigner.loadXml(source: TBytes): TMXmlDocument;
 begin
-  doc := TXMLDocument.Create(nil);
-  result := doc;
-  doc.DOMVendor := OpenXML4Factory;
-  doc.ParseOptions := [poPreserveWhiteSpace];
-  doc.Options := [doNamespaceDecl];
-
-  bs := TBytesStream.Create(source);
-  try
-    result.LoadFromStream(bs);
-  finally
-    bs.Free;
-  end;
+  result := TMXmlParser.parse(source, [xpResolveNamespaces]);
 end;
 
 function TDigitalSigner.resolveReference(url: string): TBytes;
@@ -852,7 +958,7 @@ begin
     result := sdXmlRSASha1
   else if uri = 'http://www.w3.org/2000/09/xmldsig#dsa-sha256' then
     result := sdXmlDSASha256
-  else if uri = 'http://www.w3.org/2000/09/xmldsig#rsa-sha256' then
+  else if uri = 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256' then
     result := sdXmlRSASha256
   else
     raise Exception.Create('Unsupported signature method '+uri);
@@ -882,102 +988,6 @@ destructor TDigitalSignatureReference.Destroy;
 begin
   FTransforms.Free;
   inherited;
-end;
-
-{ TDigitalSignatureTests }
-
-var
-  inputRSA : TBytes;
-  inputDSA : TBytes;
-
-class procedure TDigitalSignatureTests.test;
-begin
-  LoadEAYExtensions;
-  ERR_load_crypto_strings;
-  OpenSSL_add_all_algorithms;
-  testGen;
-  testValidate;
-  UnloadEAYExtensions;
-end;
-
-class procedure TDigitalSignatureTests.testFile(filename: String);
-var
-  bytes : TBytes;
-  f : TFileStream;
-  sig : TDigitalSigner;
-begin
-  f := TFileStream.Create(filename, fmOpenRead);
-  try
-    setLength(bytes, f.Size);
-    f.Read(bytes[0], length(bytes));
-  finally
-    f.free;
-  end;
-  sig := TDigitalSigner.Create;
-  try
-    if not sig.verifySignature(bytes) then
-      raise Exception.Create('Signature Invalid, '+filename);
-  finally
-    sig.Free;
-  end;
-end;
-
-class procedure TDigitalSignatureTests.testGen;
-var
-  sig : TDigitalSigner;
-  output : string;
-begin
-  // rsa using test key
-  sig := TDigitalSigner.Create;
-  try
-    sig.KeyFile := 'C:\work\fhirserver\Exec\jwt-test.key.key';
-    sig.KeyPassword := 'fhirserver';
-    inputRSA := sig.signEnveloped(TEncoding.UTF8.GetBytes('<Envelope xmlns="urn:envelope">'+#13#10+'</Envelope>'+#13#10), sdXmlRSASha256, true);
-    output := TENcoding.UTF8.GetString(inputRSA);
-    writeln(output);
- finally
-    sig.Free;
-  end;
-
-  //  dsa using test key
-  sig := TDigitalSigner.Create;
-  try
-    sig.KeyFile := 'C:\work\fhirserver\tests\signatures\test_dsa_key.pem';
-    sig.KeyPassword := 'fhir';
-    inputDSA := sig.signEnveloped(TEncoding.UTF8.GetBytes('<Envelope xmlns="urn:envelope">'+#13#10+'</Envelope>'+#13#10), sdXmlDSASha256, true);
-    output := TENcoding.UTF8.GetString(inputDSA);
-    writeln(output);
- finally
-    sig.Free;
-  end;
-end;
-
-class procedure TDigitalSignatureTests.testValidate;
-var
-  sig : TDigitalSigner;
-begin
-  // 1. test yourself
-  sig := TDigitalSigner.Create;
-  try
-    if not sig.verifySignature(inputRSA) then raise Exception.Create('signature invalid');
-  finally
-    sig.Free;
-  end;
-
-  sig := TDigitalSigner.Create;
-  try
-    if not sig.verifySignature(inputDSA) then raise Exception.Create('signature invalid');
-  finally
-    sig.Free;
-  end;
-
-  // 2. other examples
-  // rsa, work
-  testFile('C:\work\fhirserver\tests\signatures\java_example_rsa.xml');
-
-  // dsa, don't work
-  testFile('C:\work\fhirserver\tests\signatures\java_example_dsa.xml');
-  testFile('C:\work\fhirserver\tests\signatures\james.xml');
 end;
 
 

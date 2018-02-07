@@ -134,9 +134,6 @@ Function HasExceptObject : Boolean;
 Implementation
 
 
-Uses
-  AdvFactories;
-
 
 Function ExceptObject : Exception;
 Begin
@@ -170,12 +167,7 @@ Var
 Begin
   If Assigned(oSender) Then
   Begin
-{$IFOPT C+}
-    If Not Factory.Valid(oSender) Then
-      sSender := '<Invalid>'
-    Else
-{$ENDIF}
-      sSender := oSender.ClassName;
+    sSender := oSender.ClassName;
   End
   Else
   Begin
@@ -212,7 +204,7 @@ Begin
 
   Inc(pAddress, 2);
 
-  If Assigned(oObject) {$IFOPT C+} And Factory.Valid(oObject) {$ENDIF} Then
+  If Assigned(oObject) Then
     Raise EAdvAbstract.Create('AdvExceptions', 'AbstractHandler', StringFormat('Attempted call onto an abstract method $%x in class ''%s''.', [pAddress^, oObject.ClassName]))
   Else
     Raise EAdvAbstract.Create('AdvExceptions', 'AbstractHandler', StringFormat('Attempted call onto an abstract method $%x in object $%x.', [pAddress^, Integer(oObject)]));

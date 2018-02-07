@@ -42,7 +42,7 @@ uses
   Winapi.Windows, Winapi.Messages, System.SysUtils, System.Variants, System.Classes, Vcl.Graphics,
   Vcl.Controls, Vcl.Forms, Vcl.Dialogs, {$IFDEF NPPUNICODE} NppForms,{$ENDIF} Vcl.OleCtrls, Vcl.StdCtrls, Vcl.ExtCtrls,
   Vcl.Buttons, Vcl.ComCtrls, VirtualTrees, FHIRResources, FHIRBase, FHIRTypes, nppplugin, FHIRPath, FHIRProfileUtilities,
-  FHIRParserBase, FHIRParser, System.ImageList, Vcl.ImgList, AdvObjectLists, AdvGenerics, pluginutilities, FHIRContext;
+  FHIRParserBase, FHIRParser, System.ImageList, Vcl.ImgList, AdvObjectLists, AdvGenerics, pluginutilities, FHIRContext, CDSHooksClientManager;
 
 const
   UMSG = WM_USER + 1;
@@ -108,27 +108,28 @@ type
   private
     { Private declarations }
     FResource : TFHIRResource;
-    FContext : TFHIRBase;
+    FContext : TFHIRObject;
     FFormat : TFHIRFormat;
-    FExpression : TFHIRExpressionNode;
-    FEngine : TFHIRExpressionEngine;
-    FServices : TWorkerContext;
+    FExpression : TFHIRPathExpressionNode;
+    FEngine : TFHIRPathEngine;
+    FServices : TFHIRWorkerContext;
     FLog : String;
     FLayoutInProgress : boolean;
     FMode : TExecutionMode;
     FSkip : TStringList;
     FDone : TStringList;
-    FCurrent : TFHIRExpressionNode;
+    FCurrent : TFHIRPathExpressionNode;
     FCurrentIsOp : boolean;
     FFreq : Int64;
     FStartLast : Int64;
     FTypes : TFHIRTypeDetails;
-    FOutcome : TFHIRBaseList;
+    FOutcome : TFHIRSelectionList;
 
     procedure ResetNode(Sender: TBaseVirtualTree; Node: PVirtualNode; Data: Pointer; var Abort: Boolean);
 
-    procedure Compose(memo : TMemo; obj : TFHIRBase; name : String); overload;
-    procedure Compose(memo : TMemo; obj : TFHIRBaseList; name, def : String); overload;
+    procedure Compose(memo : TMemo; obj : TFHIRObject; name : String); overload;
+    procedure Compose(memo : TMemo; obj : TFHIRObjectList; name, def : String); overload;
+    procedure Compose(memo : TMemo; obj : TFHIRSelectionList; name, def : String); overload;
     procedure ApplyMarks;
     procedure SaveMarks;
     procedure Log(s : String);
@@ -138,7 +139,7 @@ type
     procedure Go;
     procedure Init(var Msg: TMessage); message UMSG;
     function WantStop(package : TFHIRPathDebugPackage) : boolean;
-    procedure DoDebug(source : TFHIRExpressionEngine; package : TFHIRPathDebugPackage);
+    procedure DoDebug(source : TFHIRPathEngine; package : TFHIRPathDebugPackage);
 
   public
     { Public declarations }
@@ -149,9 +150,9 @@ var
 
 
 function RunPathDebugger(owner : {$IFDEF NPPUNICODE}TNppPlugin{$ELSE} TComponent {$ENDIF};
-    services : TWorkerContext;
-    resource : TFHIRResource; context : TFHIRBase; path : String; fmt : TFHIRFormat;
-    out types : TFHIRTypeDetails; out items : TFHIRBaseList) : boolean;
+    services : TFHIRWorkerContext;
+    resource : TFHIRResource; context : TFHIRObject; path : String; fmt : TFHIRFormat;
+    out types : TFHIRTypeDetails; out items : TFHIRSelectionList) : boolean;
 
 implementation
 
@@ -161,7 +162,7 @@ uses
   FHIRPluginSettings, textUtilities;
 
 
-function getId(expr : TFHIRExpressionNode; op : boolean) : String;
+function getId(expr : TFHIRPathExpressionNode; op : boolean) : String;
 begin
   if (op) then
     result := inttostr(expr.uniqueId)+'.op'
@@ -193,9 +194,9 @@ begin
 end;
 
 function RunPathDebugger(owner : {$IFDEF NPPUNICODE}TNppPlugin{$ELSE} TComponent {$ENDIF};
-    services : TWorkerContext;
-    resource : TFHIRResource; context : TFHIRBase; path : String; fmt : TFHIRFormat;
-    out types : TFHIRTypeDetails; out items : TFHIRBaseList) : boolean;
+    services : TFHIRWorkerContext;
+    resource : TFHIRResource; context : TFHIRObject; path : String; fmt : TFHIRFormat;
+    out types : TFHIRTypeDetails; out items : TFHIRSelectionList) : boolean;
 begin
   FHIRPathDebuggerForm := TFHIRPathDebuggerForm.Create(owner);
   try
@@ -310,7 +311,7 @@ begin
   mInput2.Text := '';
   mOutcome.Text := '';
   mConsole.Text := '';
-  FEngine := TFHIRExpressionEngine.create(FServices.link);
+  FEngine := TFHIRPathEngine.create(FServices.link);
   FEngine.OnDebug := DoDebug;
   try
     FExpression := FEngine.parse(mSource.Text);
@@ -352,9 +353,9 @@ begin
     Settings.DebuggerBreaksWidth := Panel4.Width;
 end;
 
-procedure UpdateMarks(expr : TFHIRExpressionNode; marks : TStringList);
+procedure UpdateMarks(expr : TFHIRPathExpressionNode; marks : TStringList);
 var
-  c : TFHIRExpressionNode;
+  c : TFHIRPathExpressionNode;
 begin
   if expr = nil then
     exit;
@@ -371,9 +372,9 @@ begin
   UpdateMarks(expr.OpNext, marks);
 end;
 
-procedure GetMarks(expr : TFHIRExpressionNode; marks : TStringList);
+procedure GetMarks(expr : TFHIRPathExpressionNode; marks : TStringList);
 var
-  c : TFHIRExpressionNode;
+  c : TFHIRPathExpressionNode;
 begin
   if expr = nil then
     exit;
@@ -418,6 +419,18 @@ begin
   FMode := emAbort;
 end;
 
+procedure TFHIRPathDebuggerForm.Compose(memo: TMemo; obj: TFHIRSelectionList; name, def: String);
+var
+  ol : TFHIRObjectList;
+begin
+  ol := obj.asValues;
+  try
+    compose(memo, ol, name, def);
+  finally
+    ol.Free;
+  end;
+end;
+
 procedure TFHIRPathDebuggerForm.btnNextClick(Sender: TObject);
 begin
   FMode := emNext;
@@ -446,7 +459,7 @@ begin
   vtExpressions.InvalidateChildren(vtExpressions.RootNode.FirstChild, true);
 end;
 
-procedure TFHIRPathDebuggerForm.Compose(memo: TMemo; obj: TFHIRBaseList; name, def: String);
+procedure TFHIRPathDebuggerForm.Compose(memo: TMemo; obj: TFHIRObjectList; name, def: String);
 var
   comp : TFHIRComposer;
 begin
@@ -455,36 +468,36 @@ begin
   else
   begin
     if (FFormat = ffJson) then
-      comp := TFHIRJsonComposer.Create(FServices.link, 'en')
+      comp := TFHIRJsonComposer.Create(FServices.link, OutputStylePretty, 'en')
     else
-      comp := TFHIRXmlComposer.Create(FServices.link, 'en');
+      comp := TFHIRXmlComposer.Create(FServices.link, OutputStylePretty, 'en');
     try
-      memo.Text := comp.Compose(name, obj, true)
+      memo.Text := comp.Compose(name, obj)
     finally
       comp.Free;
     end;
   end;
 end;
 
-procedure TFHIRPathDebuggerForm.Compose(memo: TMemo; obj: TFHIRBase; name : String);
+procedure TFHIRPathDebuggerForm.Compose(memo: TMemo; obj: TFHIRObject; name : String);
 var
   comp : TFHIRComposer;
 begin
   if (FFormat = ffJson) then
-    comp := TFHIRJsonComposer.Create(FServices.link, 'en')
+    comp := TFHIRJsonComposer.Create(FServices.link, OutputStylePretty, 'en')
   else
-    comp := TFHIRXmlComposer.Create(FServices.link, 'en');
+    comp := TFHIRXmlComposer.Create(FServices.link, OutputStylePretty, 'en');
   try
     if obj is TFHIRResource then
-      memo.Text := comp.Compose(TFHIRResource(obj), true)
+      memo.Text := comp.Compose(TFHIRResource(obj))
     else
-      memo.Text := comp.Compose(name, obj, true)
+      memo.Text := comp.Compose(name, obj)
   finally
     comp.Free;
   end;
 end;
 
-procedure TFHIRPathDebuggerForm.DoDebug(source : TFHIRExpressionEngine; package : TFHIRPathDebugPackage);
+procedure TFHIRPathDebuggerForm.DoDebug(source : TFHIRPathEngine; package : TFHIRPathDebugPackage);
 var
   id : string;
   tc : Int64;
@@ -596,7 +609,7 @@ end;
 procedure TFHIRPathDebuggerForm.vtExpressionsInitNode(Sender: TBaseVirtualTree; ParentNode, Node: PVirtualNode; var InitialStates: TVirtualNodeInitStates);
 var
   p, pp : PTreeDataPointer;
-  pe : TFHIRExpressionNode;
+  pe : TFHIRPathExpressionNode;
   i : integer;
 begin
   p := vtExpressions.GetNodeData(Node);

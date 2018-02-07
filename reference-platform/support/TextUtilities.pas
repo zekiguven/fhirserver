@@ -33,8 +33,13 @@ interface
 Uses
   SysUtils, Classes, AdvStreams;
 
+type
+  TXmlEncodingMode = (xmlText, xmlAttribute, xmlCanonical);
+  TEolnOption = (eolnIgnore, eolnCanonical, eolnEscape);
+
 function FormatTextToHTML(AStr: String): String; // translate ready for use in HTML
-function FormatTextToXML(AStr: String): String;
+function FormatTextToXML(AStr: String; mode : TXmlEncodingMode): String;
+function FormatCodeToXML(AStr: String): String;
 function FormatXMLToHTML(AStr : String):String;
 function FormatXMLToHTMLPlain(AStr : String):String;
 function FormatXMLForTextArea(AStr: String): String;
@@ -44,11 +49,14 @@ function UTF8StreamToString(value : TStream) : String; overload;
 function UTF8StreamToString(value : TAdvAccessStream) : String; overload;
 
 function FileToString(filename : String; encoding : TEncoding; AShareMode : Word = fmOpenRead + fmShareDenyWrite) : String;
-function StreamToString(stream : TStream; encoding : TEncoding; AShareMode : Word = fmOpenRead + fmShareDenyWrite) : String;
+function StreamToString(stream : TStream; encoding : TEncoding; AShareMode : Word = fmOpenRead + fmShareDenyWrite) : String; overload;
+function StreamToString(stream : TAdvStream; encoding : TEncoding; AShareMode : Word = fmOpenRead + fmShareDenyWrite) : String; overload;
 procedure StringToFile(content, filename : String; encoding : TEncoding);
-procedure StringToStream(content: String; stream : TStream; encoding : TEncoding);
+procedure StringToStream(content: String; stream : TStream; encoding : TEncoding); overload;
+procedure StringToStream(content: String; stream : TAdvStream; encoding : TEncoding); overload;
 
 procedure BytesToFile(bytes : TBytes; filename : String);
+function FileToBytes(filename : String; AShareMode : Word = fmOpenRead + fmShareDenyWrite) : TBytes;
 
 procedure StreamToFile(stream : TStream; filename : String);
 
@@ -114,7 +122,7 @@ begin
 end;
 
 
-function FormatTextToXML(AStr: String): String;
+function FormatCodeToXML(AStr: String): String;
 var
   i: Integer;
 begin
@@ -137,16 +145,9 @@ begin
         Result := Result + '&gt;';
       #32:
         Result := Result + ' ';
-      #13:
-        begin
-        if i < length(AStr) then
-          if AStr[i + 1] = #10 then
-            Inc(i);
-        Result := Result + ' ';
-        end;
       else
         begin
-        if CharInSet(AStr[i], [' '..'~']) then
+        if CharInSet(AStr[i], [#13, #10, ' '..'~']) then
           Result := Result + AStr[i]
         else
           Result := Result + '&#' + IntToStr(Ord(AStr[i])) + ';';
@@ -154,6 +155,75 @@ begin
       end;
     Inc(i);
     end;
+end;
+
+function FormatTextToXML(AStr: String; mode : TXmlEncodingMode): String;
+var
+  i: Integer;
+  b : TStringBuilder;
+begin
+  b := TStringBuilder.Create;
+  try
+    i := 1;
+    while i <= Length(AStr) do
+      begin
+      case AStr[i] of
+        '"':
+          case mode of
+            xmlAttribute : b.append('&quot;');
+            xmlCanonical : b.append('&#' + IntToStr(Ord(AStr[i])) + ';');
+            xmlText : b.append(AStr[i]);
+          end;
+        '''':
+          case mode of
+            xmlAttribute : b.append('&apos;');
+            xmlCanonical : b.append('&#' + IntToStr(Ord(AStr[i])) + ';');
+            xmlText : b.append(AStr[i]);
+          end;
+        '&':
+          if mode = xmlCanonical then
+            b.append('&#' + IntToStr(Ord(AStr[i])) + ';')
+          else
+            b.append('&amp;');
+        '<':
+          if mode = xmlCanonical then
+            b.append('&#' + IntToStr(Ord(AStr[i])) + ';')
+          else
+            b.append('&lt;');
+        '>':
+          if mode = xmlCanonical then
+            b.append('&#' + IntToStr(Ord(AStr[i])) + ';')
+          else
+            b.append('&gt;');
+        #32:
+          b.append(' ');
+        #13, #10:
+          begin
+          case mode of
+            xmlAttribute : b.append('&#' + IntToStr(Ord(AStr[i])) + ';');
+            xmlCanonical : b.append('&#' + IntToStr(Ord(AStr[i])) + ';');
+            xmlText : b.append(AStr[i]);
+          end;
+//        canonical?
+//          if i < length(AStr) then
+//            if AStr[i + 1] = #10 then
+//              Inc(i);
+//          b.append(' ');
+          end;
+        else
+          begin
+          if CharInSet(AStr[i], [' '..'~']) then
+            b.append(AStr[i])
+          else
+            b.append('&#' + IntToStr(Ord(AStr[i])) + ';');
+          end;
+        end;
+      Inc(i);
+      end;
+    result := b.ToString;
+  finally
+    b.Free;
+  end;
 end;
 
 function FormatXMLForTextArea(AStr: String): String;
@@ -188,7 +258,7 @@ begin
         end;
       else
         begin
-        if CharInSet(AStr[i], [' '..'~']) then
+        if CharInSet(AStr[i], [' '..'~', #10]) then
           Result := Result + AStr[i]
         else
           Result := Result + '&#' + IntToStr(Ord(AStr[i])) + ';';
@@ -386,6 +456,15 @@ begin
     stream.write(bytes[0], length(bytes));
 end;
 
+procedure StringToStream(content: String; stream : TAdvStream; encoding : TEncoding);
+var
+  bytes : TBytes;
+begin
+  bytes := encoding.GetBytes(content);
+  if (length(bytes) > 0) then
+    stream.write(bytes[0], length(bytes));
+end;
+
 function FileToString(filename : String; encoding : TEncoding; AShareMode : Word = fmOpenRead + fmShareDenyWrite) : String;
 var
   LFileStream: TFilestream;
@@ -414,6 +493,16 @@ begin
   SetLength(bytes, stream.Size);
   if stream.Size > 0 then
     stream.Read(bytes[0], stream.size);
+  result := encoding.GetString(bytes);
+end;
+
+function StreamToString(stream : TAdvStream; encoding : TEncoding; AShareMode : Word = fmOpenRead + fmShareDenyWrite) : String;
+var
+  bytes : TBytes;
+begin
+  SetLength(bytes, stream.Readable);
+  if stream.Readable > 0 then
+    stream.Read(bytes[0], stream.Readable);
   result := encoding.GetString(bytes);
 end;
 
@@ -470,4 +559,24 @@ begin
   end;
 end;
 
+function FileToBytes(filename : String; AShareMode : Word = fmOpenRead + fmShareDenyWrite) : TBytes;
+var
+  LFileStream: TFilestream;
+begin
+  if FileExists(filename) then
+    begin
+    LFileStream := TFileStream.Create(filename, aShareMode);
+    try
+      SetLength(result, LFileStream.Size);
+      if LFileStream.Size > 0 then
+        LFileStream.Read(result[0], LFileStream.size);
+    finally
+      LFileStream.Free;
+    end;
+    end
+  else
+    raise Exception.Create('File "' + filename + '" not found');
+end;
+
 end.
+

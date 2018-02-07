@@ -106,7 +106,7 @@ Type
   end;
 
 
-  TBaseWorkerContext = class abstract (TWorkerContext)
+  TBaseWorkerContext = class abstract (TFHIRWorkerContext)
   protected
     FLock : TCriticalSection;
     FProfiles : TProfileManager;
@@ -145,7 +145,7 @@ Type
 
   TProfileUtilities = class (TAdvObject)
   private
-    context : TWorkerContext;
+    context : TFHIRWorkerContext;
     messages : TFhirOperationOutcomeIssueList;
     procedure log(message : String);
     function fixedPath(contextPath, pathSimple : String) : String;
@@ -177,7 +177,7 @@ Type
     function overWriteWithCurrent(profile,
       usage: TFHIRElementDefinition): TFHIRElementDefinition;
   public
-    Constructor create(context : TWorkerContext; messages : TFhirOperationOutcomeIssueList);
+    Constructor create(context : TFHIRWorkerContext; messages : TFhirOperationOutcomeIssueList);
     Destructor Destroy; override;
     {
        * Given a base (snapshot) profile structure, and a differential profile, generate a snapshot profile
@@ -200,7 +200,7 @@ implementation
 
 { TProfileUtilities }
 
-constructor TProfileUtilities.create(context : TWorkerContext; messages : TFhirOperationOutcomeIssueList);
+constructor TProfileUtilities.create(context : TFHIRWorkerContext; messages : TFhirOperationOutcomeIssueList);
 begin
   inherited Create;
   self.context := context;
@@ -1475,14 +1475,16 @@ end;
 
 function TBaseWorkerContext.allResourceNames: TArray<String>;
 var
+  a : TFHIRResourceType;
   i : integer;
   s : string;
 begin
   FLock.Lock;
   try
-    SetLength(result, length(ALL_RESOURCE_TYPE_NAMES) + FCustomResources.Count);
-    for i := 0 to length(ALL_RESOURCE_TYPE_NAMES)-1 do
-      result[i] := ALL_RESOURCE_TYPE_NAMES[i];
+    SetLength(result, length(ALL_RESOURCE_TYPE_NAMES) - 1 + FCustomResources.Count);
+    for a := low(TFHIRResourceType) to high(TFHIRResourceType) do
+      if (a <> frtNull) then
+        result[ord(a)-1] := ALL_RESOURCE_TYPE_NAMES[a];
     i := length(ALL_RESOURCE_TYPE_NAMES);
     for s in FCustomResources.Keys do
     begin

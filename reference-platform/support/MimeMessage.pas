@@ -1,5 +1,33 @@
 unit MimeMessage;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
 interface
 
 uses
@@ -110,7 +138,7 @@ begin
   result := '';
   while copy(result, length(result)-length(AValue)+1, length(AValue)) <> AValue do
     begin
-    Condition(AStream.Size - AStream.Position <> 0, ASSERT_LOCATION, 'Premature termination of stream looking for value "'+string(AValue)+'"');
+    CheckCondition(AStream.Size - AStream.Position <> 0, ASSERT_LOCATION, 'Premature termination of stream looking for value "'+string(AValue)+'"');
     AStream.Read(c, 1);
     result := result + c;
     end;
@@ -120,7 +148,7 @@ end;
 function TMimeBase.ReadBytes(AStream : TStream; AByteCount : Integer):AnsiString;
 const ASSERT_LOCATION = ASSERT_UNIT+'.ReadBytes';
 begin
-  Condition(AStream.Size - AStream.Position >= AByteCount, ASSERT_LOCATION, 'Premature termination of stream reading "'+inttostr(AByteCount)+'" bytes');
+  CheckCondition(AStream.Size - AStream.Position >= AByteCount, ASSERT_LOCATION, 'Premature termination of stream reading "'+inttostr(AByteCount)+'" bytes');
   SetLength(result, AByteCount);
   if AByteCount > 0 then
     begin
@@ -247,7 +275,7 @@ var
   LComp0 : Pointer;
   LComp1 : Pointer;
   LCompLen : Word;
-  offset : cardinal;
+  offset : integer;
   b : TBytes;
 const
   BUF_LEN = 1024;
@@ -497,13 +525,13 @@ var
 begin
   // this parser is weak - and needs review
   StringSplitAnsi(AnsiString(Trim(AContent)), ';', l, s);
-  Condition(IdAnsiSameText(l, MULTIPART_RELATED) or IdAnsiSameText(l, MULTIPART_FORMDATA), ASSERT_LOCATION, 'attempt to read content as Mime, but the content-Type is "'+String(l)+'", not "'+String(MULTIPART_RELATED)+'" or "'+String(MULTIPART_FORMDATA)+'" in header '+String(AContent));
+  CheckCondition(IdAnsiSameText(l, MULTIPART_RELATED) or IdAnsiSameText(l, MULTIPART_FORMDATA), ASSERT_LOCATION, 'attempt to read content as Mime, but the content-Type is "'+String(l)+'", not "'+String(MULTIPART_RELATED)+'" or "'+String(MULTIPART_FORMDATA)+'" in header '+String(AContent));
   while s <> '' do
     begin
     StringSplitAnsi(s, ';',l, s);
     StringSplitAnsi(AnsiString(trim(String(l))), '=', l, r);
-    Condition(l <> '', ASSERT_LOCATION, 'Unnamed part in Content_type header '+AContent);
-    Condition(r <> '', ASSERT_LOCATION, 'Unvalued part in Content_type header '+AContent);
+    CheckCondition(l <> '', ASSERT_LOCATION, 'Unnamed part in Content_type header '+AContent);
+    CheckCondition(r <> '', ASSERT_LOCATION, 'Unvalued part in Content_type header '+AContent);
     if r[1] = '"' then
       begin
       delete(r, 1, 1);
@@ -553,14 +581,14 @@ begin
   ReadHeaders(AStream);
 
   LHeader := FHeaders.Values[CONTENT_TYPE];
-  Condition(LHeader <> '', ASSERT_LOCATION, ''+CONTENT_TYPE+' header not found in '+FHeaders.CommaText);
+  CheckCondition(LHeader <> '', ASSERT_LOCATION, ''+CONTENT_TYPE+' header not found in '+FHeaders.CommaText);
   ReadFromStream(AStream, LHeader);
 end;
 
 function TMimeMessage.GetMainPart: TMimePart;
 const ASSERT_LOCATION = ASSERT_UNIT+'.TMimeMessage.GetMainPart';
 begin
-  Condition(FStart <> '', ASSERT_LOCATION, 'Start header not valid');
+  CheckCondition(FStart <> '', ASSERT_LOCATION, 'Start header not valid');
   result := getparam(FStart);
 end;
 
@@ -597,7 +625,7 @@ var
   LTemp : AnsiString;
   LPart : TMimePart;
 begin
-  Condition(AContentType <> '', ASSERT_LOCATION, 'Content-Type header not valid');
+  CheckCondition(AContentType <> '', ASSERT_LOCATION, 'Content-Type header not valid');
   AnalyseContentType(AContentType);
 
   LTemp := ReadToValue(AStream, FBoundary);
@@ -637,19 +665,19 @@ var
   i, j : integer;
   LFound : boolean;
 begin
-  Condition(FBoundary <> '', ASSERT_LOCATION, 'Boundary is not valid');
-  Condition(FStart <> '', ASSERT_LOCATION, 'Start is not valid');
+  CheckCondition(FBoundary <> '', ASSERT_LOCATION, 'Boundary is not valid');
+  CheckCondition(FStart <> '', ASSERT_LOCATION, 'Start is not valid');
   LFound := false;
   for i := 0 to FParts.Count - 1 do
     begin
-    Condition(FParts[i].Id <> '', ASSERT_LOCATION, 'Part['+inttostr(i)+'].Id is not valid');
+    CheckCondition(FParts[i].Id <> '', ASSERT_LOCATION, 'Part['+inttostr(i)+'].Id is not valid');
     LFound := LFound or (FParts[i].Id = FStart);
     for j := 0 to i - 1 do
       begin
-      Condition(FParts[i].Id <> FParts[j].Id, ASSERT_LOCATION, 'Part['+inttostr(i)+'].Id is a duplicate of Part['+inttostr(j)+'].Id ("'+FParts[i].Id+'")');
+      CheckCondition(FParts[i].Id <> FParts[j].Id, ASSERT_LOCATION, 'Part['+inttostr(i)+'].Id is a duplicate of Part['+inttostr(j)+'].Id ("'+FParts[i].Id+'")');
       end;
     end;
-  Condition(LFound, ASSERT_LOCATION, 'The Start Part "'+FStart+'" was not found in the part list');
+  CheckCondition(LFound, ASSERT_LOCATION, 'The Start Part "'+FStart+'" was not found in the part list');
 end;
 
 procedure TMimeMessage.WriteToStream(AStream: TStream; AHeaders: boolean);

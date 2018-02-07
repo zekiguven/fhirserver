@@ -1,20 +1,50 @@
 unit SnomedAnalysis;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
   SysUtils, Classes, Math,
-  StringSupport, EncodeSupport,
-  AdvStringBuilders, AdvObjectLists,
+  StringSupport, EncodeSupport, ParseMap, TextUtilities,
+  AdvStringBuilders, AdvObjectLists, AdvJson, AdvZipParts, AdvZipWriters, AdvMemories,
   FHIRResources, FHIRTypes, FHIRConstants, FHIRParser,
-  SnomedServices,
-  AdvObjects, AdvFiles;
+  SnomedServices, FHIRParserBase,
+  AdvObjects, AdvFiles, AdvNameBuffers;
 
 type
   TRelationship = class (TAdvObject)
   public
     FRelationship : cardinal;
     FCount : cardinal;
+    FCounts : Array of Cardinal;
     FIndCount : cardinal;
     FTopmost : cardinal;
     FDupl : cardinal;
@@ -34,30 +64,70 @@ type
     function getById(id : cardinal) : TRelationship;
   end;
 
+  TProperty = record
+    relid : cardinal;
+    target : cardinal;
+    group : integer;
+  end;
+  TPropertyArray = array of TProperty;
+
+  TColumnSourceType = (stCid, stTerm, stMastercid, stReltarget, stSibling, stRefset);
+  TColumnKeyType = (ktRelId, ktSiblingId);
+  TColumnFieldDisplay = (fvString, fvCid);
+
+  TColumnDetail = record
+    srcType : TColumnSourceType;
+    keyType : TColumnKeyType;
+    members : TSnomedReferenceSetMemberArray;
+    reltype : byte;
+    lang : cardinal;
+    target : cardinal;
+    sibling : cardinal;
+    field : integer;
+    display : TColumnFieldDisplay;
+  end;
+  TColumnDetailArray = array of TColumnDetail;
+  TSnomedRelationship = record
+    relid, reltype, source, target, group : cardinal;
+  end;
+
   TSnomedAnalysis = class (TAdvObject)
   private
     FSnomed : TSnomedServices;
     FRoots : TCardinalArray;
+    FColumns : TColumnDetailArray;
+
 //    function CreateCC(index : Cardinal) : TFhirCodeableConcept;
 //    function CreateRef(root, index : Cardinal) : TFhirReference;
-    procedure listRelationships(iIndex : cardinal; list : TRelationshipList; bnd : TFhirBundle);
+    procedure listRelationships(iIndex : cardinal; list : TRelationshipList);
     function getRootConcepts(iIndex : cardinal) : TCardinalArray;
 //    function intersection(one, two : TCardinalArray) : TCardinalArray;
     procedure registerSCTRoots(ids : Array of String);
 
-    procedure assess(b : TAdvStringBuilder; id : String; bnd : TFhirBundle = nil);
+    procedure assess(b : TAdvStringBuilder; id : String);
+    function getProps(id, prop : cardinal) : TPropertyArray;
+    function findRelationshipInGroup(concept: cardinal; group : integer; siblingtype: cardinal; relationship : TSnomedRelationship) : boolean;
+    procedure listChildren(id : cardinal; list : TStringList);
+    function prepSubColumn(json : TJsonObject) : TColumnDetail;
+    procedure processSubColumn(json : TJsonObject; tbl : TAdvStringBuilder; det : TColumnDetail; child, relid, target, group : cardinal);
+    procedure processSubTable(parts : TAdvZipPartList; json : TJsonObject; children : TStringList);
+    function prepColumn(json : TJsonObject) : TColumnDetail;
+    procedure processColumn(json : TJsonObject; tbl : TAdvStringBuilder; det : TColumnDetail; child : cardinal);
+    procedure processTable(parts : TAdvZipPartList; json : TJsonObject);
+    procedure processScript(buf : TAdvNameBuffer; script : string);
+    procedure cleanUpColumn(detail : TColumnDetail);
   public
     Constructor Create(snomed : TSnomedServices); overload;
     Destructor Destroy; override;
 
-    function generate : String;
+    function generate(params : TParseMap) : TAdvNameBuffer;
   end;
 
 implementation
 
 { TSnomedAnalysis }
 
-procedure TSnomedAnalysis.assess(b: TAdvStringBuilder; id: String; bnd : TFhirBundle = nil);
+procedure TSnomedAnalysis.assess(b: TAdvStringBuilder; id: String);
 var
   list : TRelationshipList;
   did : UInt64;
@@ -69,7 +139,7 @@ var
 //  iId : UInt64;
 //  iIndex : Cardinal;
 //  Identity : UInt64;
-  Flags : Byte;
+  Active, Defining : boolean;
   Group : integer;
 //  ParentIndex : Cardinal;
 //  DescriptionIndex : Cardinal;
@@ -93,9 +163,8 @@ var
 //  ok : boolean;
 //  iRef : Cardinal;
   cid : String;
+  ic : integer;
 begin
-  writeln('');
-  writeln(id);
   iId := StrToUInt64Def(id, 0);
   if not FSnomed.Concept.FindConcept(iId, iIndex) then
     raise Exception.Create('not defined: '+id);
@@ -105,19 +174,19 @@ begin
     Inbounds := FSnomed.Refs.GetReferences(FSnomed.Concept.GetInbounds(iIndex));
     For i := 0 to length(Inbounds)-1 Do
     begin
-      FSnomed.Rel.GetRelationship(Inbounds[i], did, iWork, iWork2, iWork3, module, kind, modifier, date, Flags, Group);
+      FSnomed.Rel.GetRelationship(Inbounds[i], did, iWork, iWork2, iWork3, module, kind, modifier, date, Active, Defining, Group);
       if FSnomed.GetConceptId(iWork3) = '116680003' then
-        raise Exception.Create('Concept '+id+' has no descendents but it does ');
+        raise Exception.Create('Concept '+id+' has no descendants but it does ');
     end;
   end;
 
   b.AppendLine(' <tr><td colspan="8"><b>');
-  b.append('<a href="../doco/?type=snomed&id=');
+  b.append('<a href="../'+FSnomed.EditionId+'/?type=snomed&id=');
   b.Append(id);
   b.Append('">');
   b.Append(id);
   b.Append('</a></b> ');
-  b.Append(EncodeXML(fsnomed.getDisplay(id), xmlText));
+  b.Append(FormatTextToXML(fsnomed.getDisplay(id, ''), xmlText));
   b.append('.');
   b.Append(inttostr(length(alldesc)));
   b.AppendLine(' rows</td></tr>');
@@ -126,9 +195,7 @@ begin
   try
     for i := Low(allDesc) to high(allDesc) do
     begin
-      if (i mod 1000 = 0) then
-        write('.');
-      listRelationships(allDesc[i], list, bnd);
+      listRelationships(allDesc[i], list);
     end;
     for i := 0 to list.count -1 do
     begin
@@ -137,7 +204,7 @@ begin
       begin
 
         b.AppendLine(' <tr>');
-        b.Append('  <td><a href="../doco/?type=snomed&id=');
+        b.Append('  <td><a href="../'+FSnomed.EditionId+'/?type=snomed&id=');
         b.Append(FSnomed.GetConceptId(list[i].FRelationship));
         b.Append('"/>');
         b.Append(FSnomed.GetDisplayName(list[i].FRelationship, 0));
@@ -146,10 +213,14 @@ begin
         b.Append('</td><td>');
         b.Append(inttostr(trunc((list[i].FIndCount / length(alldesc)) * 100)));
         b.Append('</td><td>');
-        b.Append(inttostr(list[i].FCount));
+        // b.Append(inttostr(list[i].FCount));
+        for ic in list[i].FCounts do
+          b.Append(inttostr(ic)+' ');
+
+
         b.Append('</td><td>');
         b.Append(inttostr(list[i].FDupl+1));
-        b.Append('</td><td><a href="../doco/?type=snomed&id=');
+        b.Append('</td><td><a href="/snomed/'+FSnomed.EditionId+'/?type=snomed&id=');
         b.Append(FSnomed.GetConceptId(list[i].FMax));
         b.Append('"/>');
         b.Append(FSnomed.GetDisplayName(list[i].FMax, 0));
@@ -160,7 +231,7 @@ begin
         begin
           if (j > 0) then
             b.Append('<br/>');
-          b.Append('<a href="../doco/?type=snomed&id=');
+          b.Append('<a href="../'+FSnomed.EditionId+'/?type=snomed&id=');
           b.Append(FSnomed.GetConceptId(list[i].FBranches[j]));
           b.Append('"/>');
           b.Append(FSnomed.GetDisplayName(list[i].FBranches[j], 0));
@@ -219,17 +290,40 @@ begin
   inherited;
 end;
 
-function TSnomedAnalysis.generate: String;
+function TSnomedAnalysis.findRelationshipInGroup(concept: cardinal; group : integer; siblingtype: cardinal; relationship: TSnomedRelationship): boolean;
+var
+  outboundIndex, o : cardinal;
+  outbounds : TCardinalArray;
+  identity : UInt64;
+  Source, Target, RelType, module, kind, modifier : Cardinal;
+  date : TSnomedDate;
+  Active, Defining : Boolean;
+  Grp : integer;
+begin
+  result := false;
+  outboundIndex := FSnomed.Concept.GetOutbounds(concept);
+  outbounds := FSnomed.Refs.GetReferences(outboundIndex);
+  for o in outbounds do
+  begin
+    FSnomed.Rel.GetRelationship(o, identity, Source, Target, RelType, module, kind, modifier, date, Active, Defining, Grp);
+    if (grp = group) and (RelType = siblingtype) then
+    begin
+      result := true;
+      relationship.relid := o;
+      relationship.reltype := reltype;
+      relationship.source := source;
+      relationship.target := target;
+      relationship.group := grp;
+    end;
+  end;
+end;
+
+function TSnomedAnalysis.generate(params : TParseMap): TAdvNameBuffer;
 var
   b : TAdvStringBuilder;
-  bnd : TFhirBundle;
-  xml : TFHIRXmlComposer;
-  f : TFileStream;
+  st : TStringList;
+  s : String;
 begin
-  registerSCTRoots(['105590001', '123037004', '123038009', '243796009', '254291000', '260787004',
-     '272379006', '308916002', '362981000', '363787002', '370115009', '373873005', '404684003', '410607006', '419891008', '48176007',
-     '71388002', '78621006', '900000000000441003']);
-
   b  := TAdvStringBuilder.Create;
   try
     b.appendLine('<?xml version="1.0" encoding="UTF-8"?>');
@@ -298,7 +392,7 @@ begin
     b.appendLine('  <a href="/" style="color: gold">Server Home</a>   &nbsp;|&nbsp;');
     b.appendLine('  <a href="http://www.healthintersections.com.au" style="color: gold">Health Intersections</a> FHIR Server');
     b.appendLine('  &nbsp;|&nbsp;');
-    b.appendLine('  <a href="/index.html" style="color: gold">FHIR Version 0.5.0-5264</a>');
+    b.appendLine('  <a href="'+FHIR_SPEC_URL+'" style="color: gold">FHIR Version 0.5.0-5264</a>');
     b.appendLine('  &nbsp;');
     b.appendLine('		</div>  <!-- /container -->');
     b.appendLine('		</div>  <!-- /container -->');
@@ -314,51 +408,55 @@ begin
     b.appendLine('');
     b.appendLine('');
 
-    b.AppendLine('<h2>Snomed Table Analysis</h2>');
-    b.AppendLine('<table border="1" cellspacing="1">');
-    b.AppendLine(' <tr><td>Relationship</td><td># Concepts</td><td>%</td><td># Rows</td><td>MaxCount</td><td>Concept at Max</td><td># distinct targets</td><td>Common Ancestors</td></tr>');
 
-
-    bnd := TFhirBundle.create;
-    try
-      bnd.type_ := BundleTypeCollection;
-
-      assess(b, '105590001');
-      assess(b, '123037004');
-      assess(b, '123038009');
-      assess(b, '243796009');
-      assess(b, '254291000');
-      assess(b, '260787004');
-      assess(b, '272379006');
-      assess(b, '308916002');
-      assess(b, '362981000');
-      assess(b, '363787002');
-      assess(b, '370115009');
-      assess(b, '373873005');
-      assess(b, '404684003', bnd);
-      assess(b, '410607006');
-      assess(b, '419891008');
-      assess(b, '48176007');
-      assess(b, '71388002');
-      assess(b, '78621006');
-      assess(b, '900000000000441003');
-
-      xml := TFHIRXmlComposer.Create(nil, 'en');
+    if params.VarExists('script') then
+    begin
+      result := TAdvNameBuffer.Create;
       try
-        f := TFileStream.Create('c:\temp\cdefs.xml', fmcreate);
-        try
-          xml.Compose(f, bnd, true);
-        finally
-
-          f.Free;
-        end;
+        processScript(result, params.GetVar('script'));
+        result.Link;
       finally
-        xml.Free;
+        result.Free;
       end;
-    finally
-      bnd.Free;
+      exit;
+    end
+    else if params.VarExists('scan') then
+    begin
+      st := TStringList.Create;
+      try
+        st.CommaText := params.GetVar('scan');
+        b.AppendLine('<form method="POST">');
+        b.AppendLine('<p>Rescan: </p><p>');
+        b.AppendLine(' Candidate Concepts: <input type="text" name="scan" value="'+st.commatext+'"> (comma separated list of concept ids)</br>');
+        b.AppendLine('<input type="submit" value="scan"></br>');
+        b.AppendLine('</p></form method="GET">');
+        b.AppendLine('<table border="1" cellspacing="1">');
+        b.AppendLine(' <tr><td>Relationship</td><td># Concepts</td><td>%</td><td># Rows</td><td>MaxCount</td><td>Concept at Max</td><td># distinct targets</td><td>Common Ancestors</td></tr>');
+        registerSCTRoots(['105590001', '123037004', '123038009', '243796009', '254291000', '260787004',
+         '272379006', '308916002', '362981000', '363787002', '370115009', '373873005', '404684003', '410607006', '419891008', '48176007',
+         '71388002', '78621006', '900000000000441003']);
+        for s in st do
+          assess(b, s);
+      finally
+        st.Free;
+      end;
+      b.AppendLine('</table>');
+    end
+    else
+    begin
+      b.AppendLine('<h2>Snomed Table Analysis</h2>');
+      b.AppendLine('<form method="GET">');
+      b.AppendLine('<p>Scan for table candidates: </p><p>');
+      b.AppendLine(' Candidate Concepts: <input type="text" name="scan" value="105590001,123037004,123038009,243796009,254291000,260787004,272379006,308916002,362981000,363787002,370115009,373873005,'+'404684003,410607006,419891008,48176007,71388002,78621006,900000000000441003"> (comma separated list of concept ids)</br>');
+      b.AppendLine('<input type="submit" value="scan"></br>');
+      b.AppendLine('</p></form method="GET">');
+      b.AppendLine('<form method="GET">');
+      b.AppendLine('<p>Generate a set of tables: </p><p>');
+      b.AppendLine(' script: <br/> <textarea name="script" rows=20 cols=80>');
+      b.AppendLine(' </textarea><br/>');
+      b.AppendLine('<input type="submit" value="build"></br>');
+      b.AppendLine('</p></form method="GET">');
     end;
-    b.AppendLine('</table>');
 
     b.appendLine('</div>');
     b.appendLine('');
@@ -373,7 +471,7 @@ begin
     b.appendLine('		<div class="container">  <!-- container -->');
     b.appendLine('			<div class="inner-wrapper">');
     b.appendLine('				<p>');
-    b.appendLine('        <a href="/snomed/doco/" style="color: gold">Server Home</a>.&nbsp;|&nbsp;FHIR &copy; HL7.org 2011+. &nbsp;|&nbsp; FHIR Version <a href="/index.html" style="color: gold">0.5.0-5264</a>');
+    b.appendLine('        <a href="/snomed/'+FSnomed.EditionId+'/" style="color: gold">Server Home</a>.&nbsp;|&nbsp;FHIR &copy; HL7.org 2011+. &nbsp;|&nbsp; FHIR Version <a href="'+FHIR_SPEC_URL+'" style="color: gold">0.5.0-5264</a>');
     b.appendLine('        </span>');
     b.appendLine('        </p>');
     b.appendLine('			</div>  <!-- /inner-wrapper -->');
@@ -388,27 +486,13 @@ begin
     b.appendLine('');
     b.appendLine('');
     b.appendLine('');
-    b.appendLine('');
-    b.appendLine('');
-    b.appendLine('      <!-- JS and analytics only. -->');
-    b.appendLine('      <!-- Bootstrap core JavaScript');
-    b.appendLine('================================================== -->');
-    b.appendLine('  <!-- Placed at the end of the document so the pages load faster -->');
-    b.appendLine('<script src="/assets/js/jquery.js"/>');
-    b.appendLine('<script src="/dist/js/bootstrap.min.js"/>');
-    b.appendLine('<script src="/assets/js/respond.min.js"/>');
-    b.appendLine('');
-    b.appendLine('<script src="/assets/js/fhir.js"/>');
-    b.appendLine('');
-    b.appendLine('  <!-- Analytics Below');
-    b.appendLine('================================================== -->');
-    b.appendLine('');
-    b.appendLine('');
-    b.appendLine('');
     b.appendLine('</body>');
     b.appendLine('</html>');
 
-    result := b.AsString;
+    result := TAdvNameBuffer.Create;
+    result.Name := 'text/html';
+    result.Encoding := TEncoding.UTF8;
+    result.AsUnicode := b.AsString;
   finally
     b.Free;
   end;
@@ -452,6 +536,41 @@ end;
 //  SetLength(result, c);
 //end;
 //
+function TSnomedAnalysis.getProps(id, prop: cardinal): TPropertyArray;
+var
+  Identity : UInt64;
+  Flags : Byte;
+  ParentIndex : Cardinal;
+  DescriptionIndex : Cardinal;
+  InboundIndex : Cardinal;
+  outboundIndex : Cardinal;
+  refsets, c : Cardinal;
+  date : word;
+  outbounds : TCardinalArray;
+  Source, Target, RelType, module, kind, modifier : Cardinal;
+  Active, Defining : Boolean;
+  Group : Integer;
+begin
+  FSnomed.Concept.GetConcept(id, Identity, Flags, date, ParentIndex, DescriptionIndex, InboundIndex, outboundIndex, refsets);
+  SetLength(result, 0);
+  if outboundIndex > 0 then
+  begin
+    outbounds := FSnomed.Refs.GetReferences(outboundIndex);
+    for c in outbounds do
+    begin
+      FSnomed.Rel.GetRelationship(c, identity, Source, Target, RelType, module, kind, modifier, date, Active, Defining, Group);
+      if {(group = 0) and }active and (RelType = prop) then
+      begin
+        SetLength(result, length(result)+1);
+        result[length(result)-1].relid := c;
+        result[length(result)-1].target := target;
+        result[length(result)-1].group := group;
+      end;
+    end;
+  end;
+
+end;
+
 function TSnomedAnalysis.getRootConcepts(iIndex : cardinal) : TCardinalArray;
 var
   c, i, j, k, l : integer;
@@ -501,7 +620,7 @@ begin
   SetLength(queue, c);
 end;
 
-procedure TSnomedAnalysis.listRelationships(iIndex: cardinal; list : TRelationshipList; bnd : TFhirBundle);
+procedure TSnomedAnalysis.listRelationships(iIndex: cardinal; list : TRelationshipList);
 var
 //  iId : UInt64;
   did : UInt64;
@@ -537,6 +656,7 @@ var
   rootConcepts : TCardinalArray;
 //  cnd : TFhirConditionDefinition;
   cid : String;
+  Active, Defining : boolean;
 begin
   FSnomed.Concept.GetConcept(iIndex, Identity, Flags, date, ParentIndex, DescriptionIndex, InboundIndex, outboundIndex, refsets);
   Descriptions := FSnomed.Refs.GetReferences(DescriptionIndex);
@@ -558,32 +678,10 @@ begin
 
   for i := Low(Outbounds) To High(Outbounds) Do
   begin
-    FSnomed.Rel.GetRelationship(Outbounds[i], did, iWork, iWork2, iWork3, module, kind, modifier, date, Flags, Group);
-    if (flags and MASK_REL_CHARACTERISTIC <> VAL_REL_Historical) then
+    FSnomed.Rel.GetRelationship(Outbounds[i], did, iWork, iWork2, iWork3, module, kind, modifier, date, Active, Defining, Group);
+    if Active and (group = 0) then
     begin
       rootConcepts := getRootConcepts(iWork2);
-
-//      if (cnd <> nil) then
-//      begin
-//        rid := FSnomed.GetConceptId(iWork3);
-//        if (rid = '246112005') then
-//          cnd.severity := createCC(iWork2)
-//        else if (rid = '246454002') then
-//          cnd.occuranceList.Add(createCC(iWork2))
-//        else if (Length(rootConcepts) > 0) then
-//        begin
-//          if (rid = '363698007') then
-//            cnd.findingSiteList.Add(createRef(rootConcepts[0], iWork2))
-//          else if (rid = '116676008') then
-//            cnd.morphologyList.Add(createRef(rootConcepts[0], iWork2))
-//          else if (rid = '246075003') then
-//            cnd.causedByList.Add(createRef(rootConcepts[0], iWork2))
-//          else if (rid = '47429007') then
-//            cnd.associatedList.Add(createRef(rootConcepts[0], iWork2));
-//        end;
-//      end;
-
-
       rel := list.getById(iwork3);
       if (rel = nil) then
       begin
@@ -623,6 +721,9 @@ begin
           inc(c);
       if (c = 0) then
         inc(rel.FIndCount);
+      if cardinal(Length(rel.FCounts)) < c+1 then
+        SetLength(rel.FCounts, c+1);
+      rel.FCounts[c] := rel.FCounts[c] + 1;
       if c > rel.FDupl then
       begin
         rel.FDupl := c;
@@ -632,6 +733,378 @@ begin
   end;
 end;
 
+
+procedure TSnomedAnalysis.listChildren(id: cardinal; list : TStringList);
+var
+  children : TCardinalArray;
+  i : integer;
+  c : cardinal;
+  found : boolean;
+begin
+  children := FSnomed.GetConceptChildren(id);
+  for c in children do
+  begin
+    found := false;
+    for i := 0 to list.Count - 1 do
+      if Cardinal(list.Objects[i]) = c then
+      begin
+        found := true;
+        break;
+      end;
+    if not found then
+    begin
+      list.AddObject(FSnomed.GetDisplayName(c, 0), TObject(c));
+      listChildren(c, list);
+    end;
+  end;
+end;
+
+function TSnomedAnalysis.prepColumn(json: TJsonObject): TColumnDetail;
+var
+  src : String;
+begin
+  src := json['source'];
+  if (src = 'cid') then
+    result.srcType := stCid
+  else if (src = 'term') then
+  begin
+    result.srcType := stTerm;
+    if json['refset'] <> '' then
+    begin
+      if not FSnomed.Concept.FindConcept(StrToInt64(json['refset']), result.lang) then
+        raise Exception.Create('Language refset '+json['refset']+' not found');
+    end
+  end
+  else if (src = 'rel-target') then
+  begin
+    result.srcType := stRelTarget;
+    if not FSnomed.Concept.FindConcept(StrToInt64(json['rel-type']), result.target) then
+      raise Exception.Create('Relationship type '+json['rel-type']+' not found');
+  end
+  else
+    raise Exception.Create('Unknown column source '+src);
+end;
+
+procedure TSnomedAnalysis.processColumn(json: TJsonObject; tbl: TAdvStringBuilder; det : TColumnDetail; child: cardinal);
+var
+  props : TPropertyArray;
+begin
+  case det.srcType of
+    stCid:tbl.Append(FSnomed.GetConceptId(child));
+    stTerm:tbl.Append(FSnomed.GetDisplayName(child, FSnomed.RefSetIndex.GetRefSetByConcept(det.lang)));
+    stRelTarget:
+      begin
+      props := getProps(child, det.target);
+      if length(props) > 1 then
+        raise Exception.Create('Relationship type '+json['rel-type']+': multiple relationships found for '+FSnomed.GetConceptId(child));
+      if length(props) = 1 then
+        tbl.Append(FSnomed.GetConceptId(props[0].target));
+      end;
+  end;
+end;
+
+procedure TSnomedAnalysis.processScript(buf : TAdvNameBuffer; script : string);
+var
+  json : TJsonObject;
+  n : TJsonNode;
+  parts : TAdvZipPartList;
+  zip : TAdvZipWriter;
+begin
+  parts := TAdvZipPartList.Create;
+  try
+    json := TJSONParser.Parse(script);
+    try
+      if json['snomed-table-script-version'] <> '1.0' then
+        raise Exception.Create('Script could not be understood');
+
+      for n in json.arr['tables'] do
+        processTable(parts, n as TJsonObject);
+    finally
+      json.Free;
+    end;
+    zip := TAdvZipWriter.Create;
+    try
+      zip.Stream := TAdvMemoryStream.Create;
+      TAdvMemoryStream(zip.Stream).Buffer := buf.Link;
+      buf.Name := 'application/zip';
+      zip.Parts := parts.Link;
+      zip.WriteZip;
+    finally
+      zip.Free;
+    end;
+  finally
+    parts.Free;
+  end;
+end;
+
+procedure TSnomedAnalysis.processTable(parts : TAdvZipPartList; json : TJsonObject);
+var
+  tbl : TAdvStringBuilder;
+  root, child : cardinal;
+  children : TStringList;
+  i, j : integer;
+  n : TJsonNode;
+  det : TColumnDetail;
+  part : TAdvZipPart;
+//  index, c, , d : cardinal;
+//  propCs : array of cardinal;
+//  p : TCardinalArray;
+begin
+  FSnomed.Concept.FindConcept(StrToUInt64(json['root']), root);
+
+  tbl := TAdvStringBuilder.Create;
+  try
+    children := TStringList.create;
+    try
+      listChildren(root, children);
+      children.sort;
+
+      j := 0;
+      SetLength(FColumns, json.arr['columns'].Count);
+      for n in json.arr['columns'] do
+      begin
+        if j > 0 then
+          tbl.Append(#9);
+        tbl.Append(TJsonObject(n)['name']);
+        FColumns[j] := prepColumn(TJsonObject(n));
+        inc(j);
+      end;
+      tbl.Append(#10);
+
+      for i := 0 to children.count - 1 do
+      begin
+        child := cardinal(children.objects[i]);
+        j := 0;
+        for n in json.arr['columns'] do
+        begin
+          if j > 0 then
+            tbl.Append(#9);
+          processColumn(TJsonObject(n), tbl, FColumns[j], child);
+          inc(j);
+        end;
+        tbl.Append(#10);
+      end;
+      part := TAdvZipPart.Create;
+      parts.Add(part);
+      part.Name := json['name']+'.txt';
+      part.Encoding := TEncoding.UTF8;
+      part.AsUnicode := tbl.AsString;
+      for det in FColumns do
+        cleanUpColumn(det);
+
+      for n in json.arr['subtables'] do
+        processSubTable(parts, TJsonObject(n), children);
+    finally
+      children.free;
+    end;
+  finally
+    tbl.Free;
+  end;
+end;
+
+function TSnomedAnalysis.prepSubColumn(json : TJsonObject) : TColumnDetail;
+var
+  src, key : String;
+  refset : cardinal;
+  iName, iFilename, iDefinition, iMembersByRef, iMembersByName, iFieldTypes, iFieldNames: Cardinal;
+  names : TCardinalArray;
+  i : integer;
+begin
+  src := json['source'];
+  if (src = 'master-cid') then
+    result.srcType := stMastercid
+  else if (src = 'rel-target') then
+    result.srcType := stReltarget
+  else if (src = 'sibling') then
+  begin
+    result.srcType := stSibling;
+    if not FSnomed.Concept.FindConcept(StrToInt64(json['sibling-type']), result.sibling) then
+      raise Exception.Create('sibling-type '+json['sibling-type']+' not found');
+  end
+  else if (src = 'refset') then
+  begin
+    result.srcType := stRefset;
+    if not FSnomed.Concept.FindConcept(StrToInt64(json['refset']), refset) then
+      raise Exception.Create('Specified refset '+json['refset']+' not found');
+    refset := FSnomed.RefSetIndex.GetRefSetByConcept(refset);
+    FSnomed.RefSetIndex.GetReferenceSet(refset, iName, iFilename, iDefinition, iMembersByRef, iMembersByName, iFieldTypes, iFieldNames);
+    result.members := FSnomed.RefSetMembers.GetMembers(iMembersByRef);
+    key := json['key'];
+    if key = 'rel-id' then
+    begin
+      result.keyType := ktRelId;
+      result.reltype := 2;
+    end
+    else if key = 'sibling-id' then
+    begin
+      result.keyType := ktSiblingId;
+      result.reltype := 0;
+      if not FSnomed.Concept.FindConcept(StrToInt64(json['sibling-type']), result.sibling) then
+        raise Exception.Create('sibling-type '+json['sibling-type']+' not found');
+    end
+    else
+      raise Exception.Create('Unknown refset key '+key);
+    names := FSnomed.Refs.GetReferences(iFieldNames);
+    result.field := -1;
+    for i := 0 to length(names) - 1 do
+      if FSnomed.Strings.GetEntry(names[i]) = json['field'] then
+        result.field := i;
+    if result.field = -1 then
+      raise Exception.Create('Refset lookup: unable to find field name '+json['field']);
+    if (json['display'] = '') then
+      result.display := fvString
+    else if (json['display'] = 'string') then
+      result.display := fvString
+    else if (json['display'] = 'cid') then
+      result.display := fvCid
+    else
+      raise Exception.Create('Refset lookup: unknown field display '+json['field']);
+  end
+  else
+    raise Exception.Create('Unknown column source '+src);
+
+end;
+
+procedure TSnomedAnalysis.processSubColumn(json: TJsonObject; tbl: TAdvStringBuilder; det : TColumnDetail; child, relid, target, group: cardinal);
+var
+  s : String;
+  k : cardinal;
+  vl : TCardinalArray;
+  m : TSnomedReferenceSetMember;
+  relationship : TSnomedRelationship;
+begin
+  k := 0;
+  case det.srcType of
+    stMastercid : tbl.Append(FSnomed.GetConceptId(child));
+    stReltarget : tbl.Append(FSnomed.GetConceptId(target));
+    stSibling :
+      begin
+      if findRelationshipInGroup(child, group, det.sibling, relationship) then
+        tbl.Append(FSnomed.GetConceptId(relationship.target))
+      else
+        tbl.Append('');
+      end;
+    stRefset :
+      begin
+        s := '';
+        case det.keyType of
+          ktRelId : k := relid;
+          ktSiblingId : begin
+            if findRelationshipInGroup(child, group, det.sibling, relationship) then
+              k := relationship.target
+            else
+              k := 0;
+          end;
+        end;
+        for m in det.members do
+        begin
+          if (m.kind = det.reltype) and (m.Ref = k) then
+          begin
+            vl := FSnomed.Refs.GetReferences(m.values);
+            case vl[det.field*2+1] of
+            1 {concept} :
+              if (det.display = fvString) then
+                s := FSnomed.GetDisplayName(vl[det.field*2], det.lang)
+              else
+                s := FSnomed.GetConceptId(vl[det.field*2]);
+            2 {desc}    : s := FSnomed.GetDescriptionId(vl[det.field*2]);
+            3 {rel}     : s := '??';
+            4 {integer} : s := inttostr(vl[det.field*2]);
+            5 {string}  : s := FSnomed.Strings.GetEntry(vl[det.field*2]);
+          else
+            raise exception.create('Unknown Cell Type '+inttostr(vl[det.field*2+1]));
+          end;
+          end;
+        end;
+        tbl.Append(s);
+      end;
+  end;
+end;
+
+procedure TSnomedAnalysis.processSubTable(parts : TAdvZipPartList; json : TJsonObject; children : TStringList);
+var
+  tbl : TAdvStringBuilder;
+  child : cardinal;
+  i, j, t : integer;
+  n : TJsonNode;
+  rt : cardinal;
+  props : TPropertyArray;
+  prop : TProperty;
+  det : TColumnDetail;
+  part : TAdvZipPart;
+  grpCondType, grpCondValue : cardinal;
+  l, r : String;
+  rel : TSnomedRelationship;
+begin
+  grpCondType := 0;
+  grpCondValue := 0;
+  if json['group-condition'] <> '' then
+  begin
+    if json['group-condition'].Contains('=') then
+    begin
+      StringSplit(json['group-condition'], '=', l, r);
+      if not FSnomed.Concept.FindConcept(StrToInt64(l), grpCondType) then
+        raise Exception.Create('Specified group condition '+r+' not found');
+      if not FSnomed.Concept.FindConcept(StrToInt64(l), grpCondValue) then
+        raise Exception.Create('Specified group condition value '+r+' not found');
+    end
+    else if not FSnomed.Concept.FindConcept(StrToInt64(json['group-condition']), grpCondType) then
+      raise Exception.Create('Specified group condition '+json['group-condition']+' not found');
+  end;
+
+  tbl := TAdvStringBuilder.Create;
+  try
+    j := 0;
+    for n in json.arr['columns'] do
+    begin
+      if j > 0 then
+        tbl.Append(#9);
+      tbl.Append(TJsonObject(n)['name']);
+      FColumns[j] := prepSubColumn(TJsonObject(n));
+      inc(j);
+    end;
+    tbl.Append(#10);
+
+    if not FSnomed.Concept.FindConcept(StrToInt64(json['rel-type']), rt) then
+      raise Exception.Create('Relationship type '+json['rel-type']+' not found');
+    t := 0;
+    for i := 0 to children.count - 1 do
+    begin
+      child := cardinal(children.objects[i]);
+      props := getProps(child, rt);
+      for prop in props do
+      begin
+        if (grpCondType > 0) then
+        begin
+          if not findRelationshipInGroup(child, prop.group, grpCondType, rel) then
+            continue
+          else if (grpCondValue > 0) and (grpCondValue <> grpCondValue) then
+            continue;
+        end;
+
+        j := 0;
+        inc(t);
+        for n in json.arr['columns'] do
+        begin
+          if j > 0 then
+            tbl.Append(#9);
+          processSubColumn(TJsonObject(n), tbl, FColumns[j], child, prop.relid, prop.target, prop.group);
+          inc(j);
+        end;
+        tbl.Append(#10);
+      end;
+    end;
+    for det in FColumns do
+      cleanUpColumn(det);
+    part := TAdvZipPart.Create;
+    parts.Add(part);
+    part.Name := json['name']+'.txt';
+    part.Encoding := TEncoding.UTF8;
+    part.AsUnicode := tbl.AsString;
+  finally
+    tbl.Free;
+  end;
+end;
 
 procedure TSnomedAnalysis.registerSCTRoots(ids: array of String);
 var
@@ -667,6 +1140,10 @@ end;
 //
 //  !
 //end;
+
+procedure TSnomedAnalysis.cleanUpColumn(detail: TColumnDetail);
+begin
+end;
 
 { TRelationshipList }
 

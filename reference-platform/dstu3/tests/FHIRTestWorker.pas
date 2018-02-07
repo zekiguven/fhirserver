@@ -42,8 +42,7 @@ uses
   StringSupport,
   FHIRBase, FHIRTypes, FHIRResources, FHIRConstants, FHIRParser, FHIRContext,
   FHIRSupport, FHIRProfileUtilities, FHIRPath,
-  MsXml, MsXmlParser, AdvJson,
-  DUnitX.TestFramework;
+  AdvJson, DUnitX.TestFramework;
 
 var
   GBasePath : String;
@@ -53,22 +52,23 @@ Type
   private
     FFolder : String;
     FFilter : String;
+    FCount : integer;
   protected
     function GetCaseInfoArray : TestCaseInfoArray; override;
   public
-    Constructor Create(folder, filter : String);
+    Constructor Create(folder, filter : String; count : integer);
   end;
 
   TTestingWorkerContext = class (TBaseWorkerContext)
   public
     function expand(vs : TFhirValueSet) : TFHIRValueSet; override;
-    function supportsSystem(system : string) : boolean; override;
-    function validateCode(system, code, display : String) : TValidationResult; overload; override;
-    function validateCode(system, code, version : String; vs : TFhirValueSet) : TValidationResult; overload; override;
+    function supportsSystem(system, version : string) : boolean; override;
+    function validateCode(system, version, code, display : String) : TValidationResult; overload; override;
+    function validateCode(system, version, code : String; vs : TFhirValueSet) : TValidationResult; overload; override;
     function validateCode(code : TFHIRCoding; vs : TFhirValueSet) : TValidationResult; overload; override;
     function validateCode(code : TFHIRCodeableConcept; vs : TFhirValueSet) : TValidationResult; overload; override;
 
-    class function Use : TWorkerContext;
+    class function Use : TFHIRWorkerContext;
     class procedure closeUp;
   end;
 
@@ -87,6 +87,7 @@ var
 class procedure TTestingWorkerContext.closeUp;
 begin
   GWorkerContext.Free;
+  GWorkerContext := nil;
 end;
 
 function TTestingWorkerContext.expand(vs: TFhirValueSet): TFHIRValueSet;
@@ -94,13 +95,13 @@ begin
   raise EFHIRPath.create('Not done yet');
 end;
 
-function TTestingWorkerContext.supportsSystem(system: string): boolean;
+function TTestingWorkerContext.supportsSystem(system, version: string): boolean;
 begin
   raise EFHIRPath.create('Not done yet');
 end;
 
 
-class function TTestingWorkerContext.Use: TWorkerContext;
+class function TTestingWorkerContext.Use: TFHIRWorkerContext;
 begin
   if GWorkerContext = nil then
   begin
@@ -112,12 +113,12 @@ begin
   result := GWorkerContext.link;
 end;
 
-function TTestingWorkerContext.validateCode(system, code, version: String; vs: TFhirValueSet): TValidationResult;
+function TTestingWorkerContext.validateCode(system, version, code: String; vs: TFhirValueSet): TValidationResult;
 begin
   raise EFHIRPath.create('Not done yet');
 end;
 
-function TTestingWorkerContext.validateCode(system, code, display: String): TValidationResult;
+function TTestingWorkerContext.validateCode(system, version, code, display: String): TValidationResult;
 begin
   raise EFHIRPath.create('Not done yet');
 end;
@@ -134,11 +135,12 @@ end;
 
 { FHIRFolderBasedTestCaseAttribute }
 
-constructor FHIRFolderBasedTestCaseAttribute.Create(folder, filter: String);
+constructor FHIRFolderBasedTestCaseAttribute.Create(folder, filter: String; count : integer);
 begin
   inherited Create;
   FFolder := folder;
   FFilter := filter;
+  FCount := count;
 end;
 
 function FHIRFolderBasedTestCaseAttribute.GetCaseInfoArray: TestCaseInfoArray;
@@ -153,7 +155,7 @@ begin
     if FindFirst(FFolder+'\*.*', faAnyFile, SR) = 0 then
     repeat
       s := sr.Name;
-      if (FFilter = '') or (s.endsWith(FFilter)) then
+      if ((FFilter = '') or s.endsWith(FFilter)) and ((FCount = 0) or (sl.count < FCount)) then
         sl.Add(sr.Name);
     until FindNext(SR) <> 0;
     setLength(result, sl.Count);
@@ -168,5 +170,8 @@ begin
   end;
 end;
 
+initialization
+finalization
+  TTestingWorkerContext.closeUp;
 end.
 

@@ -1,3 +1,4 @@
+
 unit UcumServices;
 
 {
@@ -32,14 +33,16 @@ Interface
 
 Uses
   SysUtils, Classes,
-  MsXml,
   MathSupport, FileSupport,
-  AdvBinaryFilers, AdvFiles, AdvFactories, AdvPersistents, AdvPersistentLists, AdvStringLists, AdvObjectLists, AdvObjects,
-  DecimalSupport, UcumHandlers, UcumValidators, UcumExpressions, Ucum,
+  AdvFiles, AdvPersistents, AdvPersistentLists, AdvStringLists, AdvObjectLists, AdvObjects,
+  DecimalSupport, ParserSupport, MXML,
+  UcumHandlers, UcumValidators, UcumExpressions, Ucum,
   FHIRResources, FHIRTypes, FHIRUtilities, FHIRParser, CDSHooksUtilities,
   TerminologyServices;
 
 Type
+  EUCUMServices = class (Exception);
+
   TUcumPair = class (TAdvObject)
   private
     FUnitCode: String;
@@ -50,6 +53,29 @@ Type
     Property Value : TSmartDecimal read FValue write FValue;
     Property UnitCode : String read FUnitCode write FUnitCode;
   End;
+
+{ TUCUMCodeHolder }
+
+Type
+  TUCUMContext  = class (TCodeSystemProviderContext)
+  private
+    FConcept: TFhirValueSetComposeIncludeConcept;
+    procedure SetConcept(const Value: TFhirValueSetComposeIncludeConcept);
+  public
+    Constructor Create(concept : TFhirValueSetComposeIncludeConcept); overload;
+    Constructor Create(code : String); overload;
+    Destructor Destroy; override;
+    property concept : TFhirValueSetComposeIncludeConcept read FConcept write SetConcept;
+  end;
+
+  TUcumFilterContext = class (TCodeSystemProviderFilterContext)
+  private
+    FCursor : integer; // used on the first
+    FCanonical: String;
+  public
+    Constructor Create(canonical : String);
+    property canonical : String read FCanonical write FCanonical;
+  end;
 
   TUcumServices = class (TCodeSystemProvider)
   Private
@@ -62,9 +88,9 @@ Type
     FCommonUnits : TFhirValueSet;
 
     Function ParseDecimal(S,s1 : String):TSmartDecimal;
-    Function ParsePrefix(oElem : IXMLDOMElement):TUcumPrefix;
-    Function ParseBaseUnit(oElem : IXMLDOMElement):TUcumBaseUnit;
-    Function ParseUnit(oElem : IXMLDOMElement):TUcumDefinedUnit;
+    Function ParsePrefix(oElem : TMXmlElement):TUcumPrefix;
+    Function ParseBaseUnit(oElem : TMXmlElement):TUcumBaseUnit;
+    Function ParseUnit(oElem : TMXmlElement):TUcumDefinedUnit;
     Function GetPropertyIndex(const sName : String):Integer;
 
   public
@@ -198,8 +224,6 @@ Type
 
     // load from ucum-essence.xml
     Procedure Import(Const sFilename : String);
-    Procedure Load(Const sFilename : String);
-    Procedure Save(Const sFilename : String);
 
     Property Loaded : Boolean read FLoaded write FLoaded;
 
@@ -209,13 +233,13 @@ Type
     function system(context : TCodeSystemProviderContext) : String; override;
     function version(context : TCodeSystemProviderContext) : String; override;
     function name(context : TCodeSystemProviderContext) : String; override;
-    function getDisplay(code : String):String; override;
-    function locate(code : String) : TCodeSystemProviderContext; override;
+    function getDisplay(code : String; lang : String):String; override;
+    function locate(code : String; var message : String) : TCodeSystemProviderContext; override;
     function IsAbstract(context : TCodeSystemProviderContext) : boolean; override;
     function Code(context : TCodeSystemProviderContext) : string; override;
-    function Display(context : TCodeSystemProviderContext) : string; override;
-    procedure Displays(code : String; list : TStringList); override;
-    procedure Displays(context : TCodeSystemProviderContext; list : TStringList); override;
+    function Display(context : TCodeSystemProviderContext; lang : String) : string; override;
+    procedure Displays(code : String; list : TStringList; lang : String); override;
+    procedure Displays(context : TCodeSystemProviderContext; list : TStringList; lang : String); override;
     function filter(prop : String; op : TFhirFilterOperatorEnum; value : String; prep : TCodeSystemProviderFilterPreparationContext) : TCodeSystemProviderFilterContext; override;
     function FilterMore(ctxt : TCodeSystemProviderFilterContext) : boolean; override;
     function FilterConcept(ctxt : TCodeSystemProviderFilterContext): TCodeSystemProviderContext; override;
@@ -223,13 +247,16 @@ Type
     procedure Close(ctxt : TCodeSystemProviderContext); override;
     function locateIsA(code, parent : String) : TCodeSystemProviderContext; override;
     function InFilter(ctxt : TCodeSystemProviderFilterContext; concept : TCodeSystemProviderContext) : Boolean; override;
-    function filterLocate(ctxt : TCodeSystemProviderFilterContext; code : String) : TCodeSystemProviderContext; override;
+    function filterLocate(ctxt : TCodeSystemProviderFilterContext; code : String; var message : String) : TCodeSystemProviderContext; override;
+    function getPrepContext : TCodeSystemProviderFilterPreparationContext; override;
+    function specialFilter(prep : TCodeSystemProviderFilterPreparationContext; sort : boolean) : TCodeSystemProviderFilterContext; override;
     function searchFilter(filter : TSearchFilterText; prep : TCodeSystemProviderFilterPreparationContext; sort : boolean) : TCodeSystemProviderFilterContext; overload; override;
     function getDefinition(code : String):String; override;
     function Definition(context : TCodeSystemProviderContext) : string; override;
     function isNotClosed(textFilter : TSearchFilterText; propFilter : TCodeSystemProviderFilterContext = nil) : boolean; override;
     function SpecialEnumeration : String; override;
-    procedure getCDSInfo(card : TCDSHookCard; baseURL, code, display : String); override;
+    procedure getCDSInfo(card : TCDSHookCard; slang, baseURL, code, display : String); override;
+    //function subsumes(codeA, codeB : String) : String; override;
   End;
 
   TUcumServiceList = class (TAdvObjectList)
@@ -252,9 +279,8 @@ Type
 Implementation
 
 Uses
-  MsXmlParser,
   UcumSearch;
- 
+
 { TUcumServices }
 
 function TUcumServices.analyse(code: String): String;
@@ -284,9 +310,9 @@ var
   t : TSmartDecimal;
 begin
   if sourceUnit = '' Then
-    Error('Convert', 'Source units are required');
+    RaiseError('Convert', 'Source units are required');
   if destUnit = '' Then
-    Error('Convert', 'destination units are required');
+    RaiseError('Convert', 'destination units are required');
   if (sourceUnit = destUnit) Then
     result := value
   else
@@ -304,7 +330,7 @@ begin
       s := TUcumExpressionComposer.compose(src.Unit_);
       d := TUcumExpressionComposer.compose(dst.Unit_);
       if s <> d then
-        raise Exception.Create('Unable to convert between units '+sourceUnit+' and '+destUnit+' as they do not have matching canonical forms ('+s+' and '+d+' respectively)');
+        raise EUCUMServices.Create('Unable to convert between units '+sourceUnit+' and '+destUnit+' as they do not have matching canonical forms ('+s+' and '+d+' respectively)');
       t := value.Multiply(src.Value);
       result := t.Divide(dst.Value);
     Finally
@@ -344,9 +370,9 @@ var
   c : TUcumCanonical;
 begin
   if value = nil then
-    Error('Convert', 'A value is required');
+    RaiseError('Convert', 'A value is required');
   if value.UnitCode = '' then
-    Error('Convert', 'A value unit is required');
+    RaiseError('Convert', 'A value unit is required');
   t := TUcumExpressionParser.Parse(FModel, value.UnitCode);
   Try
     conv := TUcumConverter.Create(FModel.Link, FHandlers.Link);
@@ -372,7 +398,7 @@ var
   c : TUcumCanonical;
 begin
   if Code = '' then
-    Error('Convert', 'A unit is required');
+    RaiseError('Convert', 'A unit is required');
   t := TUcumExpressionParser.Parse(FModel, Code);
   Try
     conv := TUcumConverter.Create(FModel.Link, FHandlers.Link);
@@ -391,7 +417,7 @@ begin
   End;
 end;
 
-procedure TUcumServices.getCDSInfo(card: TCDSHookCard; baseURL, code, display: String);
+procedure TUcumServices.getCDSInfo(card: TCDSHookCard; slang, baseURL, code, display: String);
 var
   s : String;
   b : TStringBuilder;
@@ -416,7 +442,7 @@ var
   i : integer;
 begin
   if Code = '' then
-    Error('Convert', 'A unit is required');
+    RaiseError('Convert', 'A unit is required');
   result := TUcumDefinedUnitList.Create;
   Try
     base := FModel.baseUnits.GetByCode(code);
@@ -447,6 +473,11 @@ begin
     oList.Assign(Model.Properties[i].CommonUnits);
 end;
 
+function TUcumServices.getPrepContext: TCodeSystemProviderFilterPreparationContext;
+begin
+  result := nil;
+end;
+
 procedure TUcumServices.getProperties(oList: TAdvStringList);
 var
   i : integer;
@@ -456,28 +487,6 @@ begin
   oList.Sorted;
   for i := 0 to Model.Properties.Count - 1 do
     oList.Add(Model.Properties[i].Name);
-end;
-
-procedure TUcumServices.Load(const sFilename: String);
-var
-  oFile : TAdvFile;
-  oFiler : TAdvBinaryReader;
-begin
-  oFile := TAdvFile.Create;
-  Try
-    oFile.Name := sFilename;
-    oFile.OpenRead;
-    oFiler := TAdvBinaryReader.Create;
-    Try
-      oFiler.Stream := oFile.Link;
-      oFiler['Mode'].DefineObject(FModel);
-    Finally
-      oFiler.Free;
-    End;
-  Finally
-    oFile.Free;
-  End;
-  Loaded := true;
 end;
 
 function TUcumServices.multiply(o1, o2: TUcumPair): TUcumPair;
@@ -499,38 +508,12 @@ begin
   result := 'UCUM';
 end;
 
-procedure TUcumServices.Save(const sFilename: String);
-var
-  oFile : TAdvFile;
-  oFiler : TAdvBinaryWriter;
-begin
-  if FileExists(sFilename) Then
-  begin
-    FileSetReadOnlyAttribute(sFilename, False);
-    DeleteFile(sFilename);
-  End;
-  oFile := TAdvFile.Create;
-  Try
-    oFile.Name := sFilename;
-    oFile.OpenCreate;
-    oFiler := TAdvBinaryWriter.Create;
-    Try
-      oFiler.Stream := oFile.Link;
-      oFiler['Mode'].DefineObject(FModel);
-    Finally
-      oFiler.Free;
-    End;
-  Finally
-    oFile.Free;
-  End;
-end;
-
 function TUcumServices.search(kind: TConceptKind; text: String; isRegex: Boolean): TUcumConceptList;
 var
   oSearch : TUcumSearch;
 begin
   if text = '' Then
-    raise exception.Create('A text to search for is required');
+    raise EUCUMServices.Create('A text to search for is required');
   oSearch := TUcumSearch.Create;
   Try
     result := oSearch.DoSearch(model, kind, text, isRegex);
@@ -542,7 +525,7 @@ end;
 function TUcumServices.searchFilter(filter : TSearchFilterText; prep : TCodeSystemProviderFilterPreparationContext; sort : boolean): TCodeSystemProviderFilterContext;
 begin
   result := nil;
-  raise Exception.Create('to do');
+  raise EUCUMServices.Create('to do');
 end;
 
 procedure TUcumServices.SetCommonUnits(vs: TFHIRValueSet);
@@ -617,9 +600,9 @@ var
   cu : String;
 begin
   if Code = '' then
-    Error('Convert', 'A unit is required');
+    RaiseError('Convert', 'A unit is required');
   if canonical = '' then
-    Error('Convert', 'A canonical unit is required');
+    RaiseError('Convert', 'A canonical unit is required');
 
   result := '';
   Try
@@ -658,9 +641,9 @@ var
   b : TUcumBaseUnit;
 begin
   if Code = '' then
-    Error('Convert', 'A unit is required');
+    RaiseError('Convert', 'A unit is required');
   if propertyType = '' then
-    Error('Convert', 'A property is required');
+    RaiseError('Convert', 'A property is required');
 
   result := '';
   Try
@@ -727,15 +710,6 @@ begin
 end;
 
 
-{ TUCUMCodeHolder }
-
-Type
-  TUCUMCodeHolder = class (TCodeSystemProviderContext)
-  private
-    code : String;
-  public
-    Constructor Create(code : String);
-  end;
 
 { TUcumServiceList }
 
@@ -813,7 +787,7 @@ begin
   if context = nil then
     result := ''
   else
-    result := TUCUMCodeHolder(context).code;
+    result := TUCUMContext(context).concept.code;
 end;
 
 function TUcumServices.getcontext(context: TCodeSystemProviderContext; ndx: integer): TCodeSystemProviderContext;
@@ -821,25 +795,25 @@ begin
   result := nil;
 end;
 
-function TUcumServices.Display(context: TCodeSystemProviderContext): string;
+function TUcumServices.Display(context: TCodeSystemProviderContext; lang : String): string;
 begin
   if context = nil then
     result := ''
   else
-    result := getDisplay(TUCUMCodeHolder(context).code);
+    result := getDisplay(TUCUMContext(context).concept.code, lang);
 end;
 
-procedure TUcumServices.Displays(context: TCodeSystemProviderContext; list: TStringList);
+procedure TUcumServices.Displays(context: TCodeSystemProviderContext; list: TStringList; lang : String);
 begin
   list.Add(Code(context));
 end;
 
-procedure TUcumServices.Displays(code: String; list: TStringList);
+procedure TUcumServices.Displays(code: String; list: TStringList; lang : String);
 begin
-  list.Add(getDisplay(code));
+  list.Add(getDisplay(code, lang));
 end;
 
-function TUcumServices.getDisplay(code: String): String;
+function TUcumServices.getDisplay(code: String; lang : String): String;
 var
   cc : TFhirValueSetComposeIncludeConcept;
 begin
@@ -852,49 +826,52 @@ end;
 
 procedure TUcumServices.Import(const sFilename: String);
 var
-  oParser : TMsXmlParser;
-  oXml : IXMLDomDocument2;
-  oElem : IXMLDOMElement;
+  oXml : TMXmlDocument;
+  oElem : TMXmlElement;
   oErrors : TAdvStringList;
 begin
-  oParser := TMsXmlParser.Create;
+  oXml := TMXmlParser.parseFile(sFilename, [xpDropWhitespace]);
   try
-    oXml := oParser.Parse(sFilename);
-  Finally
-    oParser.Free;
-  End;
-  if oXml.documentElement.nodeName <> 'root' Then
-    raise exception.create('Invalid ucum essence file');
-  FModel.Clear;
-  FModel.Version := TMsXmlParser.GetAttribute(oXml.documentElement, 'version');
-  FModel.RevisionDate := TMsXmlParser.GetAttribute(oXml.documentElement, 'revision-date');
-  FModel.RevisionDate := copy(FModel.RevisionDate, 8, length(FModel.RevisionDate)-9);
-  oElem := TMsXmlParser.FirstChild(oXml.documentElement);
-  while (oElem <> nil) Do
-  Begin
-   if oElem.NodeName = 'prefix' Then
-     FModel.prefixes.Add(ParsePrefix(oElem))
-   Else if oElem.NodeName = 'base-unit' Then
-     FModel.baseUnits.Add(ParseBaseUnit(oElem))
-   Else if oElem.NodeName = 'unit' Then
-     FModel.definedUnits.Add(ParseUnit(oElem))
-   else
-     raise exception.create('unrecognised element '+oElem.nodename);
-    oElem := TMsXmlParser.NextSibling(oElem);
-  End;
-  oErrors := TAdvStringList.Create;
-  Try
-    Validate(oErrors);
-    if oErrors.Count > 0 then
-      raise exception.create(oErrors.asText);
-  Finally
-    oErrors.Free;
-  End;
+    if oXml.document.Name <> 'root' Then
+      raise EUCUMServices.create('Invalid ucum essence file');
+    FModel.Clear;
+    FModel.Version := oXml.document.attribute['version'];
+    FModel.RevisionDate := oXml.document.Attribute['revision-date'];
+    FModel.RevisionDate := copy(FModel.RevisionDate, 8, length(FModel.RevisionDate)-9);
+    oElem := oXml.document.firstElement;
+    while (oElem <> nil) Do
+    Begin
+     if oElem.Name = 'prefix' Then
+       FModel.prefixes.Add(ParsePrefix(oElem))
+     Else if oElem.Name = 'base-unit' Then
+       FModel.baseUnits.Add(ParseBaseUnit(oElem))
+     Else if oElem.Name = 'unit' Then
+       FModel.definedUnits.Add(ParseUnit(oElem))
+     else
+       raise EUCUMServices.create('unrecognised element '+oElem.Name);
+      oElem := oElem.nextElement;
+    End;
+    oErrors := TAdvStringList.Create;
+    Try
+      Validate(oErrors);
+      if oErrors.Count > 0 then
+        raise EUCUMServices.create(oErrors.asText);
+    Finally
+      oErrors.Free;
+    End;
+  finally
+    oXml.Free;
+  end;
 end;
 
 function TUcumServices.InFilter(ctxt: TCodeSystemProviderFilterContext; concept: TCodeSystemProviderContext): Boolean;
+var
+  code : String;
+  context : TUcumFilterContext;
 begin
-  raise Exception.Create('not supported yet');
+  context := TUcumFilterContext(ctxt);
+  code := TUcumContext(concept).concept.code;
+  result := validateCanonicalUnits(code, context.canonical) = '';
 end;
 
 function TUcumServices.IsAbstract(context: TCodeSystemProviderContext): boolean;
@@ -907,15 +884,23 @@ begin
   result := true;
 end;
 
-function TUcumServices.locate(code: String): TCodeSystemProviderContext;
+function TUcumServices.locate(code: String; var message : String): TCodeSystemProviderContext;
 var
   s : String;
 begin
   s:= validate(code);
   if s = '' then
-    result := TUCUMCodeHolder.Create(code)
+    result := TUCUMContext.Create(code)
   else
+  begin
     result := nil;
+    message := s;
+  end;
+end;
+
+function TUcumServices.specialFilter(prep: TCodeSystemProviderFilterPreparationContext; sort: boolean): TCodeSystemProviderFilterContext;
+begin
+  result := TUcumFilterContext.create('')
 end;
 
 function TUcumServices.system(context : TCodeSystemProviderContext): String;
@@ -936,22 +921,32 @@ end;
 
 function TUcumServices.filter(prop: String; op: TFhirFilterOperatorEnum; value: String; prep : TCodeSystemProviderFilterPreparationContext): TCodeSystemProviderFilterContext;
 begin
-  raise Exception.Create('not supported yet');
+  if (prop = 'canonical') and (op in [FilterOperatorEqual]) then
+    result := TUcumFilterContext.create(value)
+  else
+    result := nil;
 end;
 
 function TUcumServices.FilterConcept(ctxt: TCodeSystemProviderFilterContext): TCodeSystemProviderContext;
+var
+  context : TUcumFilterContext;
 begin
-  raise Exception.Create('not supported yet');
+  context := TUcumFilterContext(ctxt);
+  result := TUCUMContext.create(FCommonUnits.compose.includeList[0].conceptList[context.FCursor].link);
 end;
 
 function TUcumServices.FilterMore(ctxt: TCodeSystemProviderFilterContext): boolean;
+var
+  context : TUcumFilterContext;
 begin
-  raise Exception.Create('not supported yet');
+  context := TUcumFilterContext(ctxt);
+  inc(context.FCursor);
+  result := context.FCursor < FCommonUnits.compose.includeList[0].conceptList.count;
 end;
 
-function TUcumServices.filterLocate(ctxt: TCodeSystemProviderFilterContext; code: String): TCodeSystemProviderContext;
+function TUcumServices.filterLocate(ctxt: TCodeSystemProviderFilterContext; code: String; var message : String): TCodeSystemProviderContext;
 begin
-  raise Exception.Create('not supported yet');
+  result := nil;
 end;
 
 function TUcumServices.locateIsA(code, parent: String): TCodeSystemProviderContext;
@@ -967,25 +962,25 @@ begin
     result := TSmartDecimal.ValueOf(s);
 end;
 
-Function TUcumServices.ParsePrefix(oElem : IXMLDOMElement):TUcumPrefix;
+Function TUcumServices.ParsePrefix(oElem : TMXmlElement):TUcumPrefix;
 var
-  oChild : IXMLDOMElement;
+  oChild : TMXmlElement;
   s : String;
 Begin
   result := TUcumPrefix.Create;
   try
-    result.code := TMsXmlParser.GetAttribute(oElem, 'Code');
-    result.codeUC := TMsXmlParser.GetAttribute(oElem, 'CODE');
-    oChild := TMsXmlParser.FirstChild(oElem);
+    result.code := oElem.attribute['Code'];
+    result.codeUC := oElem.attribute['CODE'];
+    oChild := oElem.firstElement;
     while oChild <> nil do
     Begin
-      if oChild.nodeName = 'name' Then
-        result.names.Add(TMsXmlParser.TextContent(oChild, ttAsIs))
-      else if oChild.nodeName = 'printSymbol' Then
-        result.printSymbol := TMsXmlParser.TextContent(oChild, ttAsIs)
-      else if oChild.nodeName = 'value' Then
+      if oChild.Name = 'name' Then
+        result.names.Add(oChild.allText)
+      else if oChild.Name = 'printSymbol' Then
+        result.printSymbol := oChild.allText
+      else if oChild.Name = 'value' Then
       begin
-        s := TmsXmlParser.GetAttribute(oChild, 'value');
+        s := oChild.attribute['value'];
         result.value := ParseDecimal(s, result.Code);
         result.SetPrecision(24); // arbitrarily high. even when an integer, these numbers are precise
         if s[2] = 'e' Then
@@ -994,8 +989,8 @@ Begin
           result.Text := s;
       End
       else
-        raise exception.Create('unknown element in prefix: '+oChild.NodeName);
-      oChild := TMsXmlParser.NextSibling(oChild);
+        raise EUCUMServices.Create('unknown element in prefix: '+oChild.Name);
+      oChild := oChild.nextElement;
     End;
     result.Link;
   Finally
@@ -1003,30 +998,30 @@ Begin
   End;
 End;
 
-Function TUcumServices.ParseBaseUnit(oElem : IXMLDOMElement):TUcumBaseUnit;
+Function TUcumServices.ParseBaseUnit(oElem : TMXmlElement):TUcumBaseUnit;
 var
-  oChild : IXMLDOMElement;
+  oChild : TMXmlElement;
   s : String;
 Begin
   result := TUcumBaseUnit.Create;
   try
-    result.code := TMsXmlParser.GetAttribute(oElem, 'Code');
-    result.codeUC := TMsXmlParser.GetAttribute(oElem, 'CODE');
-    s := TMsXmlParser.GetAttribute(oElem, 'dim');
+    result.code := oElem.attribute['Code'];
+    result.codeUC := oElem.attribute['CODE'];
+    s := oElem.attribute['dim'];
     if s <> '' Then
       result.dim := s[1];
-    oChild := TMsXmlParser.FirstChild(oElem);
+    oChild := oElem.firstElement;
     while oChild <> nil do
     Begin
-      if oChild.nodeName = 'name' Then
-        result.names.Add(TMsXmlParser.TextContent(oChild, ttAsIs))
-      else if oChild.nodeName = 'printSymbol' Then
-        result.printSymbol := TMsXmlParser.TextContent(oChild, ttAsIs)
-      else if oChild.nodeName = 'property' Then
-        result.PropertyType := GetPropertyIndex(TMsXmlParser.TextContent(oChild, ttAsIs))
+      if oChild.Name = 'name' Then
+        result.names.Add(oChild.allText)
+      else if oChild.Name = 'printSymbol' Then
+        result.printSymbol := oChild.allText
+      else if oChild.Name = 'property' Then
+        result.PropertyType := GetPropertyIndex(oChild.allText)
       else
-        raise exception.Create('unknown element in base unit: '+oChild.NodeName);
-      oChild := TMsXmlParser.NextSibling(oChild);
+        raise EUCUMServices.Create('unknown element in base unit: '+oChild.Name);
+      oChild := oChild.nextElement;
     End;
     result.Link;
   Finally
@@ -1034,38 +1029,38 @@ Begin
   End;
 End;
 
-Function TUcumServices.ParseUnit(oElem : IXMLDOMElement):TUcumDefinedUnit;
+Function TUcumServices.ParseUnit(oElem : TMXmlElement):TUcumDefinedUnit;
 var
-  oChild : IXMLDOMElement;
+  oChild : TMXmlElement;
 Begin
   result := TUcumDefinedUnit.Create;
   try
-    result.code := TMsXmlParser.GetAttribute(oElem, 'Code');
-    result.codeUC := TMsXmlParser.GetAttribute(oElem, 'CODE');
-    result.metric := TMsXmlParser.GetAttribute(oElem, 'isMetric') = 'yes';
-    result.isSpecial := TMsXmlParser.GetAttribute(oElem, 'isSpecial') = 'yes';
-    result.class_ := TMsXmlParser.GetAttribute(oElem, 'class');
-    oChild := TMsXmlParser.FirstChild(oElem);
+    result.code := oElem.attribute['Code'];
+    result.codeUC := oElem.attribute['CODE'];
+    result.metric := oElem.attribute['isMetric'] = 'yes';
+    result.isSpecial := oElem.attribute['isSpecial'] = 'yes';
+    result.class_ := oElem.attribute['class'];
+    oChild := oElem.firstElement;
     while oChild <> nil do
     Begin
-      if oChild.nodeName = 'name' Then
-        result.names.Add(TMsXmlParser.TextContent(oChild, ttAsIs))
-      else if oChild.nodeName = 'printSymbol' Then
-        result.printSymbol := TMsXmlParser.TextContent(oChild, ttAsIs)
-      else if oChild.nodeName = 'property' Then
-        result.PropertyType := GetPropertyIndex(TMsXmlParser.TextContent(oChild, ttAsIs))
-      else if oChild.nodeName = 'value' Then
+      if oChild.Name = 'name' Then
+        result.names.Add(oChild.allText)
+      else if oChild.Name = 'printSymbol' Then
+        result.printSymbol := oChild.allText
+      else if oChild.Name = 'property' Then
+        result.PropertyType := GetPropertyIndex(oChild.allText)
+      else if oChild.Name = 'value' Then
       begin
-        result.value.unit_ := TMsXmlParser.GetAttribute(oChild, 'Unit');
-        result.value.unitUC := TMsXmlParser.GetAttribute(oChild, 'UNIT');
-        result.value.value := ParseDecimal(TmsXmlParser.GetAttribute(oChild, 'value'), result.value.unit_);
+        result.value.unit_ := oChild.attribute['Unit'];
+        result.value.unitUC := oChild.attribute['UNIT'];
+        result.value.value := ParseDecimal(oChild.attribute['value'], result.value.unit_);
         if result.value.value.IsWholeNumber then
           result.value.SetPrecision(24);
-        result.value.text := TMsXmlParser.TextContent(oChild, ttAsIs);
+        result.value.text := oChild.allText
       End
       else
-        raise exception.Create('unknown element in unit: '+oChild.NodeName);
-      oChild := TMsXmlParser.NextSibling(oChild);
+        raise EUCUMServices.Create('unknown element in unit: '+oChild.Name);
+      oChild := oChild.nextElement;
     End;
     result.Link;
   Finally
@@ -1083,12 +1078,41 @@ end;
 
 
 
-{ TUCUMCodeHolder }
 
-constructor TUCUMCodeHolder.Create(code: String);
+{ TUcumFilterContext }
+
+constructor TUcumFilterContext.Create(canonical: String);
 begin
   inherited Create;
-  self.code := code;
+  FCursor := -1;
+  FCanonical := canonical;
+end;
+
+{ TUCUMContext }
+
+constructor TUCUMContext.Create(concept: TFhirValueSetComposeIncludeConcept);
+begin
+  inherited Create;
+  FConcept := concept;
+end;
+
+constructor TUCUMContext.Create(code: String);
+begin
+  inherited Create;
+  FConcept := TFhirValueSetComposeIncludeConcept.Create;
+  FConcept.code := code;
+end;
+
+destructor TUCUMContext.Destroy;
+begin
+  FConcept.Free;
+  inherited;
+end;
+
+procedure TUCUMContext.SetConcept(const Value: TFhirValueSetComposeIncludeConcept);
+begin
+  FConcept.Free;
+  FConcept := Value;
 end;
 
 End.

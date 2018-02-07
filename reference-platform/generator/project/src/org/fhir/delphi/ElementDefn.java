@@ -60,6 +60,8 @@ public class ElementDefn {
   private String definition;
   private String path;
   private String statedType; // explicitly stated type (=xxxx)
+  private boolean inherited;
+  private String defaultValue;
   
 
 
@@ -443,6 +445,10 @@ public class ElementDefn {
     return path.contains(".") ? path.substring(path.lastIndexOf(".")+1) : path;
   } 
 
+  public String getPathHead() {
+    return path.contains(".") ? path.substring(0, path.lastIndexOf(".")) : "";
+  } 
+
   public void loadFrom(ElementDefinition ed, StructureDefinition sd, Map<String, ValueSet> vsmap) throws FHIRException {
     path = ed.getPath();
     name = Utilities.oidTail(ed.getPath());
@@ -452,6 +458,8 @@ public class ElementDefn {
     maxCardinality = "*".equals(ed.getMax()) ? Integer.MAX_VALUE : Integer.parseInt(ed.getMax());
     summaryItem = ed.getIsSummary();
     xmlAttribute = ed.getRepresentation().size() > 0;
+    if (ed.getDefaultValue() != null)
+      defaultValue = ed.getDefaultValue().primitiveValue();
  
     if (ed.hasNameReference()) {
       TypeRef tr = new TypeRef();
@@ -497,7 +505,7 @@ public class ElementDefn {
     }
   }
 
-  public void loadFrom(org.hl7.fhir.dstu3.model.ElementDefinition ed, org.hl7.fhir.dstu3.model.StructureDefinition sd, Map<String, org.hl7.fhir.dstu3.model.ValueSet> vsmap) throws FHIRException, org.hl7.fhir.dstu3.exceptions.FHIRException {
+  public void loadFrom(org.hl7.fhir.dstu3.model.ElementDefinition ed, org.hl7.fhir.dstu3.model.StructureDefinition sd, Map<String, org.hl7.fhir.dstu3.model.ValueSet> vsmap) throws FHIRException, org.hl7.fhir.exceptions.FHIRException {
     path = ed.getPath();
     name = Utilities.oidTail(ed.getPath());
     shortDefn = ed.getShort();
@@ -506,6 +514,8 @@ public class ElementDefn {
     maxCardinality = "*".equals(ed.getMax()) ? Integer.MAX_VALUE : Integer.parseInt(ed.getMax());
     summaryItem = ed.getIsSummary();
     xmlAttribute = ed.getRepresentation().size() > 0;
+    if (ed.getDefaultValue() != null)
+      defaultValue = ed.getDefaultValue().primitiveValue();
  
     if (ed.hasContentReference()) {
       TypeRef tr = new TypeRef();
@@ -516,8 +526,8 @@ public class ElementDefn {
       for (org.hl7.fhir.dstu3.model.ElementDefinition.TypeRefComponent t : ed.getType()) {
         if (t.getCode() == null)
           throw new Error("no code on "+ed.getPath());
-        if (t.getCode().equals("Reference") && t.hasProfile()) {
-          String ref = t.getProfile().get(0).getValue().substring(40);
+        if (t.getCode().equals("Reference") && t.hasTargetProfile()) {
+          String ref = t.getTargetProfile().substring(40);
           if (ref.equals("Resource"))
             ref = "Any";
           if (types.size() > 0 && types.get(types.size() -1).getName().equals("Reference")) {
@@ -553,6 +563,64 @@ public class ElementDefn {
     }
   }
   
+  public void loadFrom(org.hl7.fhir.r4.model.ElementDefinition ed, org.hl7.fhir.r4.model.StructureDefinition sd, Map<String, org.hl7.fhir.r4.model.ValueSet> vsmap) throws FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    path = ed.getPath();
+    name = Utilities.oidTail(ed.getPath());
+    shortDefn = ed.getShort();
+    definition = ed.getDefinition();
+    minCardinality = ed.getMin();
+    maxCardinality = "*".equals(ed.getMax()) ? Integer.MAX_VALUE : Integer.parseInt(ed.getMax());
+    summaryItem = ed.getIsSummary();
+    xmlAttribute = ed.getRepresentation().size() > 0;
+    if (ed.getDefaultValue() != null)
+      defaultValue = ed.getDefaultValue().primitiveValue();
+ 
+    if (ed.hasContentReference()) {
+      TypeRef tr = new TypeRef();
+      org.hl7.fhir.r4.model.ElementDefinition edr = getElementDefinitionByName(sd, ed.getContentReference());
+      tr.setName("@"+edr.getPath());
+      types.add(tr);
+    } else {
+      for (org.hl7.fhir.r4.model.ElementDefinition.TypeRefComponent t : ed.getType()) {
+        if (t.getCode() == null)
+          throw new Error("no code on "+ed.getPath());
+        if (t.getCode().equals("Reference") && t.hasTargetProfile()) {
+          String ref = t.getTargetProfile().substring(40);
+          if (ref.equals("Resource"))
+            ref = "Any";
+          if (types.size() > 0 && types.get(types.size() -1).getName().equals("Reference")) {
+            types.get(types.size() -1).getParams().add(ref);
+          } else {
+            TypeRef tr = new TypeRef();
+            tr.setName("Reference");
+            tr.getParams().add(ref);
+            types.add(tr);
+          }
+//        } else if (t.hasProfile() ) {
+//          String ref = t.getProfile().get(0).getValue().substring(40);
+//          TypeRef tr = new TypeRef();
+//          tr.setName(ref);
+//          types.add(tr);
+        } else {
+          TypeRef tr = new TypeRef();
+          tr.setName(t.getCode());
+          types.add(tr);
+        }
+      }
+    }
+
+    if (types.size() == 1 && (types.get(0).getName().equals("Element") || types.get(0).getName().equals("BackboneElement"))) 
+      types.clear();
+    if (typeCode().equals("boolean|integer|decimal|base64Binary|instant|string|uri|date|dateTime|time|code|oid|id|unsignedInt|positiveInt|markdown|Annotation|Attachment|Identifier|CodeableConcept|Coding|Quantity|Range|Period|Ratio|SampledData|Signature|HumanName|Address|ContactPoint|Timing|Reference|Meta")) {
+      types.clear();
+      types.add(new TypeRef("*"));
+    }
+      
+    if (ed.hasBinding() && ed.getBinding().getStrength() == org.hl7.fhir.r4.model.Enumerations.BindingStrength.REQUIRED && "code".equals(typeCode())) {
+      setBinding(convert(ed.getBinding(), vsmap));
+    }
+  }
+  
   private BindingSpecification convert(ElementDefinitionBindingComponent b, Map<String, ValueSet> vsmap, String path) throws FHIRException {
     BindingSpecification bs = new BindingSpecification(null, declaredTypeName, false);
     bs.setBindingMethod(BindingMethod.CodeList);
@@ -572,13 +640,32 @@ public class ElementDefn {
     return bs;
   }
 
-  private BindingSpecification convert(org.hl7.fhir.dstu3.model.ElementDefinition.ElementDefinitionBindingComponent b, Map<String, org.hl7.fhir.dstu3.model.ValueSet> vsmap) throws FHIRException, org.hl7.fhir.dstu3.exceptions.FHIRException {
+  private BindingSpecification convert(org.hl7.fhir.dstu3.model.ElementDefinition.ElementDefinitionBindingComponent b, Map<String, org.hl7.fhir.dstu3.model.ValueSet> vsmap) throws FHIRException, org.hl7.fhir.exceptions.FHIRException {
     BindingSpecification bs = new BindingSpecification(null, declaredTypeName, false);
     bs.setBindingMethod(BindingMethod.CodeList);
     bs.setDefinition(b.getDescription());
     bs.setStrength(BindingStrength.REQUIRED);
     if (b.hasValueSetReference()) {
       org.hl7.fhir.dstu3.model.ValueSet vs = vsmap.get(b.getValueSetReference().getReference());
+      if (vs == null)
+        throw new Error("Unable to find value set "+b.getValueSetReference().getReference());
+      bs.loadFromExpansion(vs);
+      bs.setUri(vs.getUrl());
+      bs.setName(vs.getName().replace(" ", ""));
+      bs.setReference(urlTail(vs.getUrl()));
+    } else if (b.hasValueSetUriType()) {
+      return null;
+    }
+    return bs;
+  }
+
+  private BindingSpecification convert(org.hl7.fhir.r4.model.ElementDefinition.ElementDefinitionBindingComponent b, Map<String, org.hl7.fhir.r4.model.ValueSet> vsmap) throws FHIRException, org.hl7.fhir.exceptions.FHIRException {
+    BindingSpecification bs = new BindingSpecification(null, declaredTypeName, false);
+    bs.setBindingMethod(BindingMethod.CodeList);
+    bs.setDefinition(b.getDescription());
+    bs.setStrength(BindingStrength.REQUIRED);
+    if (b.hasValueSetReference()) {
+      org.hl7.fhir.r4.model.ValueSet vs = vsmap.get(b.getValueSetReference().getReference());
       if (vs == null)
         throw new Error("Unable to find value set "+b.getValueSetReference().getReference());
       bs.loadFromExpansion(vs);
@@ -609,6 +696,34 @@ public class ElementDefn {
         return t;
     }
     return null;
+  }
+
+  private org.hl7.fhir.r4.model.ElementDefinition getElementDefinitionByName(org.hl7.fhir.r4.model.StructureDefinition sd, String name) {
+    for (org.hl7.fhir.r4.model.ElementDefinition t : sd.getDifferential().getElement()) {
+      if (name.equals("#"+t.getId()))
+        return t;
+    }
+    return null;
+  }
+
+  public boolean isInherited() {
+    return inherited;
+  }
+
+  public void setInherited(boolean inherited) {
+    this.inherited = inherited;
+  }
+
+  public String getDefaultValue() {
+    return defaultValue;
+  }
+  
+  public boolean hasDefaultValue() {
+    return defaultValue != null;
+  }
+
+  public void setDefaultValue(String defaultValue) {
+    this.defaultValue = defaultValue;
   } 
 
 

@@ -32,7 +32,7 @@ Interface
 
 
 Uses
-  Windows, SysUtils,
+  {$IFDEF MACOS} OSXUtils, {$ELSE} Windows, {$ENDIF} SysUtils,
   MemorySupport, StringSupport;
 
 Function ErrorAsString : String; Overload;
@@ -68,10 +68,13 @@ Begin
   MemoryCreate(sTemp, iSize);
   Try
     // Get the last error number and convert it to text
+ {$IFDEF MSWINDOWS}
     If FormatMessage(FORMAT_MESSAGE_FROM_SYSTEM Or FORMAT_MESSAGE_ARGUMENT_ARRAY, Nil, DWORD(iError), LANG_NEUTRAL, sTemp, iSize, Nil) <> 0 Then
       Result := StringTrimWhitespace(Copy(StrPas(sTemp), 1, iSize))
     Else
-      Result := '';
+ {$ENDIF}
+      Result := 'Error Message missing on OSX';
+
   Finally
     MemoryDestroy(sTemp, iSize);
   End;

@@ -1,5 +1,34 @@
 {! 1 !}
-{0.00-001  09 Nov 04 08:47  [21370]  User: Grahame Grieve    fix for new path}
+
+
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
 
 Unit UcumTests;
 
@@ -8,9 +37,8 @@ Interface
 Uses
   Sysutils,
   DecimalSupport,
-  MsXml,
+  MXml,
   UcumServices,
-  MsXmlParser,
   AdvObjects;
 
 Type
@@ -21,7 +49,7 @@ Type
   private
     FFolder : String;
     FUcum : TUcumServices;
-    FTestDoc : IXMLDOMDocument2;
+    FTestDoc : TMXmlDocument;
 
     Function TestValidationCase(id, unit_ : String; isValid : Boolean; var vMsg : String) : Boolean;
     procedure TestDisplaynameCase(id, unit_, display : String);
@@ -29,10 +57,10 @@ Type
     procedure TestMultiplicationCase(id, v1, u1, v2, u2, vRes, uRes : String);
 
 
-    procedure CheckValidation(oElement : IXmlDomElement);
-    procedure CheckDisplayNameGeneration(oElement : IXmlDomElement);
-    procedure CheckConversions(oElement : IXmlDomElement);
-    procedure CheckMultiplication(oElement : IXmlDomElement);
+    procedure CheckValidation(oElement : TMXmlElement);
+    procedure CheckDisplayNameGeneration(oElement : TMXmlElement);
+    procedure CheckConversions(oElement : TMXmlElement);
+    procedure CheckMultiplication(oElement : TMXmlElement);
   Published
     Procedure Setup;
     Procedure TearDown;
@@ -55,27 +83,27 @@ Uses
 
 Procedure TUcumTests.TestValidation;
 var
-  iElem : IXMLDOMElement;
+  iElem : TMXmlElement;
 Begin
-  iElem := TMsXmlParser.FirstChild(FTestDoc.documentElement);
+  iElem := FTestDoc.document.firstElement;
   while iElem <> nil Do
   Begin
-    if iElem.nodeName = 'validation' Then
+    if iElem.Name = 'validation' Then
       CheckValidation(iElem);
-    iElem := TMsXmlParser.NextSibling(iElem);
+    iElem := iElem.nextElement;
   End;
 End;
 
 Procedure TUcumTests.TestDisplay;
 var
-  iElem : IXMLDOMElement;
+  iElem : TMXmlElement;
 Begin
-  iElem := TMsXmlParser.FirstChild(FTestDoc.documentElement);
+  iElem := FTestDoc.document.firstElement;
   while iElem <> nil Do
   Begin
-    if iElem.nodeName = 'displayNameGeneration' Then
+    if iElem.name = 'displayNameGeneration' Then
       CheckDisplayNameGeneration(iElem);
-    iElem := TMsXmlParser.NextSibling(iElem);
+    iElem := iElem.nextElement;
   End;
 End;
 
@@ -87,48 +115,48 @@ end;
 
 Procedure TUcumTests.TestConversion;
 var
-  iElem : IXMLDOMElement;
+  iElem : TMXmlElement;
 Begin
-  iElem := TMsXmlParser.FirstChild(FTestDoc.documentElement);
+  iElem := FTestDoc.document.firstElement;
   while iElem <> nil Do
   Begin
-    if iElem.nodeName = 'conversion' Then
+    if iElem.name = 'conversion' Then
       CheckConversions(iElem);
-    iElem := TMsXmlParser.NextSibling(iElem);
+    iElem := iElem.nextElement;
   End;
 End;
 
 Procedure TUcumTests.TestMultiplication;
 var
-  iElem : IXMLDOMElement;
+  iElem : TMXmlElement;
 Begin
-  iElem := TMsXmlParser.FirstChild(FTestDoc.documentElement);
+  iElem := FTestDoc.document.firstElement;
   while iElem <> nil Do
   Begin
-    if iElem.nodeName = 'multiplication' Then
+    if iElem.name = 'multiplication' Then
       CheckMultiplication(iElem);
-    iElem := TMsXmlParser.NextSibling(iElem);
+    iElem := iElem.nextElement;
   End;
 End;
 
 
 
-procedure TUcumTests.CheckValidation(oElement : IXmlDomElement);
+procedure TUcumTests.CheckValidation(oElement : TMXmlElement);
 var
-  oChild : IXMLDOMElement;
+  oChild : TMXmlElement;
   bOk : Boolean;
   Msg, id : String;
 Begin
   bOk := true;
   Msg := '';
-  oChild := TMsXmlParser.FirstChild(oElement);
+  oChild := oElement.firstElement;
   while (oChild <> nil) Do
   Begin
-    id := TMsXmlParser.GetAttribute(oChild, 'id');
-    bOk := TestValidationCase(id,  TMsXmlParser.GetAttribute(oChild, 'unit'), StringToBoolean(TMsXmlParser.GetAttribute(oChild, 'valid')), Msg) and bOk;
+    id := oChild.attribute['id'];
+    bOk := TestValidationCase(id,  oChild.attribute['unit'], StringToBoolean(oChild.attribute['valid']), Msg) and bOk;
     if not bOk then
       raise exception.Create('Error running case '+id+': '+Msg);
-    oChild := TMsXmlParser.NextSibling(oChild);
+    oChild := oChild.nextElement;
   End;
 End;
 
@@ -154,57 +182,49 @@ begin
 end;
 
 procedure TUcumTests.Setup;
-var
-  oParser : TMsXmlParser;
 begin
   FUcum := TUcumServices.Create;
   FUcum.Import(IncludeTrailingPathDelimiter(Ffolder)+'ucum-essence.xml');
-
-  oParser := TMsXmlParser.Create;
-  try
-    FTestDoc := oParser.Parse(IncludeTrailingPathDelimiter(Ffolder)+'ucum-tests.xml');
-  finally
-    oParser.Free;
-  End;
+  FTestDoc := TMXmlParser.parseFile(IncludeTrailingPathDelimiter(Ffolder)+'ucum-tests.xml', [xpResolveNamespaces]);
 end;
 
-procedure TUcumTests.CheckDisplayNameGeneration(oElement : IXmlDomElement);
+procedure TUcumTests.CheckDisplayNameGeneration(oElement : TMXmlElement);
 var
-  oChild : IXMLDOMElement;
+  oChild : TMXmlElement;
 Begin
-  oChild := TMsXmlParser.FirstChild(oElement);
+  oChild := oElement.firstElement;
   while (oChild <> nil) Do
   Begin
-    TestDisplaynameCase(TMsXmlParser.GetAttribute(oChild, 'id'),  TMsXmlParser.GetAttribute(oChild, 'unit'), TMsXmlParser.GetAttribute(oChild, 'display'));
-    oChild := TMsXmlParser.NextSibling(oChild);
+    TestDisplaynameCase(oChild.attribute['id'], oChild.attribute['unit'], oChild.attribute['display']);
+    oChild := oChild.nextElement;
   End;
 End;
 
-procedure TUcumTests.CheckConversions(oElement : IXmlDomElement);
+procedure TUcumTests.CheckConversions(oElement : TMXmlElement);
 var
-  oChild : IXMLDOMElement;
+  oChild : TMXmlElement;
 Begin
-  oChild := TMsXmlParser.FirstChild(oElement);
+  oChild := oElement.firstElement;
   while (oChild <> nil) Do
   Begin
-    TestConversionCase(TMsXmlParser.GetAttribute(oChild, 'id'),  TMsXmlParser.GetAttribute(oChild, 'value'), TMsXmlParser.GetAttribute(oChild, 'srcUnit'),
-                            TMsXmlParser.GetAttribute(oChild, 'dstUnit'), TMsXmlParser.GetAttribute(oChild, 'outcome'));
-    oChild := TMsXmlParser.NextSibling(oChild);
+    TestConversionCase(oChild.attribute['id'], oChild.attribute['value'], oChild.attribute['srcUnit'],
+                            oChild.attribute['dstUnit'], oChild.attribute['outcome']);
+    oChild := oChild.nextElement;
   End;
 End;
 
-procedure TUcumTests.CheckMultiplication(oElement : IXmlDomElement);
+procedure TUcumTests.CheckMultiplication(oElement : TMXmlElement);
 var
-  oChild : IXMLDOMElement;
+  oChild : TMXmlElement;
 Begin
-  oChild := TMsXmlParser.FirstChild(oElement);
+  oChild := oElement.firstElement;
   while (oChild <> nil) Do
   Begin
-    TestMultiplicationCase(TMsXmlParser.GetAttribute(oChild, 'id'),
-      TMsXmlParser.GetAttribute(oChild, 'v1'), TMsXmlParser.GetAttribute(oChild, 'u1'),
-      TMsXmlParser.GetAttribute(oChild, 'v2'), TMsXmlParser.GetAttribute(oChild, 'u2'),
-      TMsXmlParser.GetAttribute(oChild, 'vRes'), TMsXmlParser.GetAttribute(oChild, 'uRes'));
-    oChild := TMsXmlParser.NextSibling(oChild);
+    TestMultiplicationCase(oChild.attribute['id'],
+      oChild.attribute['v1'], oChild.attribute['u1'],
+      oChild.attribute['v2'], oChild.attribute['u2'],
+      oChild.attribute['vRes'], oChild.attribute['uRes']);
+    oChild := oChild.nextElement;
   End;
 End;
 
@@ -217,7 +237,7 @@ begin
   o := TSmartDecimal.valueOf(outcome);
   r := FUcum.convert(v, srcUnit, dstunit);
   if r.Compares(o) <> 0 then
-     Error('TestConversionCase', 'case '+id+': conversion of '+value+' '+srcUnit+' to '+dstUnit+' failed. Expected '+outcome+' but got '+r.AsString);
+     RaiseError('TestConversionCase', 'case '+id+': conversion of '+value+' '+srcUnit+' to '+dstUnit+' failed. Expected '+outcome+' but got '+r.AsString);
 end;
 
 procedure TUcumTests.TestDisplaynameCase(id, unit_, display: String);
@@ -240,9 +260,9 @@ begin
       o3 := FUcum.multiply(o1, o2);
       Try
         if o3.UnitCode <> uRes Then
-          Error('TestMultiplicationCase', 'Error in multiplication: got units '+o3.unitCode +' expecting '+URes);
+          RaiseError('TestMultiplicationCase', 'Error in multiplication: got units '+o3.unitCode +' expecting '+URes);
         if (o3.Value.AsString <> vRes) Then
-          Error('TestMultiplicationCase', 'Error in multiplication: got value '+o3.Value.AsString +' expecting '+vRes);
+          RaiseError('TestMultiplicationCase', 'Error in multiplication: got value '+o3.Value.AsString +' expecting '+vRes);
       Finally
         o3.Free;
       End;

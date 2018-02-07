@@ -21,17 +21,19 @@ ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
 IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
 INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
-NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
 PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 }
 
 interface
 
 uses
+  FastMM4,
   AdvObjects,
+  psapi,
   ThreadSupport,
   Windows,
   WinSvc;
@@ -58,6 +60,7 @@ type
   Protected
     function CanInstall : boolean; Virtual;
     function CanStart : boolean; Virtual;
+    procedure postStart; Virtual;
     procedure DoStop; Virtual;
     procedure DoRemove; Virtual;
 
@@ -67,11 +70,12 @@ type
     function CheckClose(var s: String): Boolean; Virtual;
   Public
     constructor Create(const ASystemName, ADisplayName: String);
+    function MemoryStatus : String;
     procedure DebugExecute;
     procedure ServiceExecute;
     Procedure ContainedStart;
     Procedure ContainedStop;
-    property DebugMode : Boolean read FDebugMode;
+    property DebugMode : Boolean read FDebugMode write FDebugMode;
     property IsContained : Boolean read FIsContained;
     property WantStop : Boolean read FWantStop;
     property StopReason: String read FStopReason;
@@ -86,7 +90,7 @@ var
 implementation
 
 uses
-  KDate,
+  DateSupport,
   ServiceController,
   StringSupport,
   kCritSct,
@@ -180,8 +184,9 @@ end;
 
 Procedure DeathThread(o : TObject); Stdcall;
 var
-  LMemMgr: TMemoryManagerEx;
+  LMemMgr: {$IFDEF VER130}TMemoryManager {$ELSE}TMemoryManagerEx{$ENDIF};
 Begin
+  exit;
   DebugThreadName := 'DeathThread';
   Try
     Sleep(150);
@@ -245,10 +250,12 @@ begin
           begin
           SetStatus(SERVICE_RUNNING, SERVICE_ACCEPT_STOP or SERVICE_ACCEPT_SHUTDOWN);
           end;
+        postStart;
         repeat
+          SetConsoleTitle(pChar(FDisplayName+MemoryStatus));
           if (LCheckTime < Now) then
             begin
-            LCheckTime := now + 10 * SECOND_LENGTH;
+            LCheckTime := now + 10 * DATETIME_SECOND_ONE;
             if CheckClose(LMsg) then
               begin
               Stop(LMsg);
@@ -271,7 +278,8 @@ begin
       if FDebugMode then
         begin
         logt('Exception in Service Execution: '+#13#10+#13#10+e.message+' '+#13#10+'['+e.classname+']');
-        write('press Enter to close');
+        if DebugMode then
+          write('press Enter to close');
         Readln;
         end
       else
@@ -280,6 +288,38 @@ begin
         end;
       end;
   end;
+end;
+
+function memToMb(v : UInt64) : string;
+begin
+  v := v div 1024;
+  v := v div 1024;
+  result := inttostr(v)+'MB';
+end;
+
+function TSystemService.MemoryStatus: String;
+var
+  st: TMemoryManagerState;
+  sb: TSmallBlockTypeState;
+  v : UInt64;
+  hProcess: THandle;
+  pmc: PROCESS_MEMORY_COUNTERS;
+  total: DWORD;
+begin
+  GetMemoryManagerState(st);
+  v := st.TotalAllocatedMediumBlockSize + st.TotalAllocatedLargeBlockSize;
+  for sb in st.SmallBlockTypeStates do
+    v := v + sb.UseableBlockSize * sb.AllocatedBlockCount;
+  result := ' '+memToMb(v);
+  hProcess := GetCurrentProcess;
+  if (GetProcessMemoryInfo(hProcess, @pmc, SizeOf(pmc))) then
+    result := result +' / '+memToMB(pmc.WorkingSetSize + pmc.QuotaPagedPoolUsage + pmc.QuotaNonPagedPoolUsage);
+  CloseHandle(hProcess);
+end;
+
+procedure TSystemService.postStart;
+begin
+// nothing
 end;
 
 procedure ServiceCallHandler(fdwControl: DWORD); Stdcall;
@@ -301,7 +341,6 @@ end;
 procedure ServiceMainEntry(dwArgc: DWORD; lpszArgv: pointer); Stdcall;
 begin
   DebugThreadName := 'Service';
-
   GService.FHandle := RegisterServiceCtrlHandler(PChar(lpszArgv^), @ServiceCallHandler);
   if GService.FHandle <> 0 then
     begin
@@ -319,10 +358,11 @@ end;
 var
   GServiceInfo : array [0..1] of TServiceTableEntry;
 
+
 procedure TSystemService.ServiceExecute;
 begin
   // problem: if we weren't actually started as a service we are about
-  // to hang. But there is no way to determine whether we are running
+  // to hang. But there is no way to deteramine whether we are running
   // as a service
   GServiceInfo[0].lpServiceName := PChar(FSystemName);
   GServiceInfo[0].lpServiceProc := @ServiceMainEntry;

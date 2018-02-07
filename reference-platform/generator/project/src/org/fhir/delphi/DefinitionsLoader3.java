@@ -6,12 +6,14 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.hl7.fhir.convertors.VersionConvertor_10_30;
 import org.hl7.fhir.dstu3.formats.XmlParser;
 import org.hl7.fhir.dstu3.model.Bundle;
 import org.hl7.fhir.dstu3.model.Bundle.BundleEntryComponent;
+import org.hl7.fhir.dstu3.model.CapabilityStatement;
+import org.hl7.fhir.dstu3.model.CodeType;
 import org.hl7.fhir.dstu3.model.CompartmentDefinition;
 import org.hl7.fhir.dstu3.model.CompartmentDefinition.CompartmentDefinitionResourceComponent;
-import org.hl7.fhir.dstu3.model.Conformance;
 import org.hl7.fhir.dstu3.model.OperationDefinition;
 import org.hl7.fhir.dstu3.model.SearchParameter;
 import org.hl7.fhir.dstu3.model.StringType;
@@ -24,7 +26,9 @@ import org.hl7.fhir.exceptions.FHIRException;
 import org.hl7.fhir.utilities.Utilities;
 
 public class DefinitionsLoader3 {
-
+  
+  private List<ResourceDefn> markList = new ArrayList<ResourceDefn>();
+  
   public Definitions loadDefinitions(String src) throws Exception {
     Bundle types = (Bundle) new XmlParser().parse(new FileInputStream(Utilities.path(src, "profiles-types.xml")));
     Bundle resources = (Bundle) new XmlParser().parse(new FileInputStream(Utilities.path(src, "profiles-resources.xml")));
@@ -45,8 +49,8 @@ public class DefinitionsLoader3 {
     for (BundleEntryComponent entry : resources.getEntry()) {
       if (entry.getResource() instanceof StructureDefinition) 
         processResource(def, (StructureDefinition) entry.getResource(), vsmap);
-      else if (entry.getResource() instanceof Conformance) 
-        processConformance(def, (Conformance) entry.getResource());
+      else if (entry.getResource() instanceof CapabilityStatement) 
+        processCapabilityStatement(def, (CapabilityStatement) entry.getResource());
       else if (entry.getResource() instanceof OperationDefinition)
         def.getOperations().add((OperationDefinition) entry.getResource());
       else if (!(entry.getResource() instanceof CompartmentDefinition))
@@ -62,7 +66,24 @@ public class DefinitionsLoader3 {
       else 
         System.out.println("unhandled entry in search parameters: "+entry.getResource().fhirType());
     }
+    for (ResourceDefn rd : markList)
+      mark(def, rd);
     return def;
+  }
+
+  private void mark(Definitions def, ResourceDefn rd) throws Exception {
+    ResourceDefn p = def.getResourceByName(rd.getRoot().typeCode());
+    for (ElementDefn e : rd.getRoot().getElements()) {
+      if (hasName(p, e.getName()))
+        e.setInherited(true);
+    }
+  }
+
+  private boolean hasName(ResourceDefn p, String name) {
+    for (ElementDefn e : p.getRoot().getElements())
+      if (e.getName().equals(name))
+        return true;
+    return false;
   }
 
   private void processCompartmentDefinition(Definitions def, CompartmentDefinition cd) throws Exception {
@@ -80,26 +101,50 @@ public class DefinitionsLoader3 {
     def.getCompartments().add(c);
   }
    
-  private void processConformance(Definitions def, Conformance resource) throws FHIRException {
+  private void processCapabilityStatement(Definitions def, CapabilityStatement resource) throws FHIRException {
     def.setVersion(resource.getFhirVersion());
-    def.setGenDate(new VersionConvertor(null).convertDateTime(resource.getDateElement()));
+    def.setGenDate(new VersionConvertor_10_30(null).convertDateTime(resource.getDateElement()));
   }
 
-  private static void processSearchParam(Definitions def, SearchParameter sp) throws Exception {
-    SearchParameterDefn spd = new SearchParameterDefn(sp.getCode(), sp.getDescription(), new VersionConvertor(null).convertSearchParamType(sp.getType()), 
-        sp.getTarget(), new VersionConvertor(null).convertXPathUsageType(sp.getXpathUsage()), sp.getExpression());
-    def.getResourceByName(sp.getBase()).getSearchParams().put(spd.getCode(), spd);
+  private void processSearchParam(Definitions def, SearchParameter sp) throws Exception {
+    for (CodeType ct : sp.getBase()) {
+      SearchParameterDefn spd = new SearchParameterDefn().loadR3(sp.getCode(), pickDescription(sp.getDescription(), ct.asStringValue()), new VersionConvertor_10_30(null).convertSearchParamType(sp.getType()), 
+          sp.getTarget(), new VersionConvertor_10_30(null).convertXPathUsageType(sp.getXpathUsage()), sp.getExpression());
+      def.getResourceByName(ct.asStringValue()).getSearchParams().put(spd.getCode(), spd);
+    }
   }
 
-  private static void processResource(Definitions def, StructureDefinition sd, Map<String, ValueSet> vsmap) throws Exception {
+  
+  private String pickDescription(String description, String rn) {
+    String[] list = description.split("\\* ");
+    for (String entry : list) {
+      String[] parts = entry.split("\\:");
+      if (parts.length == 2 && parts[0].contains(rn))
+        return parts[1].trim();
+    }
+    return description;
+  }
+
+  private void processResource(Definitions def, StructureDefinition sd, Map<String, ValueSet> vsmap) throws Exception {
     ResourceDefn rd = new ResourceDefn();
     rd.setName(sd.getName());
     rd.setAbstract(sd.getAbstract());
-    rd.setDisplay(sd.getDisplay());
+    rd.setDisplay(sd.getTitle());
     rd.setDefinition(sd.getDifferential().getElement().get(0).getDefinition());
+    if (sd.getKind() == StructureDefinitionKind.LOGICAL) {
+      rd.setAbstract(true);
+      rd.setSpecial(true);
+    }
     TypeDefn type = new TypeDefn();
     type.loadFrom(sd.getDifferential().getElement().get(0), sd, vsmap);
     rd.setRoot(type);
+    if (sd.hasBaseDefinition()) {
+      if (ToolingExtensions.hasExtension(sd.getBaseDefinitionElement(), ToolingExtensions.EXT_CODE_GENERATION_PARENT)) { 
+        markList.add(rd);
+        type.getTypes().add(new TypeRef(ToolingExtensions.readStringExtension(sd.getBaseDefinitionElement(), ToolingExtensions.EXT_CODE_GENERATION_PARENT)));
+      } else
+        type.getTypes().add(new TypeRef(sd.getBaseDefinition().substring(40)));
+    }
     for (int i = 1; i < sd.getDifferential().getElement().size(); i++) { 
       ElementDefn ed = new ElementDefn();
       ed.loadFrom(sd.getDifferential().getElement().get(i), sd, vsmap);
@@ -159,20 +204,20 @@ public class DefinitionsLoader3 {
 
   private static DefinedCode makePrimitive(StructureDefinition sd) {
     System.out.println("type "+sd.getId());
-    if (!sd.getBaseType().equals("Element")) {
+    if (!sd.getBaseDefinition().equals("http://hl7.org/fhir/StructureDefinition/Element")) {
       DefinedStringPattern dsp = new DefinedStringPattern();
       dsp.setCode(sd.getId());
       dsp.setDefinition(removeprefix(sd.getDescription()));
-      dsp.setComment(sd.getSnapshot().getElement().get(0).getComments());
+      dsp.setComment(sd.getSnapshot().getElement().get(0).getComment());
       dsp.setSchema(ToolingExtensions.readStringExtension(sd.getSnapshot().getElement().get(2).getType().get(0).getCodeElement(), ToolingExtensions.EXT_XML_TYPE));
       dsp.setJsonType(ToolingExtensions.readStringExtension(sd.getSnapshot().getElement().get(2).getType().get(0).getCodeElement(), ToolingExtensions.EXT_JSON_TYPE));
-      dsp.setBase(sd.getBaseType());
+      dsp.setBase(sd.getBaseDefinition().substring(40));
       return dsp;
     } else {
       PrimitiveType pt = new PrimitiveType();
       pt.setCode(sd.getId());
       pt.setDefinition(removeprefix(sd.getDescription()));
-      pt.setComment(sd.getSnapshot().getElement().get(0).getComments());
+      pt.setComment(sd.getSnapshot().getElement().get(0).getComment());
       pt.setSchemaType(ToolingExtensions.readStringExtension(sd.getSnapshot().getElement().get(3).getType().get(0).getCodeElement(), ToolingExtensions.EXT_XML_TYPE));
       pt.setJsonType(ToolingExtensions.readStringExtension(sd.getSnapshot().getElement().get(3).getType().get(0).getCodeElement(), ToolingExtensions.EXT_JSON_TYPE));
       if (!pt.getSchemaType().startsWith("xs:"))

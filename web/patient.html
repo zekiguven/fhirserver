@@ -6,6 +6,7 @@
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="http://hl7.org/fhir" name="author"/>
+  <meta charset="utf-8" http-equiv="X-UA-Compatible" content="IE=edge" />
 
   <link rel="stylesheet" href="/fhir.css"/>
 
@@ -60,7 +61,7 @@
   <a href="/" style="color: gold">Server Home</a>   &nbsp;|&nbsp;
   <a href="http://www.healthintersections.com.au" style="color: gold">[%id%]</a> FHIR Server
   &nbsp;|&nbsp;
-  <a href="/index.html" style="color: gold">FHIR Version [%ver%]</a>
+  <a href="[%specurl%]" style="color: gold">FHIR Version [%ver%]</a>
   &nbsp;[%logout%]
 		</div>  <!-- /container -->
 		</div>  <!-- /container -->
@@ -100,9 +101,11 @@ jQuery.get("[%root%]/_web/PatientHooks/[%hookid%]", function (data) {
 Patient Focused Applications:
 </p>
 <ul>
+ [%patient-app-list%]   
+<!-- <li><a href="https://fhir.smartplatforms.org/apps/growth-chart/launch.html?iss=https://[%baseSecure%]&launch=[%patient-id%]">Launch Smart Application (growth charts)</a> </li>
  <li><a href="https://fhir.smartplatforms.org/apps/growth-chart/launch.html?iss=https://[%baseSecure%]&launch=[%patient-id%]">Launch Smart Application (growth charts)</a> </li>
  <li><a href="http://localhost:8000/fhir-app/launch.html?iss=https://[%baseSecure%]&launch=[%patient-id%]">Launch Scot's app</a></li>
- <li><a href="/fitbit-start.hts"/>Load FitBit Data</a>: this app loads summary data from FitBit into this patient's record. You will have to provide you own fitbit data</li>
+ <li><a href="/fitbit-start.hts"/>Load FitBit Data</a>: this app loads summary data from FitBit into this patient's record. You will have to provide you own fitbit data</li>-->
 </ul>
 
  </div>
@@ -118,7 +121,7 @@ Patient Focused Applications:
 		<div class="container">  <!-- container -->
 			<div class="inner-wrapper">
 				<p>
-        <a href="/" style="color: gold">Server Home</a>.&nbsp;|&nbsp;FHIR &copy; HL7.org 2011+. &nbsp;|&nbsp; This server based on version <a href="/index.html" style="color: gold">[%ver%]</a>
+        <a href="/" style="color: gold">Server Home</a>.&nbsp;|&nbsp;FHIR &copy; HL7.org 2011+. &nbsp;|&nbsp; This server based on version <a href="[%specurl%]" style="color: gold">[%ver%]</a>
         </span>
         </p>
 			</div>  <!-- /inner-wrapper -->

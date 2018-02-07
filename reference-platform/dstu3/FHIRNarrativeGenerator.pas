@@ -138,7 +138,7 @@ Type
   TFHIRNarrativeGenerator = class(TAdvObject)
   private
     FPrefix: String; // for links
-    context: TWorkerContext;
+    context: TFHIRWorkerContext;
     FBasePath: String;
     FTooCostlyNote: String;
     function describeSystem(system: TFHIRContactPointSystemEnum): String; overload;
@@ -167,7 +167,7 @@ Type
     procedure renderTiming(s: TFHIRTiming; x: TFHIRXhtmlNode);
     procedure renderRange(q: TFHIRRange; x: TFHIRXhtmlNode);
 
-    function lookupCode(system, code: String): String;
+    function lookupCode(system, version, code: String): String;
 
     function getChildrenForPath(elements: TFHIRElementDefinitionList; path: String): TAdvList<TFHIRElementDefinition>;
     function splitExtensions(profile: TFHIRStructureDefinition; children: TAdvList<TPropertyWrapper>): TAdvList<TPropertyWrapper>;
@@ -194,7 +194,7 @@ Type
     procedure generate(cm: TFHIRConceptMap); overload;
     procedure generate(vs: TFHIRValueSet; b: boolean); overload;
     procedure generate(oo: TFHIROperationOutcome); overload;
-    procedure generate(conf: TFHIRConformance); overload;
+    procedure generate(conf: TFhirCapabilityStatement); overload;
     procedure generate(od: TFHIROperationDefinition); overload;
 
     procedure renderLeaf(res: TResourceWrapper; ew: TBaseWrapper; defn: TFHIRElementDefinition; x: TFHIRXhtmlNode; title: boolean; showCodeDetails: boolean;
@@ -208,7 +208,7 @@ Type
     procedure generateByProfile(r: TFHIRDomainResource; profile: TFHIRStructureDefinition; showCodeDetails: boolean); overload;
     procedure inject(r: TFHIRDomainResource; x: TFHIRXhtmlNode; status: TFhirNarrativeStatusEnum);
   public
-    Constructor Create(cc: TWorkerContext);
+    Constructor Create(cc: TFHIRWorkerContext);
     Destructor Destroy; override;
     procedure generate(r: TFHIRDomainResource); overload;
 
@@ -431,8 +431,8 @@ begin
     generate(TFHIRValueSet(r), true)
   else if (r is TFHIROperationOutcome) then
     generate(TFHIROperationOutcome(r))
-  else if (r is TFHIRConformance) then
-    generate(TFHIRConformance(r))
+  else if (r is TFhirCapabilityStatement) then
+    generate(TFhirCapabilityStatement(r))
   else if (r is TFHIROperationDefinition) then
     generate(TFHIROperationDefinition(r))
   else
@@ -475,7 +475,7 @@ begin
   raise Exception.create('Not done yet');
 end;
 
-procedure TFHIRNarrativeGenerator.generate(conf: TFHIRConformance);
+procedure TFHIRNarrativeGenerator.generate(conf: TFhirCapabilityStatement);
 begin
   raise Exception.create('Not done yet');
 end;
@@ -542,6 +542,7 @@ var
   v: TBaseWrapper;
   first: boolean;
 begin
+  v := nil;
   if (children.Empty) then
   begin
     displayHints := readDisplayHints(defn);
@@ -834,7 +835,7 @@ begin
   end;
 end;
 
-constructor TFHIRNarrativeGenerator.create(cc: TWorkerContext);
+constructor TFHIRNarrativeGenerator.create(cc: TFHIRWorkerContext);
 begin
   inherited create;
   context := cc;
@@ -941,13 +942,13 @@ begin
   else if (e is TFHIRExtension) then
     x.addText('Extensions: Todo')
   else if (e is TFHIRInstant) then
-    x.addText(TFHIRInstant(e).value.AsString)
+    x.addText(TFHIRInstant(e).value.ToString)
   else if (e is TFHIRDateTime) then
-    x.addText(TFHIRDateTime(e).value.AsString)
+    x.addText(TFHIRDateTime(e).value.ToString)
     // else if (e is TFHIRBase64Binary) then
     // x.addText(EncodeBase64(TFHIRBase64Binary(e).value))
   else if (e is TFHIRDate) then
-    x.addText(TFHIRDate(e).value.AsString)
+    x.addText(TFHIRDate(e).value.ToString)
   else if (e is TFHIRENum) then
     x.addText(TFHIRENum(e).value) // todo: look up a display name if there is one the
   else if (e is TFHIRBoolean) then
@@ -989,12 +990,12 @@ begin
   else if (e is TFHIRPeriod) then
   begin
     p := TFHIRPeriod(e);
-    if (p.start <> nil) then
+    if (p.start.notNull) then
       x.addText(p.start.toString)
     else
       x.addText('??');
     x.addText(' --> ');
-    if (p.end_ <> nil) then
+    if (p.end_.notNull) then
       x.addText(p.end_.toString)
     else
       x.addText('??');
@@ -1117,12 +1118,12 @@ begin
     else if (e is TFHIRPeriod) then
     begin
       p := TFHIRPeriod(e);
-      if (p.start <> nil) then
+      if (p.start.notNull) then
         x.addText(p.start.toString)
       else
         x.addText('??');
       x.addText(' --> ');
-      if (p.end_ <> nil) then
+      if (p.end_.notNull) then
         x.addText(p.end_.toString)
       else
         x.addText('??');
@@ -1340,7 +1341,7 @@ begin
     begin
       if (c.code <> '') and (c.system <> '') then
       begin
-        s := lookupCode(c.system, c.code);
+        s := lookupCode(c.system, c.version, c.code);
         if s <> '' then
           break;
       end;
@@ -1373,9 +1374,9 @@ begin
       else
         sp.addText('; ');
       if c.display <> '' then
-        sp.addText('{' + describeSystem(c.system) + ' code "' + c.code + '" := "' + lookupCode(c.system, c.code) + '", given as "' + c.display + '"}')
+        sp.addText('{' + describeSystem(c.system) + ' code "' + c.code + '" := "' + lookupCode(c.system, c.version, c.code) + '", given as "' + c.display + '"}')
       else
-        sp.addText('{' + describeSystem(c.system) + ' code "' + c.code + '" := "' + lookupCode(c.system, c.code));
+        sp.addText('{' + describeSystem(c.system) + ' code "' + c.code + '" := "' + lookupCode(c.system, c.version, c.code));
     end;
     sp.addText(')');
   end
@@ -1409,12 +1410,12 @@ begin
         s.append(TFHIRString(o.author).value);
     end;
 
-    if (o.time <> nil) then
+    if (o.time.notNull) then
     begin
       if (s.length > 0) then
         s.append('; ');
 
-      s.append('Made: ').append(o.time.AsString);
+      s.append('Made: ').append(o.time.ToString);
     end;
 
     if (o.Text <> '') then
@@ -1438,14 +1439,14 @@ begin
   if (c.display <> '') then
     s := c.display;
   if (s = '') then
-    s := lookupCode(c.system, c.code);
+    s := lookupCode(c.system, c.version, c.code);
 
   if (s = '') then
     s := c.code;
 
   if (showCodeDetails) then
   begin
-    x.addText(s + ' (Details: ' + describeSystem(c.system) + ' code ' + c.code + ' := "' + lookupCode(c.system, c.code) + '", stated as "' + c.display + '")');
+    x.addText(s + ' (Details: ' + describeSystem(c.system) + ' code ' + c.code + ' := "' + lookupCode(c.system, c.version, c.code) + '", stated as "' + c.display + '")');
   end
   else
     x.addTag('span').setAttribute('title', 'begin' + c.system + ' ' + c.code + 'end;').addText(s);
@@ -1473,11 +1474,11 @@ begin
     result := system;
 end;
 
-function TFHIRNarrativeGenerator.lookupCode(system, code: String): String;
+function TFHIRNarrativeGenerator.lookupCode(system, version, code: String): String;
 var
   t: TValidationResult;
 begin
-  t := context.validateCode(system, code, '');
+  t := context.validateCode(system, version, code, '');
   try
     if (t <> nil) and (t.display <> '') then
       result := t.display
@@ -1523,7 +1524,7 @@ begin
     begin
       if (c.code <> '') and (c.system <> '') then
       begin
-        s := lookupCode(c.system, c.code);
+        s := lookupCode(c.system, c.version, c.code);
         if (s <> '') then
           break;
       end;
@@ -1565,7 +1566,7 @@ begin
   begin
     sp := x.addTag('span');
     sp.setAttribute('style', 'background: LightGoldenRodYellow ');
-    sp.addText(' (Details: ' + describeSystem(q.system) + ' code ' + q.code + ' := "' + lookupCode(q.system, q.code) + '")');
+    sp.addText(' (Details: ' + describeSystem(q.system) + ' code ' + q.code + ' := "' + lookupCode(q.system, '', q.code) + '")');
   end;
 end;
 
@@ -1650,7 +1651,7 @@ begin
     s.append('" code ');
     s.append(q.code);
     s.append(' := "');
-    s.append(lookupCode(q.system, q.code)).append('")');
+    s.append(lookupCode(q.system, '', q.code)).append('")');
 
     result := s.toString();
   finally
@@ -1663,6 +1664,7 @@ var
   s, sc, st: String;
   p: TFHIRDateTime;
   rep: TFhirTimingRepeat;
+  w : TFhirEventTimingEnum;
 begin
   s := '';
   if (t.code <> nil) then
@@ -1679,14 +1681,14 @@ begin
   if (t.repeat_ <> nil) then
   begin
     rep := t.repeat_;
-    if (rep.bounds <> nil) and (rep.bounds is TFHIRPeriod) and (TFHIRPeriod(rep.bounds).start <> nil) then
+    if (rep.bounds <> nil) and (rep.bounds is TFHIRPeriod) and (TFHIRPeriod(rep.bounds).start.notNull) then
       CommaAdd(s, 'Starting ' + TFHIRPeriod(rep.bounds).start.toString());
     if (rep.Count <> '') then
       CommaAdd(s, 'Count ' + rep.Count + ' times');
     if (rep.Duration <> '') then
       CommaAdd(s, 'Duration ' + rep.Duration + displayTimeUnits(rep.periodUnit));
 
-    if (rep.when <> EventTimingNull) then
+    if (rep.when <> []) then
     begin
       st := '';
       if (rep.Period <> '') then
@@ -1696,7 +1698,9 @@ begin
           st := st + '-' + rep.PeriodMax;
         st := st + displayTimeUnits(rep.periodUnit);
       end;
-      CommaAdd(s, 'Do ' + st + displayEventCode(rep.when));
+      for w := low(TFhirEventTimingEnum) to high(TFhirEventTimingEnum) do
+        if w in rep.when then
+          CommaAdd(s, 'Do ' + st + displayEventCode(w));
     end
     else
     begin
@@ -1718,7 +1722,7 @@ begin
       end;
       CommaAdd(s, 'Do ' + st);
     end;
-    if (rep.bounds <> nil) and (rep.bounds is TFHIRPeriod) and (TFHIRPeriod(rep.bounds).end_ <> nil) then
+    if (rep.bounds <> nil) and (rep.bounds is TFHIRPeriod) and (TFHIRPeriod(rep.bounds).end_.notNull) then
       CommaAdd(s, 'Until ' + TFHIRPeriod(rep.bounds).end_.toString);
   end;
   result := sc;
@@ -1798,9 +1802,9 @@ begin
         s.append(p.value);
         s.append(' ');
       end;
-      for p in name.familyList do
+      if name.family <> '' then
       begin
-        s.append(p.value);
+        s.append(name.family);
         s.append(' ');
       end;
     end;
@@ -1905,7 +1909,7 @@ begin
     else if (ii.Type_.codingList.Count > 0) and (ii.Type_.codingList[0].display <> '') then
       s := ii.Type_.codingList[0].display + ' = ' + s
     else if (ii.Type_.codingList.Count > 0) and (ii.Type_.codingList[0].code <> '') then
-      s := lookupCode(ii.Type_.codingList[0].system, ii.Type_.codingList[0].code) + ' = ' + s;
+      s := lookupCode(ii.Type_.codingList[0].system, ii.Type_.codingList[0].version, ii.Type_.codingList[0].code) + ' = ' + s;
   end;
 
   if (ii.Use <> IdentifierUseNull) then
@@ -3157,7 +3161,7 @@ end;
   end;
   end;
 
-  public void generate(TFHIRConformance conf) begin
+  public void generate(TFhirCapabilityStatement conf) begin
   TFHIRXhtmlNode x := new TFHIRXhtmlNode(NodeType.Element, 'div');
   x.addTag('h2').addText(conf.getName());
   smartAddText(x.addTag('p'), conf.getDescription());

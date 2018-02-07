@@ -122,8 +122,7 @@ Implementation
 
 
 Uses
-  MemorySupport, StringSupport,
-  AdvFactories;
+  MemorySupport, StringSupport;
 
 
 Procedure TAdvIntegerList.SaveItem(oFiler : TAdvFiler; iIndex : Integer);
@@ -204,7 +203,7 @@ Begin
   If Not IsAllowDuplicates And Find(Pointer(aValue), Result) Then
   Begin 
     If IsPreventDuplicates Then
-      Error('Add', StringFormat('Item already exists in list (%d)', [aValue]));
+      RaiseError('Add', StringFormat('Item already exists in list (%d)', [aValue]));
   End   
   Else
   Begin 
@@ -231,7 +230,7 @@ Var
   iIndex : Integer;
 Begin
   If Not Find(Pointer(iValue), iIndex) Then
-    Error('DeleteByValue', StringFormat('''%d'' not found in list', [iValue]));
+    RaiseError('DeleteByValue', StringFormat('''%d'' not found in list', [iValue]));
 
   DeleteByIndex(iIndex);
 End;
@@ -278,7 +277,7 @@ Begin
   Assert(Invariants('EqualTo', oIntegers, TAdvIntegerList, 'oIntegers'));
 
   If IsAllowDuplicates Then
-    Error('EqualTo', 'Equality checking not supported by integer collection containing duplicates.');
+    RaiseError('EqualTo', 'Equality checking not supported by integer collection containing duplicates.');
 
   Result := oIntegers.Count = Count;
 
@@ -479,7 +478,4 @@ Begin
   End;
 End;
 
-
-Initialization
-  Factory.RegisterClass(TAdvIntegerList);
 End. // AdvIntegerLists //

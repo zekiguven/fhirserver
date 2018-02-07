@@ -3,28 +3,49 @@
         <ProjectGuid>{09AF4F3A-3C40-46E9-AB64-2E0AA7A9EEFF}</ProjectGuid>
     </PropertyGroup>
     <ItemGroup>
+        <Projects Include="Server\fhirserver4.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="tests\FHIRServerTests.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="utils\FhirServerUtils.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="install\helper\installer.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="reference-platform\r4\fhirtests4.dproj">
+            <Dependencies/>
+        </Projects>
         <Projects Include="Server\FHIRServer3.dproj">
-            <Dependencies/>
-        </Projects>
-        <Projects Include="Server\FHIRServer2.dproj">
-            <Dependencies/>
-        </Projects>
-        <Projects Include="Server\fhirserverNCTS.dproj">
-            <Dependencies/>
-        </Projects>
-        <Projects Include="npp\fhirnpp.dproj">
-            <Dependencies/>
-        </Projects>
-        <Projects Include="vseditor\ValueSetEditor.dproj">
-            <Dependencies/>
-        </Projects>
-        <Projects Include="reference-platform\dstu1\dstu1.dproj">
             <Dependencies/>
         </Projects>
         <Projects Include="reference-platform\dstu3\fhirtests3.dproj">
             <Dependencies/>
         </Projects>
+        <Projects Include="Server\FHIRServer2.dproj">
+            <Dependencies/>
+        </Projects>
         <Projects Include="reference-platform\dstu2\fhirtests2.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="bridge\ExampleBridgeServer.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="Server\fhirserverOSX4.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="toolkit\FHIRToolkit.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="utils\VocabTxServer\VocabTxServer.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="npp\fhirnpp.dproj">
+            <Dependencies/>
+        </Projects>
+        <Projects Include="vcldemo\FhirVclDemo.dproj">
             <Dependencies/>
         </Projects>
     </ItemGroup>
@@ -35,6 +56,51 @@
             <Default.Personality/>
         </BorlandProject>
     </ProjectExtensions>
+    <Target Name="fhirserver4">
+        <MSBuild Projects="Server\fhirserver4.dproj"/>
+    </Target>
+    <Target Name="fhirserver4:Clean">
+        <MSBuild Projects="Server\fhirserver4.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="fhirserver4:Make">
+        <MSBuild Projects="Server\fhirserver4.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="FHIRServerTests">
+        <MSBuild Projects="tests\FHIRServerTests.dproj"/>
+    </Target>
+    <Target Name="FHIRServerTests:Clean">
+        <MSBuild Projects="tests\FHIRServerTests.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FHIRServerTests:Make">
+        <MSBuild Projects="tests\FHIRServerTests.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="FhirServerUtils">
+        <MSBuild Projects="utils\FhirServerUtils.dproj"/>
+    </Target>
+    <Target Name="FhirServerUtils:Clean">
+        <MSBuild Projects="utils\FhirServerUtils.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FhirServerUtils:Make">
+        <MSBuild Projects="utils\FhirServerUtils.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="installer">
+        <MSBuild Projects="install\helper\installer.dproj"/>
+    </Target>
+    <Target Name="installer:Clean">
+        <MSBuild Projects="install\helper\installer.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="installer:Make">
+        <MSBuild Projects="install\helper\installer.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="fhirtests4">
+        <MSBuild Projects="reference-platform\r4\fhirtests4.dproj"/>
+    </Target>
+    <Target Name="fhirtests4:Clean">
+        <MSBuild Projects="reference-platform\r4\fhirtests4.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="fhirtests4:Make">
+        <MSBuild Projects="reference-platform\r4\fhirtests4.dproj" Targets="Make"/>
+    </Target>
     <Target Name="FHIRServer3">
         <MSBuild Projects="Server\FHIRServer3.dproj"/>
     </Target>
@@ -43,51 +109,6 @@
     </Target>
     <Target Name="FHIRServer3:Make">
         <MSBuild Projects="Server\FHIRServer3.dproj" Targets="Make"/>
-    </Target>
-    <Target Name="FHIRServer2">
-        <MSBuild Projects="Server\FHIRServer2.dproj"/>
-    </Target>
-    <Target Name="FHIRServer2:Clean">
-        <MSBuild Projects="Server\FHIRServer2.dproj" Targets="Clean"/>
-    </Target>
-    <Target Name="FHIRServer2:Make">
-        <MSBuild Projects="Server\FHIRServer2.dproj" Targets="Make"/>
-    </Target>
-    <Target Name="fhirserverNCTS">
-        <MSBuild Projects="Server\fhirserverNCTS.dproj"/>
-    </Target>
-    <Target Name="fhirserverNCTS:Clean">
-        <MSBuild Projects="Server\fhirserverNCTS.dproj" Targets="Clean"/>
-    </Target>
-    <Target Name="fhirserverNCTS:Make">
-        <MSBuild Projects="Server\fhirserverNCTS.dproj" Targets="Make"/>
-    </Target>
-    <Target Name="fhirnpp">
-        <MSBuild Projects="npp\fhirnpp.dproj"/>
-    </Target>
-    <Target Name="fhirnpp:Clean">
-        <MSBuild Projects="npp\fhirnpp.dproj" Targets="Clean"/>
-    </Target>
-    <Target Name="fhirnpp:Make">
-        <MSBuild Projects="npp\fhirnpp.dproj" Targets="Make"/>
-    </Target>
-    <Target Name="ValueSetEditor">
-        <MSBuild Projects="vseditor\ValueSetEditor.dproj"/>
-    </Target>
-    <Target Name="ValueSetEditor:Clean">
-        <MSBuild Projects="vseditor\ValueSetEditor.dproj" Targets="Clean"/>
-    </Target>
-    <Target Name="ValueSetEditor:Make">
-        <MSBuild Projects="vseditor\ValueSetEditor.dproj" Targets="Make"/>
-    </Target>
-    <Target Name="dstu1">
-        <MSBuild Projects="reference-platform\dstu1\dstu1.dproj"/>
-    </Target>
-    <Target Name="dstu1:Clean">
-        <MSBuild Projects="reference-platform\dstu1\dstu1.dproj" Targets="Clean"/>
-    </Target>
-    <Target Name="dstu1:Make">
-        <MSBuild Projects="reference-platform\dstu1\dstu1.dproj" Targets="Make"/>
     </Target>
     <Target Name="fhirtests3">
         <MSBuild Projects="reference-platform\dstu3\fhirtests3.dproj"/>
@@ -98,6 +119,15 @@
     <Target Name="fhirtests3:Make">
         <MSBuild Projects="reference-platform\dstu3\fhirtests3.dproj" Targets="Make"/>
     </Target>
+    <Target Name="FHIRServer2">
+        <MSBuild Projects="Server\FHIRServer2.dproj"/>
+    </Target>
+    <Target Name="FHIRServer2:Clean">
+        <MSBuild Projects="Server\FHIRServer2.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FHIRServer2:Make">
+        <MSBuild Projects="Server\FHIRServer2.dproj" Targets="Make"/>
+    </Target>
     <Target Name="fhirtests2">
         <MSBuild Projects="reference-platform\dstu2\fhirtests2.dproj"/>
     </Target>
@@ -107,14 +137,68 @@
     <Target Name="fhirtests2:Make">
         <MSBuild Projects="reference-platform\dstu2\fhirtests2.dproj" Targets="Make"/>
     </Target>
+    <Target Name="ExampleBridgeServer">
+        <MSBuild Projects="bridge\ExampleBridgeServer.dproj"/>
+    </Target>
+    <Target Name="ExampleBridgeServer:Clean">
+        <MSBuild Projects="bridge\ExampleBridgeServer.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="ExampleBridgeServer:Make">
+        <MSBuild Projects="bridge\ExampleBridgeServer.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="fhirserverOSX4">
+        <MSBuild Projects="Server\fhirserverOSX4.dproj"/>
+    </Target>
+    <Target Name="fhirserverOSX4:Clean">
+        <MSBuild Projects="Server\fhirserverOSX4.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="fhirserverOSX4:Make">
+        <MSBuild Projects="Server\fhirserverOSX4.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="FHIRToolkit">
+        <MSBuild Projects="toolkit\FHIRToolkit.dproj"/>
+    </Target>
+    <Target Name="FHIRToolkit:Clean">
+        <MSBuild Projects="toolkit\FHIRToolkit.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FHIRToolkit:Make">
+        <MSBuild Projects="toolkit\FHIRToolkit.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="VocabTxServer">
+        <MSBuild Projects="utils\VocabTxServer\VocabTxServer.dproj"/>
+    </Target>
+    <Target Name="VocabTxServer:Clean">
+        <MSBuild Projects="utils\VocabTxServer\VocabTxServer.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="VocabTxServer:Make">
+        <MSBuild Projects="utils\VocabTxServer\VocabTxServer.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="fhirnpp">
+        <MSBuild Projects="npp\fhirnpp.dproj"/>
+    </Target>
+    <Target Name="fhirnpp:Clean">
+        <MSBuild Projects="npp\fhirnpp.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="fhirnpp:Make">
+        <MSBuild Projects="npp\fhirnpp.dproj" Targets="Make"/>
+    </Target>
+    <Target Name="FhirVclDemo">
+        <MSBuild Projects="vcldemo\FhirVclDemo.dproj"/>
+    </Target>
+    <Target Name="FhirVclDemo:Clean">
+        <MSBuild Projects="vcldemo\FhirVclDemo.dproj" Targets="Clean"/>
+    </Target>
+    <Target Name="FhirVclDemo:Make">
+        <MSBuild Projects="vcldemo\FhirVclDemo.dproj" Targets="Make"/>
+    </Target>
     <Target Name="Build">
-        <CallTarget Targets="FHIRServer3;FHIRServer2;fhirserverNCTS;fhirnpp;ValueSetEditor;dstu1;fhirtests3;fhirtests2"/>
+        <CallTarget Targets="fhirserver4;FHIRServerTests;FhirServerUtils;installer;fhirtests4;FHIRServer3;fhirtests3;FHIRServer2;fhirtests2;ExampleBridgeServer;fhirserverOSX4;FHIRToolkit;VocabTxServer;fhirnpp;FhirVclDemo"/>
     </Target>
     <Target Name="Clean">
-        <CallTarget Targets="FHIRServer3:Clean;FHIRServer2:Clean;fhirserverNCTS:Clean;fhirnpp:Clean;ValueSetEditor:Clean;dstu1:Clean;fhirtests3:Clean;fhirtests2:Clean"/>
+        <CallTarget Targets="fhirserver4:Clean;FHIRServerTests:Clean;FhirServerUtils:Clean;installer:Clean;fhirtests4:Clean;FHIRServer3:Clean;fhirtests3:Clean;FHIRServer2:Clean;fhirtests2:Clean;ExampleBridgeServer:Clean;fhirserverOSX4:Clean;FHIRToolkit:Clean;VocabTxServer:Clean;fhirnpp:Clean;FhirVclDemo:Clean"/>
     </Target>
     <Target Name="Make">
-        <CallTarget Targets="FHIRServer3:Make;FHIRServer2:Make;fhirserverNCTS:Make;fhirnpp:Make;ValueSetEditor:Make;dstu1:Make;fhirtests3:Make;fhirtests2:Make"/>
+        <CallTarget Targets="fhirserver4:Make;FHIRServerTests:Make;FhirServerUtils:Make;installer:Make;fhirtests4:Make;FHIRServer3:Make;fhirtests3:Make;FHIRServer2:Make;fhirtests2:Make;ExampleBridgeServer:Make;fhirserverOSX4:Make;FHIRToolkit:Make;VocabTxServer:Make;fhirnpp:Make;FhirVclDemo:Make"/>
     </Target>
     <Import Project="$(BDS)\Bin\CodeGear.Group.Targets" Condition="Exists('$(BDS)\Bin\CodeGear.Group.Targets')"/>
 </Project>

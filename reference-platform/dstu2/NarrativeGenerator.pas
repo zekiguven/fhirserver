@@ -53,10 +53,10 @@ type
     FOnLookupReference : TLookupReferenceEvent;
     FContext : TFHIRRequest;
 
-    procedure generateByProfile(res : TFHIRDomainResource; e : TFHIRBase; allElements : TFhirElementDefinitionList; defn : TFhirElementDefinition; children : TFhirElementDefinitionList; x : TFHIRXhtmlNode; path : String; showCodeDetails : boolean);
+    procedure generateByProfile(res : TFHIRDomainResource; e : TFHIRObject; allElements : TFhirElementDefinitionList; defn : TFhirElementDefinition; children : TFhirElementDefinitionList; x : TFHIRXhtmlNode; path : String; showCodeDetails : boolean);
     function getChildrenForPath(elements : TFhirElementDefinitionList; path : String) : TFhirElementDefinitionList;
     procedure inject(res : TFHIRDomainResource; x : TFHIRXhtmlNode; status : TFhirNarrativeStatusEnum);
-    procedure renderLeaf(res : TFHIRResource; e : TFHIRBase; defn : TFhirElementDefinition; x : TFHIRXhtmlNode; title, showCodeDetails : boolean; displayHints : TDictionary<String, String>);
+    procedure renderLeaf(res : TFHIRResource; e : TFHIRObject; defn : TFhirElementDefinition; x : TFHIRXhtmlNode; title, showCodeDetails : boolean; displayHints : TDictionary<String, String>);
     procedure readDisplayHints(defn : TFhirElementDefinition; hints : TDictionary<String, String>);
     function getElementDefinition(elements : TFhirElementDefinitionList; path : String) : TFhirElementDefinition;
     function exemptFromRendering(child : TFhirElementDefinition) : boolean;
@@ -95,7 +95,7 @@ type
     function displayCodeable(v : TFHIRCodeableConcept) : String;
 
     function resolveReference(res : TFHIRResource; url : String) : TResourceWithReference;
-    function lookupCode(system, code : String) : String;
+    function lookupCode(system, version, code : String) : String;
     function describeSystem(system : String) : String; overload;
     function describeSystem(system : TFHIRContactPointSystemEnum) : String;  overload;
   public
@@ -163,7 +163,7 @@ begin
   end;
 end;
 
-procedure TNarrativeGenerator.generateByProfile(res : TFHIRDomainResource; e : TFHIRBase; allElements : TFhirElementDefinitionList; defn : TFhirElementDefinition; children : TFhirElementDefinitionList; x : TFHIRXhtmlNode; path : String; showCodeDetails : boolean);
+procedure TNarrativeGenerator.generateByProfile(res : TFHIRDomainResource; e : TFHIRObject; allElements : TFhirElementDefinitionList; defn : TFhirElementDefinition; children : TFhirElementDefinitionList; x : TFHIRXhtmlNode; path : String; showCodeDetails : boolean);
 var
   i : integer;
   iter : TFHIRPropertyIterator;
@@ -319,18 +319,18 @@ procedure TNarrativeGenerator.addColumnValues(res : TFHIRResource; tr : TFHIRXht
 var
   i : integer;
   e : TFhirElementDefinition;
-  list : TFHIRObjectList;
+  list : TFHIRSelectionList;
 begin
   for i := 0 to grandChildren.Count - 1 do
   begin
     e := grandChildren[i];
-    list := TFHIRObjectList.Create;
+    list := TFHIRSelectionList.Create;
     try
       v.ListChildrenByName(tail(e.path), list);
       if (list.Count = 0) then
         tr.addTag('td').addText(' ')
       else
-        renderLeaf(res, list[0] as TFhirElement, e, tr.addTag('td'), false, showCodeDetails, displayHints);
+        renderLeaf(res, list[0].value as TFhirElement, e, tr.addTag('td'), false, showCodeDetails, displayHints);
     finally
       list.Free;
     end;
@@ -399,10 +399,10 @@ begin
   result := not e.Type_List.isEmpty;
 end;
 
-function TNarrativeGenerator.lookupCode(system, code: String): String;
+function TNarrativeGenerator.lookupCode(system, version, code: String): String;
 begin
   if Assigned(FOnLookupCode) then
-    result := FOnLookupCode(system, code)
+    result := FOnLookupCode(system, version, code)
   else
     result := '';
 end;
@@ -421,7 +421,7 @@ begin
   end;
 end;
 
-procedure TNarrativeGenerator.renderLeaf(res : TFHIRResource; e : TFHIRBase; defn : TFhirElementDefinition; x : TFHIRXhtmlNode; title, showCodeDetails : boolean; displayHints : TDictionary<String, String>);
+procedure TNarrativeGenerator.renderLeaf(res : TFHIRResource; e : TFHIRObject; defn : TFhirElementDefinition; x : TFHIRXhtmlNode; title, showCodeDetails : boolean; displayHints : TDictionary<String, String>);
 var
   p : TFHIRPeriod;
   r : TFhirReference;
@@ -440,11 +440,11 @@ begin
   else if (e is TFhirExtension) then
     x.addText('Todo')
   else if (e is TFHIRInstant) then
-    x.addText(TFHIRInstant(e).Value.AsXML)
+    x.addText(TFHIRInstant(e).Value.ToXML)
   else if (e is TFHIRDateTime) then
-    x.addText(TFHIRDateTime(e).Value.AsXML)
+    x.addText(TFHIRDateTime(e).Value.ToXML)
   else if (e is TFHIRDate) then
-    x.addText(TFHIRDate(e).Value.AsXML)
+    x.addText(TFHIRDate(e).Value.ToXML)
   else if (e is TFhirEnum) then
     x.addText(TFhirEnum(e).value) // todo: look up a display name if there is one
   else if (e is TFhirBoolean) then
@@ -480,15 +480,15 @@ begin
   else if (e is TFHIRPeriod) then
   begin
     p := TFHIRPeriod(e);
-    if p.Start = nil then
+    if p.Start.null then
       x.addText('??')
     else
-      x.addText(p.Start.AsXML);
+      x.addText(p.Start.toXML);
     x.addText(' --> ');
-    if p.end_ = nil then
+    if p.end_.null then
       x.addText('??')
     else
-    x.addText(p.End_.AsXML);
+    x.addText(p.End_.ToXML);
   end
   else if (e is TFhirReference) then
   begin
@@ -565,12 +565,12 @@ begin
     end
     else if (e is TFHIRDateTime) then
     begin
-      x.addText(name+': '+TFHIRDateTime(e).Value.AsXML);
+      x.addText(name+': '+TFHIRDateTime(e).Value.ToXML);
       result := true;
     end
     else if (e is TFHIRInstant) then
     begin
-      x.addText(name+': '+TFHIRInstant(e).Value.AsXML);
+      x.addText(name+': '+TFHIRInstant(e).Value.ToXML);
       result := true;
     end
     else if (e is TFHIRExtension) then
@@ -580,7 +580,7 @@ begin
     end
     else if (e is TFHIRDate) then
     begin
-      x.addText(name+': '+TFHIRDate(e).Value.AsXML);
+      x.addText(name+': '+TFHIRDate(e).Value.ToXML);
       result := true;
     end
     else if (e is TFhirEnum) then
@@ -656,15 +656,15 @@ begin
     else if (e is TFHIRPeriod) then
     begin
       p := TFHIRPeriod(e);
-      if p.Start = nil then
+      if p.Start.null then
         x.addText('??')
       else
-        x.addText(p.Start.AsXML);
+        x.addText(p.Start.ToXML);
       x.addText(' --> ');
-      if p.end_ = nil then
+      if p.end_.null then
         x.addText('??')
       else
-      x.addText(p.End_.AsXML);
+      x.addText(p.End_.ToXML);
     end
     else if (e is TFhirReference) then
     begin
@@ -819,7 +819,7 @@ begin
     // still? ok, let's try looking it up
     for i := 0 to v.codingList.Count - 1 do
       if (s = '') and (v.codingList[i].Code <> '') and (v.codingList[i].System <> '') then
-         s := lookupCode(v.codingList[i].System, v.codingList[i].Code);
+         s := lookupCode(v.codingList[i].System, v.codingList[i].Version, v.codingList[i].Code);
   end;
 
   if (s = '') then
@@ -846,7 +846,7 @@ begin
       end
       else
         sp.addText('; ');
-      sp.addText('{'+describeSystem(v.codingList[i].System)+' code "'+v.codingList[i].Code+'" := "'+lookupCode(v.codingList[i].System, v.codingList[i].Code)+'", given as "'+v.codingList[i].Display+'"}');
+      sp.addText('{'+describeSystem(v.codingList[i].System)+' code "'+v.codingList[i].Code+'" := "'+lookupCode(v.codingList[i].System, v.codingList[i].Version, v.codingList[i].Code)+'", given as "'+v.codingList[i].Display+'"}');
     end;
     sp.addText(')');
   end
@@ -875,13 +875,13 @@ begin
   if (v.Display <> '') then
     s := v.Display;
   if (s = '') then
-    s := lookupCode(v.System, v.Code);
+    s := lookupCode(v.System, v.version, v.Code);
 
   if (s = '') then
     s := v.Code;
 
   if (showCodeDetails) then
-    x.addText(s+' (Details: '+describeSystem(v.System)+' code '+v.Code+' := "'+lookupCode(v.System, v.Code)+'", stated as "'+v.Display+'")')
+    x.addText(s+' (Details: '+describeSystem(v.System)+' code '+v.Code+' := "'+lookupCode(v.System, v.version, v.Code)+'", stated as "'+v.Display+'")')
   else
     x.addTag('span').setAttribute('title', '{'+v.System+' '+v.Code+'}').addText(s);
 end;
@@ -923,7 +923,7 @@ begin
   begin
     sp := x.addTag('span');
     sp.setAttribute('style', 'background: LightGoldenRodYellow ');
-    sp.addText(' (Details: '+describeSystem(v.System)+' code '+v.Code+' := "'+lookupCode(v.System, v.Code)+'")');
+    sp.addText(' (Details: '+describeSystem(v.System)+' code '+v.Code+' := "'+lookupCode(v.System, '', v.Code)+'")');
   end;
 end;
 

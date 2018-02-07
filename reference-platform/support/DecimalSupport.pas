@@ -31,8 +31,6 @@ POSSIBILITY OF SUCH DAMAGE.
 Interface
 
 Uses
-  Windows,
-  ActiveX,
   GuidSupport,
   StringSupport,
   MathSupport,
@@ -112,6 +110,7 @@ Type
     Function AsInt64 : Int64;
     Property AsScientific : String read GetValueScientific;
     Property AsDecimal : String read GetValuedecimal;
+    function AsDouble : Double;
 
     // properties
     Function IsZero : Boolean;
@@ -155,23 +154,47 @@ function StringIsDecimal(s : String) : Boolean;
 
 Implementation
 
-function StringIsDecimal(s : String) : Boolean;
+function SimpleStringIsDecimal(s : String; allowDec : boolean) : boolean;
 var
   bDec : Boolean;
   i : integer;
 Begin
+  if s.StartsWith('+') or s.StartsWith('-')  then
+    delete(s, 1, 1);
+  if s = '' then
+    exit(false);
+
   bDec := false;
   result := true;
   for i := 1 to length(s) Do
   begin
-    if not (
-       ((i = 1) and (s[i] = '-')) or
-       (not bDec and (s[i] = '.')) or
-       CharInSet(s[i], ['0'..'9'])) Then
-      result := false;
-    bdec := s[i] = '.';
-  End;
-End;
+    if not (CharInSet(s[i], ['0'..'9'])) then
+      if s[i] <> '.' then
+        exit(false)
+      else if bDec then
+        exit(false)
+      else
+        bDec := true;
+  end;
+end;
+
+function StringIsDecimal(s : String) : Boolean;
+var
+  l, r : String;
+begin
+  if (s.Contains('e')) then
+  begin
+    StringSplit(s, 'e', l, r);
+    result := SimpleStringIsDecimal(l, true) and SimpleStringIsDecimal(r, false)
+  end
+  else if (s.Contains('e')) or (s.Contains('E')) then
+  begin
+    StringSplit(s, 'E', l, r);
+    result := SimpleStringIsDecimal(l, true) and SimpleStringIsDecimal(r, false)
+  end
+  else
+    result := SimpleStringIsDecimal(s, true);
+end;
 
 
 class function TSmartDecimalHelper.CheckValue(sValue: String): boolean;
@@ -1092,6 +1115,11 @@ begin
   result := r;
 end;
 
+function TSmartDecimalHelper.AsDouble: Double;
+begin
+  result := StrToFloat(AsScientific);
+end;
+
 function TSmartDecimalHelper.AsInt64: Int64;
 var
   t : TSmartDecimal;
@@ -1124,19 +1152,16 @@ end;
 
 class Function TSmartDecimalHelper.valueOf(value : String) : TSmartDecimal;
 begin
-  ZeroMemory(@result, sizeof(TSmartDecimal));
   result.SetValue(value);
 end;
 
 class Function TSmartDecimalHelper.valueOf(value : Integer) : TSmartDecimal;
 begin
-  ZeroMemory(@result, sizeof(TSmartDecimal));
   result.SetValue(inttostr(value));
 end;
 
 class Function TSmartDecimalHelper.valueOf(value : int64) : TSmartDecimal;
 begin
-  ZeroMemory(@result, sizeof(TSmartDecimal));
   result.SetValue(inttostr(value));
 end;
 

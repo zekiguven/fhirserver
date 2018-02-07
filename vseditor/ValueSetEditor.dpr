@@ -1,3 +1,30 @@
+{
+Copyright (c) 2017+, Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
 program ValueSetEditor;
 
 {
@@ -33,10 +60,10 @@ uses
   VTAccessibilityFactory in '..\Libraries\treeview\Source\VTAccessibilityFactory.pas',
   VTHeaderPopup in '..\Libraries\treeview\Source\VTHeaderPopup.pas',
   FHIRBase in '..\reference-platform\dstu2\FHIRBase.pas',
-  FHIRClient in '..\reference-platform\dstu2\FHIRClient.pas',
+  FHIRClient in '..\reference-platform\client\FHIRClient.pas',
   FHIRConstants in '..\reference-platform\dstu2\FHIRConstants.pas',
   FHIRDigitalSignatures in '..\reference-platform\dstu2\FHIRDigitalSignatures.pas',
-  FHIRLang in '..\reference-platform\dstu2\FHIRLang.pas',
+  FHIRLang in '..\reference-platform\support\FHIRLang.pas',
   FHIRParser in '..\reference-platform\dstu2\FHIRParser.pas',
   FHIRParserBase in '..\reference-platform\dstu2\FHIRParserBase.pas',
   FHIRResources in '..\reference-platform\dstu2\FHIRResources.pas',
@@ -46,7 +73,7 @@ uses
   FHIRUtilities in '..\reference-platform\dstu2\FHIRUtilities.pas',
   FHIRWorkerContext in '..\reference-platform\dstu2\FHIRWorkerContext.pas',
   NarrativeGenerator in '..\reference-platform\dstu2\NarrativeGenerator.pas',
-  SCIMObjects in '..\reference-platform\dstu2\SCIMObjects.pas',
+  SCIMObjects in '..\reference-platform\support\SCIMObjects.pas',
   DecimalSupport in '..\reference-platform\Support\DecimalSupport.pas',
   GUIDSupport in '..\reference-platform\Support\GUIDSupport.pas',
   StringSupport in '..\reference-platform\Support\StringSupport.pas',
@@ -108,7 +135,6 @@ uses
   AdvNames in '..\reference-platform\Support\AdvNames.pas',
   AdvStringMatches in '..\reference-platform\Support\AdvStringMatches.pas',
   OIDSupport in '..\reference-platform\Support\OIDSupport.pas',
-  RegExpr in '..\reference-platform\Support\RegExpr.pas',
   TextUtilities in '..\reference-platform\Support\TextUtilities.pas',
   ParseMap in '..\reference-platform\Support\ParseMap.pas',
   JWT in '..\reference-platform\Support\JWT.pas',
@@ -117,7 +143,7 @@ uses
   AdvStringObjectMatches in '..\reference-platform\Support\AdvStringObjectMatches.pas',
   HMAC in '..\reference-platform\Support\HMAC.pas',
   libeay32 in '..\reference-platform\Support\libeay32.pas',
-  FHIRSecurity in '..\reference-platform\dstu2\FHIRSecurity.pas',
+  FHIRSecurity in '..\reference-platform\support\FHIRSecurity.pas',
   MsXmlParser in '..\reference-platform\Support\MsXmlParser.pas',
   AdvMemories in '..\reference-platform\Support\AdvMemories.pas',
   XMLBuilder in '..\reference-platform\Support\XMLBuilder.pas',
@@ -151,15 +177,45 @@ uses
   MimeMessage in '..\reference-platform\Support\MimeMessage.pas',
   FHIRPath in '..\reference-platform\dstu2\FHIRPath.pas',
   FHIRProfileUtilities in '..\reference-platform\dstu2\FHIRProfileUtilities.pas',
-  SmartOnFhirUtilities in '..\reference-platform\dstu2\SmartOnFhirUtilities.pas',
-  ClosureManagerFrm in 'ClosureManagerFrm.pas' {ClosureManagerForm},
+  SmartOnFhirUtilities in '..\reference-platform\client\SmartOnFhirUtilities.pas',
   ConceptLookupFrm in 'ConceptLookupFrm.pas' {ConceptLookupForm},
   NewServerForm in 'NewServerForm.pas' {frmNewServer},
   QuestionnaireBuilder in '..\reference-platform\dstu2\QuestionnaireBuilder.pas',
   RDFUtilities in '..\reference-platform\support\RDFUtilities.pas',
-  FHIRXhtml in '..\reference-platform\dstu2\FHIRXhtml.pas',
+  FHIRXhtml in '..\reference-platform\support\FHIRXhtml.pas',
   FHIRContext in '..\reference-platform\dstu2\FHIRContext.pas',
-  FHIRMetaModel in '..\reference-platform\dstu2\FHIRMetaModel.pas';
+  FHIRMetaModel in '..\reference-platform\dstu2\FHIRMetaModel.pas',
+  JclSysUtils in '..\Libraries\jcl\JclSysUtils.pas',
+  JclBase in '..\Libraries\jcl\JclBase.pas',
+  JclResources in '..\Libraries\jcl\JclResources.pas',
+  JclSynch in '..\Libraries\jcl\JclSynch.pas',
+  JclWin32 in '..\Libraries\jcl\JclWin32.pas',
+  JclLogic in '..\Libraries\jcl\JclLogic.pas',
+  JclRegistry in '..\Libraries\jcl\JclRegistry.pas',
+  JclStrings in '..\Libraries\jcl\JclStrings.pas',
+  JclAnsiStrings in '..\Libraries\jcl\JclAnsiStrings.pas',
+  JclStreams in '..\Libraries\jcl\JclStreams.pas',
+  JclStringConversions in '..\Libraries\jcl\JclStringConversions.pas',
+  JclCharsets in '..\Libraries\jcl\JclCharsets.pas',
+  JclMath in '..\Libraries\jcl\JclMath.pas',
+  Jcl8087 in '..\Libraries\jcl\Jcl8087.pas',
+  JclConsole in '..\Libraries\jcl\JclConsole.pas',
+  JclFileUtils in '..\Libraries\jcl\JclFileUtils.pas',
+  JclShell in '..\Libraries\jcl\JclShell.pas',
+  JclWideStrings in '..\Libraries\jcl\JclWideStrings.pas',
+  JclUnicode in '..\Libraries\jcl\JclUnicode.pas',
+  JclSysInfo in '..\Libraries\jcl\JclSysInfo.pas',
+  Snmp in '..\Libraries\jcl\Snmp.pas',
+  JclIniFiles in '..\Libraries\jcl\JclIniFiles.pas',
+  JclSecurity in '..\Libraries\jcl\JclSecurity.pas',
+  JclDateTime in '..\Libraries\jcl\JclDateTime.pas',
+  JclMapi in '..\Libraries\jcl\JclMapi.pas',
+  JclPeImage in '..\Libraries\jcl\JclPeImage.pas',
+  JclUnitVersioning in '..\Libraries\jcl\JclUnitVersioning.pas',
+  JclUnitVersioningProviders in '..\Libraries\jcl\JclUnitVersioningProviders.pas',
+  JclDebug in '..\Libraries\jcl\JclDebug.pas',
+  JclTD32 in '..\Libraries\jcl\JclTD32.pas',
+  JclHookExcept in '..\Libraries\jcl\JclHookExcept.pas';
 
 {$R *.res}
 
@@ -173,7 +229,6 @@ begin
   Application.CreateForm(TValueSetEditorAboutForm, ValueSetEditorAboutForm);
   Application.CreateForm(TValueSetEditorWelcomeForm, ValueSetEditorWelcomeForm);
   Application.CreateForm(TForm2, Form2);
-  Application.CreateForm(TClosureManagerForm, ClosureManagerForm);
   Application.CreateForm(TConceptLookupForm, ConceptLookupForm);
   Application.CreateForm(TfrmNewServer, frmNewServer);
   Application.Run;

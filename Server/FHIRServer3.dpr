@@ -1,5 +1,10 @@
 // JCL_DEBUG_EXPERT_INSERTJDBG ON
 program FHIRServer3;
+
+{$IFDEF FPC}
+  {$MODE Delphi}
+{$ENDIF}
+
 {
 Copyright (c) 2001-2013, Health Intersections Pty Ltd (http://www.healthintersections.com.au)
 All rights reserved.
@@ -34,61 +39,56 @@ POSSIBILITY OF SUCH DAMAGE.
 
 
 {
+todo:
+STU3 draft:
+ - check using UTF-8 in URLs
+ - check prefer = operation outcome
+ - check turtle support
+ - check versioning in capabilities statement
+ - check elements & summary on read/vread
+ - check delete return codes
+ - changes to id element on update
+ - check conditional delete flag.
+ - search on multiple resource types
+ - check over transaction handling
+ - dateTIme parameter on history
+ - check use of 401 instead of 403
+ - check handling of unsupported parameters
+ - check implementations of sa and be prefixes in search
+ - review searching on names
+ - check search by canonical URL and version
+ - add searching for token system|
+ - reverse chaining
+ - check _list parameter
+ - check sorting
+ - check handling count = 0
+ - composite search parameter work
+ - test flag support
+ - check document operation
+ - check handling binary parameter
+ - update FHIRPath
+ - string validation rules
+ - Both _include and _revInclude use the wild card "*" for the search parameter name, indicating that any search parameter of type=reference be included.
 
-bug list:
 
-Hi Grahame,
-[12:05:43 PM] David Hay: any reason why this query doesn’t return any expansion:
-[12:05:51 PM] David Hay: http://fhir-dev.healthintersections.com.au/openValueSet/valueset-medication-codes/$expand?filter=amox
-[12:05:59 PM] David Hay: This one works just fine:
-[12:06:07 PM] David Hay: http://fhir-dev.healthintersections.com.au/openValueSet/valueset-condition-code/$expand?filter=asth
-[12:12:43 PM] David Hay: also: valueset-medication-form-codes
-[12:12:50 PM] David Hay: are actually route codes…
+
+https://chat.fhir.org/#narrow/stream/implementers/subject/search.20on.20several.20resource.20types.3F
 
 
 
- * multiple duplicate tags
- * Try dereferencing http://hl7.org/fhir/questionnaire-extensions#answerFormat -- 404
-    Our URLs for extensions are broken
-    They should all be http://hl7.org/fhir/Profile/someid#extension
+Add reverse chaining
+Grahame, I see you don't respond to either of the following:
+ http://hl7connect.healthintersections.com.au/svc/fhir/condition/search?subject=patient/350
+ http://hl7connect.healthintersections.com.au/svc/fhir/condition/search?subject=patient/@350
+cross resource search
+ucum search
 
-[2:25:55 PM] Brian Postlethwaite: http://fhir.healthintersections.com.au/open/MedicationStatement/_search?_count=100&patient:Patient._id=163
- is there a way to issue a query and include _since>= on it?
-
-
-[1:33:14 AM] Ewout Kramer: paging on your server seems to reverse url and relation:
-[1:33:14 AM] Ewout Kramer: <relation value="http://fhir-dev.healthintersections.com.au/open/DiagnosticReport/_search?_format=text/xml+fhir&amp;search-id=e9a68b91-6777-4fbf-a4e2-de31e44829&amp;&amp;search-sort=_id" xmlns="http://hl7.org/fhir" />
-[1:33:18 AM] Ewout Kramer: <url value="self" xmlns="http://hl7.org/fhir" />
-
-
-build validator jar not in validation pack
-
-
-Change record:\
-  3-May 2015
-    * fix string searching - case and accent insensitive
-
-  2-May 2014
-    * fix search / last
-    * rebuild history to work like search (modify search tables too)
-
-  19-April 2014
-    * add Questionnaire web interface (Lloyd's transform)
-    * fix bug indexing patient compartment
-  18-April 2014
-    * pick up tags on PUT/POST and handle them properly
-    * fix tag functionality in Web UI
-    * reject unknown attributes
-    * fix problem where you couldn't vread an old version of a resource that is currently deleted
-    * fix compartment searches looking for plural name instead of singular name e.g.http://hl7connect.healthintersections.com.au/open/Patient/1053/Observation[s]
-    * fix mime type on content element in atom feed
 }
 
 uses
   FastMM4 in '..\Libraries\FMM\FastMM4.pas',
-  FastMM4Messages in '..\Libraries\FMM\FastMM4Messages.pas',
   Windows,
-  System.SysUtils,
+  SysUtils,
   Classes,
   IdSSLOpenSSLHeaders,
   JclDebug,
@@ -100,7 +100,6 @@ uses
   SystemSupport in '..\reference-platform\Support\SystemSupport.pas',
   DateSupport in '..\reference-platform\Support\DateSupport.pas',
   MemorySupport in '..\reference-platform\Support\MemorySupport.pas',
-  ErrorSupport in '..\reference-platform\Support\ErrorSupport.pas',
   ThreadSupport in '..\reference-platform\Support\ThreadSupport.pas',
   BytesSupport in '..\reference-platform\Support\BytesSupport.pas',
   AdvStringBuilders in '..\reference-platform\Support\AdvStringBuilders.pas',
@@ -131,8 +130,6 @@ uses
   AdvExclusiveCriticalSections in '..\reference-platform\Support\AdvExclusiveCriticalSections.pas',
   AdvThreads in '..\reference-platform\Support\AdvThreads.pas',
   AdvSignals in '..\reference-platform\Support\AdvSignals.pas',
-  AdvSynchronizationRegistries in '..\reference-platform\Support\AdvSynchronizationRegistries.pas',
-  AdvTimeControllers in '..\reference-platform\Support\AdvTimeControllers.pas',
   AdvInt64Matches in '..\reference-platform\Support\AdvInt64Matches.pas',
   AdvLargeIntegerMatches in '..\reference-platform\Support\AdvLargeIntegerMatches.pas',
   AdvStringLargeIntegerMatches in '..\reference-platform\Support\AdvStringLargeIntegerMatches.pas',
@@ -160,28 +157,22 @@ uses
   AdvZipWorkers in '..\reference-platform\Support\AdvZipWorkers.pas',
   GUIDSupport in '..\reference-platform\Support\GUIDSupport.pas',
   DecimalSupport in '..\reference-platform\Support\DecimalSupport.pas',
-  DateAndTime in '..\reference-platform\Support\DateAndTime.pas',
-  KDate in '..\reference-platform\Support\KDate.pas',
   HL7V2DateSupport in '..\reference-platform\Support\HL7V2DateSupport.pas',
   MsXmlParser in '..\reference-platform\Support\MsXmlParser.pas',
   XMLBuilder in '..\reference-platform\Support\XMLBuilder.pas',
   AdvWinInetClients in '..\reference-platform\Support\AdvWinInetClients.pas',
-  MsXmlBuilder in '..\reference-platform\Support\MsXmlBuilder.pas',
   AdvXmlBuilders in '..\reference-platform\Support\AdvXmlBuilders.pas',
   AdvJSON in '..\reference-platform\Support\AdvJSON.pas',
   AfsResourceVolumes in '..\reference-platform\Support\AfsResourceVolumes.pas',
   AfsVolumes in '..\reference-platform\Support\AfsVolumes.pas',
   AfsStreamManagers in '..\reference-platform\Support\AfsStreamManagers.pas',
   AdvObjectMatches in '..\reference-platform\Support\AdvObjectMatches.pas',
-  RegExpr in '..\reference-platform\Support\RegExpr.pas',
   TextUtilities in '..\reference-platform\Support\TextUtilities.pas',
-  FHIROperation in 'FHIROperation.pas',
   AdvIntegerObjectMatches in '..\reference-platform\Support\AdvIntegerObjectMatches.pas',
   AdvStringObjectMatches in '..\reference-platform\Support\AdvStringObjectMatches.pas',
   FHIRIndexManagers in 'FHIRIndexManagers.pas',
   AdvNames in '..\reference-platform\Support\AdvNames.pas',
   UcumServices in '..\Libraries\ucum\UcumServices.pas',
-  AdvBinaryFilers in '..\reference-platform\Support\AdvBinaryFilers.pas',
   AdvClassLists in '..\reference-platform\Support\AdvClassLists.pas',
   AdvPointers in '..\reference-platform\Support\AdvPointers.pas',
   UcumHandlers in '..\Libraries\ucum\UcumHandlers.pas',
@@ -196,10 +187,6 @@ uses
   SnomedServices in '..\Libraries\Snomed\SnomedServices.pas',
   InternetFetcher in '..\reference-platform\Support\InternetFetcher.pas',
   FacebookSupport in '..\reference-platform\Support\FacebookSupport.pas',
-  DCPsha256 in '..\Libraries\DCP\DCPsha256.pas',
-  DCPcrypt2 in '..\Libraries\DCP\DCPcrypt2.pas',
-  DCPconst in '..\Libraries\DCP\DCPconst.pas',
-  DCPbase64 in '..\Libraries\DCP\DCPbase64.pas',
   SystemService in '..\reference-platform\Support\SystemService.pas',
   ServiceController in '..\reference-platform\Support\ServiceController.pas',
   AdvIntegerLists in '..\reference-platform\Support\AdvIntegerLists.pas',
@@ -210,22 +197,16 @@ uses
   KDBDialects in '..\reference-platform\Support\KDBDialects.pas',
   KDBLogging in '..\Libraries\db\KDBLogging.pas',
   KDBManager in '..\Libraries\db\KDBManager.pas',
-  KDBOdbcExpress in '..\Libraries\db\KDBOdbcExpress.pas',
   KDBUtils in '..\Libraries\db\KDBUtils.pas',
   KSettings in '..\Libraries\db\KSettings.pas',
-  OdbcCore in '..\Libraries\db\OdbcCore.pas',
-  OdbcExtras in '..\Libraries\db\OdbcExtras.pas',
-  OdbcHeaders in '..\Libraries\db\OdbcHeaders.pas',
-  OdbcImplementation in '..\Libraries\db\OdbcImplementation.pas',
   CurrencySupport in '..\reference-platform\Support\CurrencySupport.pas',
-  FHIRDataStore in 'FHIRDataStore.pas',
+  FHIRNativeStorage in 'FHIRNativeStorage.pas',
   SnomedImporter in '..\Libraries\snomed\SnomedImporter.pas',
   AdvProfilers in '..\reference-platform\Support\AdvProfilers.pas',
   AnsiStringBuilder in '..\reference-platform\Support\AnsiStringBuilder.pas',
   AdvIntegerMatches in '..\reference-platform\Support\AdvIntegerMatches.pas',
   SnomedPublisher in '..\Libraries\snomed\SnomedPublisher.pas',
   SnomedExpressions in '..\Libraries\snomed\SnomedExpressions.pas',
-  FhirServerTests in 'FhirServerTests.pas',
   HTMLPublisher in '..\reference-platform\Support\HTMLPublisher.pas',
   LoincImporter in '..\Libraries\loinc\LoincImporter.pas',
   LoincPublisher in '..\Libraries\loinc\LoincPublisher.pas',
@@ -253,8 +234,6 @@ uses
   XMLSupport in '..\reference-platform\Support\XMLSupport.pas',
   DigitalSignatures in '..\reference-platform\Support\DigitalSignatures.pas',
   UriServices in 'UriServices.pas',
-  CvxServices in 'CvxServices.pas',
-  USStateCodeServices in 'USStateCodeServices.pas',
   UniiServices in 'UniiServices.pas',
   RxNormServices in 'RxNormServices.pas',
   OIDSupport in '..\reference-platform\Support\OIDSupport.pas',
@@ -264,31 +243,33 @@ uses
   FHIRSubscriptionManager in 'FHIRSubscriptionManager.pas',
   ServerValidator in 'ServerValidator.pas',
   IdWebSocket in '..\reference-platform\Support\IdWebSocket.pas',
-  MsXML in '..\reference-platform\Support\MsXML.pas',
   MimeMessage in '..\reference-platform\Support\MimeMessage.pas',
   kCritSct in '..\reference-platform\Support\kCritSct.pas',
   QuestionnaireBuilder in '..\reference-platform\dstu3\QuestionnaireBuilder.pas',
-  SCIMObjects in '..\reference-platform\dstu3\SCIMObjects.pas',
+  SCIMObjects in '..\reference-platform\support\SCIMObjects.pas',
   NarrativeGenerator in '..\reference-platform\dstu3\NarrativeGenerator.pas',
-  FHIRSecurity in '..\reference-platform\dstu3\FHIRSecurity.pas',
+  FHIRSecurity in '..\reference-platform\support\FHIRSecurity.pas',
   FHIRNarrativeGenerator in '..\reference-platform\dstu3\FHIRNarrativeGenerator.pas',
-  SmartOnFhirUtilities in '..\reference-platform\dstu3\SmartOnFhirUtilities.pas',
+  SmartOnFhirUtilities in '..\reference-platform\client\SmartOnFhirUtilities.pas',
   FhirPath in '..\reference-platform\dstu3\FhirPath.pas',
   FHIRTags in '..\reference-platform\dstu3\FHIRTags.pas',
   FHIRProfileUtilities in '..\reference-platform\dstu3\FHIRProfileUtilities.pas',
-  FHIRBase in '..\reference-platform\dstu3\FHIRBase.pas',
+  FHIRBase in '..\reference-platform\support\FHIRBase.pas',
   FHIRTypes in '..\reference-platform\dstu3\FHIRTypes.pas',
   FHIRResources in '..\reference-platform\dstu3\FHIRResources.pas',
-  FHIRParser in '..\reference-platform\dstu3\FHIRParser.pas',
-  FHIRParserBase in '..\reference-platform\dstu3\FHIRParserBase.pas',
+  FHIRParser in '..\reference-platform\support\FHIRParser.pas',
+  FHIRParserXml in '..\reference-platform\dstu3\FHIRParserXml.pas',
+  FHIRParserJson in '..\reference-platform\dstu3\FHIRParserJson.pas',
+  FHIRParserTurtle in '..\reference-platform\dstu3\FHIRParserTurtle.pas',
+  FHIRParserBase in '..\reference-platform\support\FHIRParserBase.pas',
   FHIRConstants in '..\reference-platform\dstu3\FHIRConstants.pas',
-  FHIRSupport in '..\reference-platform\dstu3\FHIRSupport.pas',
-  FHIRLang in '..\reference-platform\dstu3\FHIRLang.pas',
+  FHIRSupport in '..\reference-platform\support\FHIRSupport.pas',
+  FHIRLang in '..\reference-platform\support\FHIRLang.pas',
   FHIRUtilities in '..\reference-platform\dstu3\FHIRUtilities.pas',
-  FHIRClient in '..\reference-platform\dstu3\FHIRClient.pas',
+  FHIRClient in '..\reference-platform\client\FHIRClient.pas',
   FHIRValidator in '..\reference-platform\dstu3\FHIRValidator.pas',
   ClosureManager in 'ClosureManager.pas',
-  CDSHooksUtilities in '..\reference-platform\dstu3\CDSHooksUtilities.pas',
+  CDSHooksUtilities in '..\reference-platform\support\CDSHooksUtilities.pas',
   MarkdownProcessor in '..\..\markdown\source\MarkdownProcessor.pas',
   MarkdownDaringFireball in '..\..\markdown\source\MarkdownDaringFireball.pas',
   MarkdownDaringFireballTests in '..\..\markdown\source\MarkdownDaringFireballTests.pas',
@@ -297,20 +278,87 @@ uses
   RDFUtilities in '..\reference-platform\support\RDFUtilities.pas',
   FHIROperations in '..\reference-platform\dstu3\FHIROperations.pas',
   FhirOpBase in '..\reference-platform\dstu3\FhirOpBase.pas',
-  fluentpath in '..\Libraries\fluentpath.pas',
   FHIRIndexInformation in '..\reference-platform\dstu3\FHIRIndexInformation.pas',
   FHIRMetaModel in '..\reference-platform\dstu3\FHIRMetaModel.pas',
-  FHIRXhtml in '..\reference-platform\dstu3\FHIRXhtml.pas',
+  FHIRXhtml in '..\reference-platform\support\FHIRXhtml.pas',
   FHIRStructureMapUtilities in '..\reference-platform\dstu3\FHIRStructureMapUtilities.pas',
   FHIRContext in '..\reference-platform\dstu3\FHIRContext.pas',
   XmlPatch in '..\reference-platform\support\XmlPatch.pas',
-  FHIRLog in 'FHIRLog.pas';
+  FHIRLog in '..\reference-platform\support\FHIRLog.pas',
+  FHIRAuthMap in '..\reference-platform\dstu3\FHIRAuthMap.pas',
+  AdvZipWriters in '..\reference-platform\support\AdvZipWriters.pas',
+  ObservationStatsEvaluator in 'ObservationStatsEvaluator.pas',
+  OpenMHealthServer in 'OpenMHealthServer.pas',
+  DifferenceEngine in '..\reference-platform\support\DifferenceEngine.pas',
+  ACIRServices in 'ACIRServices.pas',
+  ReverseClient in 'ReverseClient.pas',
+  FHIRStorageService in 'FHIRStorageService.pas',
+  FHIRServerContext in 'FHIRServerContext.pas',
+  ExampleBridge in '..\bridge\ExampleBridge.pas',
+  FHIRSessionManager in 'FHIRSessionManager.pas',
+  FHIRTagManager in 'FHIRTagManager.pas',
+  FHIRUserProvider in 'FHIRUserProvider.pas',
+  GraphQL in '..\reference-platform\support\GraphQL.pas',
+  FastMM4Messages in '..\Libraries\FMM\FastMM4Messages.pas',
+  FHIRGraphQL in '..\reference-platform\support\FHIRGraphQL.pas',
+  ParserSupport in '..\reference-platform\support\ParserSupport.pas',
+  MXML in '..\reference-platform\support\MXML.pas',
+  MXmlBuilder in '..\reference-platform\support\MXmlBuilder.pas',
+  MarkdownCommonMark in '..\..\markdown\source\MarkdownCommonMark.pas',
+  FHIRCodeGenerator in '..\reference-platform\support\FHIRCodeGenerator.pas',
+  CDSHooksServer in 'CDSHooksServer.pas',
+  CDSHooksServices in 'CDSHooksServices.pas',
+  TurtleParser in '..\reference-platform\support\TurtleParser.pas',
+  CertificateSupport in '..\reference-platform\support\CertificateSupport.pas',
+  ClientApplicationVerifier in '..\Libraries\security\ClientApplicationVerifier.pas',
+  JWTService in 'JWTService.pas',
+  CDSHooksClientManager in '..\reference-platform\support\CDSHooksClientManager.pas',
+  HackingHealthLogic in 'Modules\HackingHealthLogic.pas',
+  ApplicationCache in 'ApplicationCache.pas',
+  SCrypt in '..\Libraries\security\SCrypt.pas',
+  TerminologyOperations in 'TerminologyOperations.pas',
+  WebSourceProvider in 'WebSourceProvider.pas',
+  FHIRIndexBase in '..\reference-platform\support\FHIRIndexBase.pas',
+  ErrorSupport in '..\reference-platform\Support\ErrorSupport.pas',
+  KDBOdbc in '..\Libraries\db\KDBOdbc.pas',
+  ODBCObjects in '..\Libraries\db\ODBCObjects.pas',
+  OdbcHeaders in '..\Libraries\db\OdbcHeaders.pas',
+  KDBSQLite in '..\Libraries\db\KDBSQLite.pas',
+  SQLite3Wrap in '..\Libraries\db\SQLite3Wrap.pas',
+  SQLite3 in '..\Libraries\db\SQLite3.pas',
+  SQLite3Utils in '..\Libraries\db\SQLite3Utils.pas',
+  QuestionnaireRenderer in '..\reference-platform\dstu3\QuestionnaireRenderer.pas',
+  FHIRDeIdentifier in '..\reference-platform\common\FHIRDeIdentifier.pas',
+  ServerPostHandlers in 'ServerPostHandlers.pas',
+  ICD10Services in 'ICD10Services.pas',
+  FHIRJavascript in '..\Libraries\js\FHIRJavascript.pas',
+  FHIRJavascriptReg in '..\reference-platform\dstu3\FHIRJavascriptReg.pas',
+  AdvJavascript in '..\Libraries\js\AdvJavascript.pas',
+  ServerJavascriptHost in 'ServerJavascriptHost.pas',
+  ServerEventJs in 'ServerEventJs.pas',
+  Javascript in '..\Libraries\js\Javascript.pas',
+  ChakraCommon in '..\Libraries\js\ChakraCommon.pas',
+  FHIRClientJs in '..\Libraries\js\FHIRClientJs.pas',
+  JNI in '..\Libraries\java\JNI.pas',
+  JNIWrapper in '..\Libraries\java\JNIWrapper.pas',
+  JavaRuntime in '..\Libraries\java\JavaRuntime.pas',
+  JUtils in '..\Libraries\java\JUtils.pas',
+  myUTF8Strings in '..\Libraries\java\myUTF8Strings.pas',
+  JavaBridge in 'JavaBridge.pas',
+  FHIRFactory in '..\reference-platform\support\FHIRFactory.pas',
+  Logging in 'Logging.pas';
 
 begin
+  logfile := IncludeTrailingPathDelimiter(SystemTemp)+'fhirserver.log';
+  if ParamCount = 0 then
+  begin
+    filelog := true;
+    logt('testing');
+  end;
   JclStartExceptionTracking;
   IdOpenSSLSetLibPath(ExtractFilePath(Paramstr(0)));
   try
-    SetConsoleTitle('FHIR Server DSTU3');
+    SetConsoleTitle('FHIR Server R3');
     ExecuteFhirServer;
   except
     on E: Exception do

@@ -9,6 +9,7 @@
   <meta charset="utf-8"/>
   <meta content="width=device-width, initial-scale=1.0" name="viewport"/>
   <meta content="http://hl7.org/fhir" name="author"/>
+  <meta charset="utf-8" http-equiv="X-UA-Compatible" content="IE=edge" />
 
   <link rel="stylesheet" href="/fhir.css"/>
 
@@ -63,7 +64,7 @@
   <a href="/" style="color: gold">Server Home</a>   &nbsp;|&nbsp;
   <a href="http://www.healthintersections.com.au" style="color: gold">[%id%]</a> FHIR Server
   &nbsp;|&nbsp;
-  <a href="/index.html" style="color: gold">FHIR Version [%ver%]</a>
+  <a href="[%specurl%]" style="color: gold">FHIR Version [%ver%]</a>
   &nbsp;
 		</div>  <!-- /container -->
 		</div>  <!-- /container -->
@@ -78,7 +79,7 @@
   <div class="col-9">
 <h2>[%username%] Account Details</h2>
 
-<form method="POST" action="/oauth2/auth_choice">
+<form method="POST" action="[%/oauth2%]/auth_choice">
   <input type="hidden" name="form" value="true"/>
   <table>
    <tr>
@@ -102,7 +103,7 @@
 		<div class="container">  <!-- container -->
 			<div class="inner-wrapper">
 				<p>
-        <a href="/" style="color: gold">Server Home</a>.&nbsp;|&nbsp;FHIR &copy; HL7.org 2011+. &nbsp;|&nbsp; This server based on version <a href="/index.html" style="color: gold">[%ver%]</a>
+        <a href="/" style="color: gold">Server Home</a>.&nbsp;|&nbsp;FHIR &copy; HL7.org 2011+. &nbsp;|&nbsp; This server based on version <a href="[%specurl%]" style="color: gold">[%ver%]</a>
         </span>
         </p>
 			</div>  <!-- /inner-wrapper -->

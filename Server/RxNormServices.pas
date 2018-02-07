@@ -1,14 +1,43 @@
 unit RxNormServices;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
-  SysUtils, Classes,
-  StringSupport,
+  SysUtils, Classes, Generics.Collections,
+  StringSupport, ThreadSupport,
   AdvObjects, AdvObjectLists, AdvExceptions, AdvGenerics,
-  YuStemmer, DateAndTime,
+  YuStemmer, 
   KDBManager,
-  FHIRTypes, FHIRResources, CDSHooksUtilities,
+  FHIRTypes, FHIRResources, FHIROperations, FHIRUtilities, CDSHooksUtilities,
   TerminologyServices;
 
 type
@@ -58,15 +87,15 @@ type
     function ChildCount(context : TCodeSystemProviderContext) : integer; override;
     function getcontext(context : TCodeSystemProviderContext; ndx : integer) : TCodeSystemProviderContext; override;
 //    function system(context : TCodeSystemProviderContext) : String; override;
-    function getDisplay(code : String):String; override;
+    function getDisplay(code : String; lang : String):String; override;
     function getDefinition(code : String):String; override;
-    function locate(code : String) : TCodeSystemProviderContext; override;
+    function locate(code : String; var message : String) : TCodeSystemProviderContext; override;
     function locateIsA(code, parent : String) : TCodeSystemProviderContext; override;
     function IsAbstract(context : TCodeSystemProviderContext) : boolean; override;
     function Code(context : TCodeSystemProviderContext) : string; override;
-    function Display(context : TCodeSystemProviderContext) : string; override;
-    procedure Displays(code : String; list : TStringList); override;
-    procedure Displays(context : TCodeSystemProviderContext; list : TStringList); override;
+    function Display(context : TCodeSystemProviderContext; lang : String) : string; override;
+    procedure Displays(code : String; list : TStringList; lang : String); override;
+    procedure Displays(context : TCodeSystemProviderContext; list : TStringList; lang : String); override;
     function Definition(context : TCodeSystemProviderContext) : string; override;
 
     function getPrepContext : TCodeSystemProviderFilterPreparationContext; override;
@@ -74,12 +103,14 @@ type
 
     function searchFilter(filter : TSearchFilterText; prep : TCodeSystemProviderFilterPreparationContext; sort : boolean) : TCodeSystemProviderFilterContext; override;
     function filter(prop : String; op : TFhirFilterOperatorEnum; value : String; prep : TCodeSystemProviderFilterPreparationContext) : TCodeSystemProviderFilterContext; override;
-    function filterLocate(ctxt : TCodeSystemProviderFilterContext; code : String) : TCodeSystemProviderContext; override;
+    function filterLocate(ctxt : TCodeSystemProviderFilterContext; code : String; var message : String) : TCodeSystemProviderContext; override;
     function FilterMore(ctxt : TCodeSystemProviderFilterContext) : boolean; override;
     function FilterConcept(ctxt : TCodeSystemProviderFilterContext): TCodeSystemProviderContext; override;
     function InFilter(ctxt : TCodeSystemProviderFilterContext; concept : TCodeSystemProviderContext) : Boolean; override;
     function isNotClosed(textFilter : TSearchFilterText; propFilter : TCodeSystemProviderFilterContext = nil) : boolean; override;
-    procedure getCDSInfo(card : TCDSHookCard; baseURL, code, display : String); override;
+    procedure getCDSInfo(card : TCDSHookCard; lang, baseURL, code, display : String); override;
+    procedure extendLookup(ctxt : TCodeSystemProviderContext; lang : String; props : TList<String>; resp : TFHIRLookupOpResponse); override;
+    //function subsumes(codeA, codeB : String) : String; override;
 
     procedure Close(ctxt : TCodeSystemProviderFilterPreparationContext); override;
     procedure Close(ctxt : TCodeSystemProviderContext); override;
@@ -102,7 +133,7 @@ type
     function name(context : TCodeSystemProviderContext) : String; override;
   end;
 
-procedure generateRxStems(db : TKDBManager);
+procedure generateRxStems(db : TKDBManager; callback : TInstallerCallback = nil);
 
 implementation
 
@@ -132,12 +163,12 @@ begin
   end;
 end;
 
-procedure generateRxStems(db : TKDBManager);
+procedure generateRxStems(db : TKDBManager; callback : TInstallerCallback = nil);
 var
   stems, list : TStringList;
   qry : TKDBConnection;
   stemmer : TYuStemmer_8;
-  i, j : integer;
+  i, j, c, t : integer;
 begin
   stemmer := GetStemmer_8('english');
   stems := TStringList.Create;
@@ -147,25 +178,40 @@ begin
     try
       qry.ExecSQL('delete from rxnstems');
 
+      t := qry.CountSQL('Select count(*) from rxnconso where SAB = ''RXNORM''');
+      c := 0;
+
       qry.SQL := 'select RXCUI, STR from rxnconso where SAB = ''RXNORM'''; // allow SY
       qry.Prepare;
       qry.Execute;
       i := 0;
-      write('Stemming');
+      if (assigned(callback)) then
+        callback(0, 'Stemming')
+      else
+        write('Stemming');
       while qry.FetchNext do
       begin
         makeStems(stemmer, stems, qry.ColString[2], qry.ColString[1]);
         inc(i);
-        if (i mod 10000 = 0) then
-          write('.');
+        if (i mod 1000 = 0) then
+          if assigned(callback) then
+            callback(trunc(i * 10 / t), 'Stemming')
+          else
+            write('.');
       end;
-      writeln('done');
-      writeln(inttostr(stems.Count)+' stems');
       qry.Terminate;
+      if (not assigned(callback)) then
+      begin
+        writeln('done');
+        writeln(inttostr(stems.Count)+' stems');
+      end;
 
       qry.SQL := 'insert into rxnstems (stem, cui) values (:stem, :cui)';
       qry.Prepare;
-      write('Storing');
+      if (assigned(callback)) then
+        callback(10, 'Storing')
+      else
+        write('Storing');
       for i := 0 to stems.count - 1 do
       begin
         list := stems.objects[i] as TStringList;
@@ -176,9 +222,15 @@ begin
           qry.Execute;
         end;
         if (i mod 100 = 0) then
-          write('.');
+          if (assigned(callback)) then
+            callback(10 + trunc(i * 90 / stems.Count), 'Storing')
+          else
+            write('.');
       end;
-      writeln('done');
+      if (assigned(callback)) then
+        callback(100, 'Done')
+      else
+        writeln('done');
       qry.Terminate;
       qry.Release;
     except
@@ -190,6 +242,8 @@ begin
       end;
     end;
   finally
+    for i := 0 to stems.Count - 1 do
+      stems.Objects[i].free;
     stems.Free;
     stemmer.Free;
     db.free;
@@ -248,7 +302,7 @@ begin
   result := '';
 end;
 
-function TUMLSServices.getDisplay(code : String):String;
+function TUMLSServices.getDisplay(code : String; lang : String):String;
 var
   qry : TKDBConnection;
 begin
@@ -276,9 +330,9 @@ begin
   result := TUMLSPrep.Create;
 end;
 
-procedure TUMLSServices.Displays(code : String; list : TStringList);
+procedure TUMLSServices.Displays(code : String; list : TStringList; lang : String);
 begin
-  list.Add(getDisplay(code));
+  list.Add(getDisplay(code, lang));
 end;
 
 
@@ -312,7 +366,7 @@ begin
   end;
 end;
 
-function TUMLSServices.locate(code : String) : TCodeSystemProviderContext;
+function TUMLSServices.locate(code : String; var message : String) : TCodeSystemProviderContext;
 var
   qry : TKDBConnection;
   res : TUMLSConcept;
@@ -372,15 +426,55 @@ begin
   inherited;
 end;
 
-function TUMLSServices.Display(context : TCodeSystemProviderContext) : string;
+function TUMLSServices.Display(context : TCodeSystemProviderContext; lang : String) : string;
 begin
   result := TUMLSConcept(context).FDisplay;
 end;
 
-procedure TUMLSServices.Displays(context: TCodeSystemProviderContext; list: TStringList);
+procedure TUMLSServices.Displays(context: TCodeSystemProviderContext; list: TStringList; lang : String);
 begin
-  list.Add(Display(context));
+  list.Add(Display(context, lang));
   list.AddStrings(TUMLSConcept(context).FOthers);
+end;
+
+procedure TUMLSServices.extendLookup(ctxt: TCodeSystemProviderContext; lang : String; props: TList<String>; resp: TFHIRLookupOpResponse);
+var
+  qry : TKDBConnection;
+  b : boolean;
+  {$IFDEF FHIR3}
+  p : TFHIRLookupOpRespProperty_;
+  {$ENDIF}
+begin
+  if hasProp(props, 'inactive', true) then
+  begin
+    qry := db.GetConnection(dbprefix+'.extendLookup');
+    try
+      qry.SQL := 'Select suppress from rxnconso where RXCUI = :code and SAB = ''RXNORM'' and TTY <> ''SY''';
+      qry.prepare;
+      qry.BindString('code', TUMLSConcept(ctxt).FCode);
+      qry.execute;
+      qry.FetchNext;
+      b := qry.colinteger[1] = 1;
+      qry.Terminate;
+      qry.Release;
+    except
+      on e : Exception do
+      begin
+        qry.Error(e);
+        recordStack(e);
+        raise;
+      end;
+    end;
+
+    {$IFDEF FHIR3}
+    p := TFHIRLookupOpRespProperty_.create;
+    resp.property_List.Add(p);
+    p.code := 'inactive';
+    p.value := BooleanToString(b);
+    {$ELSE}
+    resp.addExtension('inactive', b);
+    {$ENDIF}
+  end;
 end;
 
 function TUMLSServices.IsAbstract(context : TCodeSystemProviderContext) : boolean;
@@ -403,7 +497,7 @@ begin
   raise Exception.Create('ChildCount not supported by RXNorm'); // only used when iterating the entire code system. and RxNorm is too big
 end;
 
-procedure TUMLSServices.getCDSInfo(card: TCDSHookCard; baseURL, code, display: String);
+procedure TUMLSServices.getCDSInfo(card: TCDSHookCard; lang, baseURL, code, display: String);
 begin
 //    b.Append(#13#10+'This term definition is derived from SNOMED CT, which is copyright © 2002+ International Health Terminology Standards Development Organisation (IHTSDO)'#13#10);
   card.detail := 'Not done yet';
@@ -543,7 +637,7 @@ begin
   end;
 end;
 
-function TUMLSServices.filterLocate(ctxt : TCodeSystemProviderFilterContext; code : String) : TCodeSystemProviderContext;
+function TUMLSServices.filterLocate(ctxt : TCodeSystemProviderFilterContext; code : String; var message : String) : TCodeSystemProviderContext;
 var
   qry : TKDBConnection;
   res : TUMLSConcept;

@@ -1,26 +1,54 @@
 unit TerminologyWebServer;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
   SysUtils, Classes, System.Generics.Collections,
   ParseMap,
-  EncodeSupport, StringSupport,
-  AdvObjects, AdvStringMatches,
+  EncodeSupport, StringSupport, TextUtilities,
+  AdvObjects, AdvStringMatches, AdvNameBuffers,
   IdContext, IdCustomHTTPServer,
-  FHIRLang, FHIRContext, FHIRSupport, FHIRUtilities, FHIRResources, FHIRTypes, FHIRXhtml,
+  FHIRLang, FHIRContext, FHIRSupport, FHIRUtilities, FHIRResources, FHIRTypes, FHIRXhtml, FHIRBase,
   HtmlPublisher, SnomedPublisher, SnomedServices, LoincPublisher, LoincServices, SnomedExpressions, SnomedAnalysis,
   TerminologyServer, TerminologyServices, TerminologyServerStore, FHIRServerConstants, FHIROperations;
 
 Type
-  TReturnProcessFileEvent = procedure (response: TIdHTTPResponseInfo; session : TFhirSession; named, path: String; secure : boolean; variables: TDictionary<String, String>) of Object;
+  TReturnProcessFileEvent = procedure (request : TIdHTTPRequestInfo; response: TIdHTTPResponseInfo; session : TFhirSession; named, path: String; secure : boolean; variables: TDictionary<String, String>) of Object;
 
   TTerminologyWebServer = class (TAdvObject)
   private
-    FWorker : TWorkerContext;
+    FWorker : TFHIRWorkerContext;
     FServer : TTerminologyServer;
     FFHIRPath : String;
-    FWebDir : String;
     FReturnProcessFileEvent : TReturnProcessFileEvent;
     function asJson(r : TFHIRResource) : String;
     function asXml(r : TFHIRResource) : String;
@@ -30,9 +58,10 @@ Type
 
     function processFind(pm : TParseMap) : String;
     function processValidate(pm : TParseMap) : String;
-    function processExpand(pm : TParseMap) : String;
+    function processExpand(pm : TParseMap; lang : string) : String;
     function processTranslate(pm : TParseMap) : String;
 
+    function chooseSnomedRelease() : String;
     Procedure HandleLoincRequest(AContext: TIdContext; request: TIdHTTPRequestInfo; response: TIdHTTPResponseInfo);
     Procedure HandleSnomedRequest(AContext: TIdContext; request: TIdHTTPRequestInfo; response: TIdHTTPResponseInfo);
     Procedure HandleTxRequest(AContext: TIdContext; request: TIdHTTPRequestInfo; response: TIdHTTPResponseInfo; session : TFhirSession);
@@ -41,7 +70,7 @@ Type
 //    Procedure BuildCsByURL(html : THtmlPublisher; id : String);
 //    Procedure BuildVsByName(html : THtmlPublisher; id : String);
 //    Procedure BuildVsByURL(html : THtmlPublisher; id : String);
-    function processSnomedForTool(code : String) : String;
+    function processSnomedForTool(ss : TSnomedServices; code : String) : String;
 
     function sortVsByUrl(pA, pB : Pointer) : Integer;
     function sortVsByVer(pA, pB : Pointer) : Integer;
@@ -72,28 +101,56 @@ Type
     procedure ProcessConceptMap(AContext: TIdContext; request: TIdHTTPRequestInfo; response: TIdHTTPResponseInfo; session : TFhirSession);
     procedure ProcessHome(AContext: TIdContext; request: TIdHTTPRequestInfo; response: TIdHTTPResponseInfo; session : TFhirSession);
   public
-    constructor create(server : TTerminologyServer; Worker : TWorkerContext; BaseURL, FHIRPath, webdir : String; ReturnProcessFileEvent : TReturnProcessFileEvent); overload;
+    constructor create(server : TTerminologyServer; Worker : TFHIRWorkerContext; BaseURL, FHIRPath : String; ReturnProcessFileEvent : TReturnProcessFileEvent); overload;
     destructor Destroy; Override;
     function HandlesRequest(path : String) : boolean;
     Procedure Process(AContext: TIdContext; request: TIdHTTPRequestInfo; session : TFhirSession; response: TIdHTTPResponseInfo; secure : boolean);
-
   end;
 
 implementation
 
 uses
   FHIRLog,
-  SystemService,
   FHIRParser;
 
 { TTerminologyWebServer }
 
-constructor TTerminologyWebServer.create(server: TTerminologyServer; Worker : TWorkerContext; BaseURL, FHIRPath, WebDir : String; ReturnProcessFileEvent : TReturnProcessFileEvent);
+function TTerminologyWebServer.chooseSnomedRelease: String;
+var
+  html : THtmlPublisher;
+  ss : TSnomedServices;
+begin
+  html := THtmlPublisher.Create;
+  try
+    html.Version := SERVER_VERSION;
+    html.Header('Choose SNOMED CT Version');
+    html.StartTable(true);
+    html.StartTableRow;
+    html.AddTableCell('Choose SNOMED Edition');
+    html.AddTableCell('Version');
+    html.AddTableCell('Date');
+    html.EndTableRow;
+    for ss in FServer.Snomed do
+    begin
+      html.StartTableRow;
+      html.AddTableCellURL(ss.EditionName, '/snomed/'+ss.editionId);
+      html.AddTableCell(ss.VersionUri);
+      html.AddTableCell(ss.VersionDate);
+      html.EndTableRow;
+    end;
+    html.EndTable;
+    html.done;
+    result := html.output;
+  finally
+    html.Free;
+  end;
+end;
+
+constructor TTerminologyWebServer.create(server: TTerminologyServer; Worker : TFHIRWorkerContext; BaseURL, FHIRPath : String; ReturnProcessFileEvent : TReturnProcessFileEvent);
 begin
   create;
   FServer := server;
   FFHIRPath := FHIRPath;
-  FWebDir := WebDir;
   FReturnProcessFileEvent := ReturnProcessFileEvent;
   FServer.webBase := BaseURl;
   FWorker := worker;
@@ -162,11 +219,11 @@ begin
       else if pm.getVar('op') = 'validate' then
         vars['validate.results'] := processValidate(pm)
       else if pm.getVar('op') = 'expand' then
-        vars['expand.results'] := processExpand(pm)
+        vars['expand.results'] := processExpand(pm, request.AcceptLanguage)
       else if pm.getVar('op') = 'translate' then
         vars['translate.results'] := processTranslate(pm);
 
-      FReturnProcessFileEvent(response, session, request.Document, IncludeTrailingPathDelimiter(FWebDir) + 'txhome.html', false, vars);
+      FReturnProcessFileEvent(request, response, session, request.Document, 'txhome.html', false, vars);
     finally
       pm.Free;
     end;
@@ -192,7 +249,7 @@ begin
     finally
       cm.Free;
     end;
-    FReturnProcessFileEvent(response, session, request.Document, IncludeTrailingPathDelimiter(FWebDir) + 'tx-cm-id.html', false, vars);
+    FReturnProcessFileEvent(request, response, session, request.Document, 'tx-cm-id.html', false, vars);
   finally
     vars.Free;
   end;
@@ -215,7 +272,7 @@ begin
     finally
       vs.Free;
     end;
-    FReturnProcessFileEvent(response, session, request.Document, IncludeTrailingPathDelimiter(FWebDir) + 'tx-vs-id.html', false, vars);
+    FReturnProcessFileEvent(request, response, session, request.Document, 'tx-vs-id.html', false, vars);
   finally
     vars.Free;
   end;
@@ -238,7 +295,7 @@ begin
     finally
       cs.Free;
     end;
-    FReturnProcessFileEvent(response, session, request.Document, IncludeTrailingPathDelimiter(FWebDir) + 'tx-cs-id.html', false, vars);
+    FReturnProcessFileEvent(request, response, session, request.Document, 'tx-cs-id.html', false, vars);
   finally
     vars.Free;
   end;
@@ -283,7 +340,7 @@ begin
     finally
       html.Free;
     end;
-    FReturnProcessFileEvent(response, session, request.Document, IncludeTrailingPathDelimiter(FWebDir) + 'tx-vs.html', false, vars);
+    FReturnProcessFileEvent(request, response, session, request.Document, 'tx-vs.html', false, vars);
   finally
     vars.Free;
   end;
@@ -340,7 +397,7 @@ begin
     finally
       list.free;
     end;
-    FReturnProcessFileEvent(response, session, request.Document, IncludeTrailingPathDelimiter(FWebDir) + 'tx-vs.html', false, vars);
+    FReturnProcessFileEvent(request, response, session, request.Document, 'tx-vs.html', false, vars);
   finally
     vars.Free;
   end;
@@ -415,13 +472,13 @@ begin
     finally
       mlist.free;
     end;
-    FReturnProcessFileEvent(response, session, request.Document, IncludeTrailingPathDelimiter(FWebDir) + 'tx-vs.html', false, vars);
+    FReturnProcessFileEvent(request, response, session, request.Document, 'tx-vs.html', false, vars);
   finally
     vars.Free;
   end;
 end;
 
-function TTerminologyWebServer.processExpand(pm: TParseMap): String;
+function TTerminologyWebServer.processExpand(pm: TParseMap; lang : string): String;
 var
   res : TFHIRValueSet;
   vs : TFHIRValueSet;
@@ -432,6 +489,8 @@ begin
   try
     profile.includeDefinition := pm.GetVar('nodetails') <> '1';
     profile.limitedExpansion := true;
+    if lang <> '' then
+      profile.displayLanguage := lang;
 
     try
       res := FServer.expandVS(vs, vs.url, profile, pm.GetVar('filter'), 1000, 0, 0);
@@ -467,7 +526,7 @@ begin
     resp := TFHIRLookupOpResponse.Create;
     try
       try
-        FServer.lookupCode(coding, nil, resp);
+        FServer.lookupCode(coding, 'en', nil, resp);
         p := resp.asParams;
         try
           result := '<div>'+paramsAsHtml(p)+'</div>'#13 +
@@ -544,7 +603,7 @@ begin
     finally
       list.free;
     end;
-    FReturnProcessFileEvent(response, session, request.Document, IncludeTrailingPathDelimiter(FWebDir) + 'tx-vs.html', false, vars);
+    FReturnProcessFileEvent(request, response, session, request.Document, 'tx-vs.html', false, vars);
   finally
     vars.Free;
   end;
@@ -652,13 +711,13 @@ var
 begin
   b := TBytesStream.Create();
   try
-    json := TFHIRJsonComposer.Create(FWorker.link, 'en');
+    json := TFHIRJsonComposer.Create(FWorker.link, OutputStylePretty, 'en');
     try
-      json.Compose(b, r, true);
+      json.Compose(b, r);
     finally
       json.Free;
     end;
-    result := EncodeXML(TEncoding.UTF8.GetString(b.Bytes, 0, b.size), xmlText);
+    result := FormatTextToXml(TEncoding.UTF8.GetString(b.Bytes, 0, b.size), xmlText);
   finally
     b.Free;
   end;
@@ -671,13 +730,13 @@ var
 begin
   b := TBytesStream.Create();
   try
-    xml := TFHIRXmlComposer.Create(FWorker.link, 'en');
+    xml := TFHIRXmlComposer.Create(FWorker.link, OutputStylePretty, 'en');
     try
-      xml.Compose(b, r, true);
+      xml.Compose(b, r);
     finally
       xml.Free;
     end;
-    result := EncodeXML(TEncoding.UTF8.GetString(b.Bytes, 0, b.size), xmlText);
+    result := FormatTextToXml(TEncoding.UTF8.GetString(b.Bytes, 0, b.size), xmlText);
   finally
     b.Free;
   end;
@@ -835,56 +894,107 @@ var
   pub : TSnomedPublisher;
   html : THtmlPublisher;
   analysis : TSnomedAnalysis;
+  parts : TArray<String>;
+  ss, t : TSnomedServices;
+  pm : TParseMap;
+  buf : TAdvNameBuffer;
 begin
-  FServer.DefSnomed.RecordUse;
   if request.Document.StartsWith('/snomed/tool/') then // FHIR build process support
   begin
-    response.ContentType := 'text/xml';
-    try
-      response.ContentText := processSnomedForTool(request.Document.Substring(13));
-      response.ResponseNo := 200;
-    except
-      on e : Exception do
-      begin
-        response.ResponseNo := 500;
-        response.ContentText := '<snomed version="'+FServer.DefSnomed.VersionDate+'" type="error" message="'+EncodeXML(e.Message, xmlAttribute)+'"/>';
+    parts := request.Document.Split(['/']);
+    ss := nil;
+    for t in FServer.Snomed do
+      if t.EditionId = parts[3] then
+        ss := t;
+    if ss = nil then
+    begin
+      response.ResponseNo := 404;
+      response.ContentText := 'Document '+request.Document+' not found';
+      logt('miss: '+request.Document);
+    end
+    else
+    begin
+      ss.RecordUse;
+      response.ContentType := 'text/xml';
+      try
+        response.ContentText := processSnomedForTool(ss, parts[4]);
+        response.ResponseNo := 200;
+      except
+        on e : Exception do
+        begin
+          response.ResponseNo := 500;
+          response.ContentText := '<snomed version="'+FServer.DefSnomed.VersionDate+'" type="error" message="'+FormatTextToXml(e.Message, xmlAttribute)+'"/>';
+        end;
       end;
     end;
   end
   else if request.Document.StartsWith('/snomed/analysis/')  then
   begin
+    FServer.DefSnomed.RecordUse;
     analysis := TSnomedAnalysis.create(FServer.DefSnomed.Link);
     try
-      response.ContentText := analysis.generate;
+      pm := TParseMap.create(request.UnparsedParams);
+      try
+        buf := analysis.generate(pm);
+        try
+          response.ContentType := buf.Name;
+          response.ContentStream := TBytesStream.Create(buf.AsBytes);
+          response.FreeContentStream := true;
+        finally
+          buf.free;
+        end;
+      finally
+        pm.Free;
+      end;
       response.ResponseNo := 200;
     finally
       analysis.free;
     end;
   end
-  else if request.Document.StartsWith('/snomed/doco/')  then
+  else if request.Document.StartsWith('/snomed/doco') then
   begin
-    code := request.UnparsedParams;
-    logt('Snomed Doco: '+code);
+    response.ContentText := chooseSnomedRelease();
+    response.ResponseNo := 200;
+  end
+  else if request.Document.StartsWith('/snomed/') then
+  begin
+    parts := request.Document.Split(['/']);
+    ss := nil;
+    for t in FServer.Snomed do
+      if t.EditionId = parts[2] then
+        ss := t;
+    if ss = nil then
+    begin
+      response.ResponseNo := 404;
+      response.ContentText := 'Document '+request.Document+' not found';
+      logt('miss: '+request.Document);
+    end
+    else
+    begin
+      ss.RecordUse;
+      code := request.UnparsedParams;
+      logt('Snomed Doco ('+ss.EditionName+'): '+code);
 
-    try
-      html := THtmlPublisher.Create;
-      pub := TSnomedPublisher.create(FServer.DefSnomed, FFHIRPath);
       try
-        html.Version := SERVER_VERSION;
-        html.BaseURL := '/snomed/doco/';
-        html.Lang := request.AcceptLanguage;
-        pub.PublishDict(code, '/snomed/doco/', html);
-        response.ContentText := html.output;
-        response.ResponseNo := 200;
-      finally
-        html.free;
-        pub.free;
-      end;
-    except
-      on e:exception do
-      begin
-        response.ResponseNo := 500;
-        response.ContentText := 'error:'+EncodeXML(e.Message, xmlText);
+        html := THtmlPublisher.Create;
+        pub := TSnomedPublisher.create(ss, FFHIRPath);
+        try
+          html.Version := SERVER_VERSION;
+          html.BaseURL := '/snomed/'+ss.EditionId+'/';
+          html.Lang := request.AcceptLanguage;
+          pub.PublishDict(code, '/snomed/'+ss.EditionId+'/', html);
+          response.ContentText := html.output;
+          response.ResponseNo := 200;
+        finally
+          html.free;
+          pub.free;
+        end;
+      except
+        on e:exception do
+        begin
+          response.ResponseNo := 500;
+          response.ContentText := 'error:'+FormatTextToXml(e.Message, xmlText);
+        end;
       end;
     end;
   end
@@ -898,35 +1008,87 @@ end;
 
 procedure TTerminologyWebServer.HandleLoincRequest(AContext: TIdContext; request: TIdHTTPRequestInfo; response: TIdHTTPResponseInfo);
 var
-  code : String;
+  code, lang, country : String;
   pub : TLoincPublisher;
   html : THtmlPublisher;
+  mem : TMemoryStream;
+  op : TBytes;
+  i : integer;
+  st : TStringList;
 begin
   FServer.Loinc.RecordUse;
-  if request.Document.StartsWith('/loinc/doco/')  then
+  if request.Document.StartsWith('/loinc/doco/') then
   begin
     code := request.UnparsedParams;
-    logt('Loinc Doco: '+code);
-
-    try
-      html := THtmlPublisher.Create;
-      pub := TLoincPublisher.create(FServer.Loinc, FFHIRPath);
+    lang := request.Document.Substring(12);
+    if ((lang = '') and (code = '')) or ((lang <> '') and not FServer.Loinc.supportsLang(lang)) then
+    begin
+      st := TStringList.create;
       try
-        html.Version := SERVER_VERSION;
-        html.BaseURL := '/loinc/doco/';
-        html.Lang := request.AcceptLanguage;
-        pub.PublishDict(code, '/loinc/doco/', html);
-        response.ContentText := html.output;
-        response.ResponseNo := 200;
+        for i := 0 to FServer.Loinc.Lang.count - 1 do
+        begin
+          FServer.Loinc.Lang.GetEntry(i, lang, country);
+          st.add(lang+'-'+country);
+        end;
+        st.sort;
+        html := THtmlPublisher.Create;
+        try
+          html.Version := SERVER_VERSION;
+          html.BaseURL := '/loinc/doco/';
+          html.Lang := lang;
+          html.Header('LOINC Languages');
+          html.StartList();
+          for i := 0 to st.count - 1 do
+          begin
+            html.StartListItem;
+            html.URL(st[i], st[i]);
+            html.EndListItem;
+          end;
+          html.EndList();
+          mem := TMemoryStream.Create;
+          response.ContentStream := mem;
+          response.FreeContentStream := true;
+          op := TEncoding.UTF8.GetBytes(html.output);
+          mem.Write(op, 0, length(op));
+          mem.Position := 0;
+          response.ContentType := 'text/html; charset=utf-8';
+          response.ResponseNo := 200;
+        finally
+          html.free;
+        end;
       finally
-        html.free;
-        pub.free;
+        st.free;
       end;
-    except
-      on e:exception do
-      begin
-        response.ResponseNo := 500;
-        response.ContentText := 'error:'+EncodeXML(e.Message, xmlText);
+    end
+    else
+    begin
+      logt('Loinc Doco: '+code);
+      try
+        html := THtmlPublisher.Create;
+        pub := TLoincPublisher.create(FServer.Loinc, FFHIRPath, lang);
+        try
+          html.Version := SERVER_VERSION;
+          html.BaseURL := '/loinc/doco/'+lang;
+          html.Lang := Lang;
+          pub.PublishDict(code, '/loinc/doco/'+lang, html);
+          mem := TMemoryStream.Create;
+          response.ContentStream := mem;
+          response.FreeContentStream := true;
+          op := TEncoding.UTF8.GetBytes(html.output);
+          mem.Write(op, 0, length(op));
+          mem.Position := 0;
+          response.ContentType := 'text/html; charset=utf-8';
+          response.ResponseNo := 200;
+        finally
+          html.free;
+          pub.free;
+        end;
+      except
+        on e:exception do
+        begin
+          response.ResponseNo := 500;
+          response.ContentText := 'error:'+FormatTextToXml(e.Message, xmlText);
+        end;
       end;
     end;
   end
@@ -938,7 +1100,7 @@ begin
   end;
 end;
 
-function TTerminologyWebServer.processSnomedForTool(code : String) : String;
+function TTerminologyWebServer.processSnomedForTool(ss : TSnomedServices; code : String) : String;
 var
   sl : TStringList;
   s : String;
@@ -948,41 +1110,41 @@ begin
   logt('Snomed: '+code);
   if StringIsInteger64(code) then
   begin
-    if FServer.DefSnomed.IsValidConcept(code) then
+    if ss.IsValidConcept(code) then
     begin
-      result := '<snomed version="'+FServer.DefSnomed.VersionDate+'" type="concept" concept="'+code+'" display="'+EncodeXml(FServer.DefSnomed.GetDisplayName(code, ''), xmlAttribute)+'">';
+      result := '<snomed version="'+ss.VersionDate+'" type="concept" concept="'+code+'" display="'+FormatTextToXml(ss.GetDisplayName(code, ''), xmlAttribute)+'">';
       sl := TStringList.Create;
       try
-        FServer.DefSnomed.ListDisplayNames(sl, code, '', ALL_DISPLAY_NAMES);
+        ss.ListDisplayNames(sl, code, '', ALL_DISPLAY_NAMES);
         for s in sl do
-          result := result + '<display value="'+EncodeXML(s, xmlAttribute)+'"/>';
+          result := result + '<display value="'+FormatTextToXml(s, xmlAttribute)+'"/>';
       finally
         sl.free;
       end;
       result := result + '</snomed>';
     end
-    else if FServer.DefSnomed.IsValidDescription(code, id, s) then
+    else if ss.IsValidDescription(code, id, s) then
     begin
-      result := '<snomed version="'+FServer.DefSnomed.VersionDate+'" type="description" description="'+code+'" concept="'+inttostr(id)+'" display="'+EncodeXml(s, xmlAttribute)+'">';
+      result := '<snomed version="'+ss.VersionDate+'" type="description" description="'+code+'" concept="'+inttostr(id)+'" display="'+FormatTextToXml(s, xmlAttribute)+'">';
       sl := TStringList.Create;
       try
-        FServer.DefSnomed.ListDisplayNames(sl, inttostr(id), '', ALL_DISPLAY_NAMES);
+        ss.ListDisplayNames(sl, inttostr(id), '', ALL_DISPLAY_NAMES);
         for s in sl do
-          result := result + '<display value="'+EncodeXML(s, xmlAttribute)+'"/>';
+          result := result + '<display value="'+FormatTextToXml(s, xmlAttribute)+'"/>';
       finally
         sl.free;
       end;
       result := result + '</snomed>';
     end
     else
-      result := '<snomed version="'+FServer.DefSnomed.VersionDate+'" description="Snomed ID '+code+' not known"/>';
+      result := '<snomed version="'+ss.VersionDate+'" description="Snomed ID '+code+' not known"/>';
   end
   else
   begin
-    exp := TSnomedExpressionParser.Parse(FServer.DefSnomed, code);
+    exp := ss.parseExpression(code);
     try
-      result := '<snomed version="'+FServer.DefSnomed.VersionDate+'" type="expression" expression="'+code+'" expressionMinimal="'+EncodeXml(TSnomedExpressionParser.Render(FServer.DefSnomed, exp, sroMinimal), xmlAttribute)+'" expressionMax="'+
-      EncodeXml(TSnomedExpressionParser.Render(FServer.DefSnomed, exp, sroReplaceAll), xmlAttribute)+'" display="'+EncodeXml(TSnomedExpressionParser.Display(FServer.DefSnomed, exp), xmlAttribute)+'" ok="true"/>';
+      result := '<snomed version="'+ss.VersionDate+'" type="expression" expression="'+code+'" expressionMinimal="'+FormatTextToXml(ss.renderExpression(exp, sroMinimal), xmlAttribute)+'" expressionMax="'+
+      FormatTextToXml(ss.renderExpression(exp, sroReplaceAll), xmlAttribute)+'" display="'+FormatTextToXml(ss.displayExpression(exp), xmlAttribute)+'" ok="true"/>';
     finally
       exp.Free;
     end;
@@ -1004,7 +1166,7 @@ begin
       coding.version := pm.GetVar('version');
       coding.code := pm.GetVar('code');
       try
-        res := FServer.translate(nil, coding, vs);
+        res := FServer.translate('en', nil, coding, vs);
         try
           result := paramsAsHtml(res)+#13#10 + '<pre class="json">'+asJson(res)+'</pre>'#13#10+'<pre class="xml">'+asXml(res)+'</pre>';
         finally
@@ -1036,7 +1198,7 @@ begin
       coding.version := pm.GetVar('version');
       coding.code := pm.GetVar('code');
       coding.display := pm.GetVar('display');
-      res := FServer.validate(vs, coding, pm.GetVar('abstract') = '1');
+      res := FServer.validate(vs, coding, nil, pm.GetVar('abstract') = '1');
       try
         if res is TFhirOperationOutcome then
           result := '<div style="background: red">'+asHtml(res as TFhirOperationOutcome)+'</div>'#13 +

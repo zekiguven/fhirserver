@@ -37,12 +37,12 @@ interface
 
 
 Uses
-  SysUtils, Classes, System.Character, RegExpr, ActiveX, ComObj,
+  SysUtils, Classes, System.Character, RegularExpressions, ActiveX, ComObj,
 
   StringSupport, MathSupport, TextUtilities,
   AdvObjects, AdvGenerics, AdvObjectLists, Advbuffers, AdvMemories, AdvVCLStreams, AdvNameBuffers,
 
-  MsXml, XmlBuilder, MsXmlParser, AdvXmlEntities, AdvJSON,
+  ParserSupport, MXML, AdvXmlEntities, AdvJSON,
 
   FHIRBase, FHIRContext, FHIRResources, FHIRTypes, FHIRParser, FHIRSupport, FHIRPath, FHIRMetaModel, FHIRXhtml;
 
@@ -59,7 +59,8 @@ Type
     function push(element: TFHIRMMElement; count: integer; definition: TFHIRElementDefinition; type_: TFHIRElementDefinition): TNodeStack;
     function addToLiteralPath(path: Array of String): String;
   public
-    Constructor Create; Override;
+    Constructor Create; Overload; Override;
+    Constructor Create(element : TFHIRMMElement); Overload;
     Destructor Destroy; Override;
   end;
 
@@ -69,8 +70,10 @@ Type
     element: TFHIRMMElement;
     path: String;
     definition: TFHIRElementDefinition;
+    slice : TFHIRElementDefinition;
     count: integer;
     index : integer;
+    sliceindex : integer;
 
     function locStart: TSourceLocation;
     function locEnd: TSourceLocation;
@@ -123,12 +126,23 @@ Type
     property Errors : TFhirOperationOutcomeIssueList read FErrors write SetErrors;
   end;
 
+  TValidationProfileSet = class (TAdvObject)
+  private
+    FCanonical : TStringList;
+    FDefinitions : TFHIRStructureDefinitionList;
+  public
+    constructor create; overload; override;
+    constructor create(profile : String); overload;
+    constructor create(profile : TFHIRStructureDefinition); overload;
+    destructor Destroy; override;
+  end;
+
   TFHIRValidator = class(TAdvObject)
   private
     // configuration items
-    FContext: TWorkerContext;
+    FContext: TFHIRWorkerContext;
     FExtensionDomains: TStringList;
-    FPathEngine : TFHIRExpressionEngine;
+    FPathEngine : TFHIRPathEngine;
 
 //    function LoadDoc(name: String; isFree: boolean = false): IXMLDomDocument2;
 
@@ -180,7 +194,7 @@ Type
 
     procedure checkFixedValue(ctxt : TFHIRValidatorContext; path: String; focus: TFHIRMMElement; fixed: TFhirElement; propName: String);
 
-    function checkCode(ctxt : TFHIRValidatorContext; element: TFHIRMMElement; path: String; code, System, display: String): boolean;
+    function checkCode(ctxt : TFHIRValidatorContext; element: TFHIRMMElement; path: String; code, System, version, display: String): boolean;
     procedure checkQuantity(ctxt : TFHIRValidatorContext; path: String; element: TFHIRMMElement; context: TFHIRElementDefinition);
     procedure checkPrimitiveBinding(ctxt : TFHIRValidatorContext; path: String; ty: String; context: TFHIRElementDefinition; element: TFHIRMMElement; profile : TFhirStructureDefinition);
     procedure checkPrimitive(ctxt : TFHIRValidatorContext; path, ty: String; context: TFHIRElementDefinition; e: TFHIRMMElement; profile : TFhirStructureDefinition);
@@ -220,34 +234,34 @@ Type
     procedure checkInnerNS(ctxt: TFHIRValidatorContext; e: TFHIRMMElement; path: String; list: TFhirXHtmlNodeList);
     procedure checkInnerNames(ctxt: TFHIRValidatorContext; e: TFHIRMMElement; path: String; list: TFhirXHtmlNodeList);
   public
-    Constructor Create(context: TWorkerContext);
+    Constructor Create(context: TFHIRWorkerContext);
     Destructor Destroy; Override;
 
-    Property Context : TWorkerContext read FContext;
+    Property Context : TFHIRWorkerContext read FContext;
 
     procedure validate(ctxt : TFHIRValidatorContext; element : TFHIRMMElement); overload;
-    procedure validate(ctxt : TFHIRValidatorContext; element : TFHIRMMElement; profile: TFHIRStructureDefinition); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; element : TFHIRMMElement; profiles: TValidationProfileSet); overload;
     procedure validate(ctxt : TFHIRValidatorContext; element : TFHIRMMElement; profile: String); overload;
 
     procedure validate(ctxt : TFHIRValidatorContext; obj: TJsonObject); overload;
-    procedure validate(ctxt : TFHIRValidatorContext; obj: TJsonObject; profile: TFHIRStructureDefinition); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; obj: TJsonObject; profiles: TValidationProfileSet); overload;
     procedure validate(ctxt : TFHIRValidatorContext; obj: TJsonObject; profile: String); overload;
 
-    procedure validate(ctxt : TFHIRValidatorContext; element: IXMLDOMElement); overload;
-    procedure validate(ctxt : TFHIRValidatorContext; element: IXMLDOMElement; profile: String); overload;
-    procedure validate(ctxt : TFHIRValidatorContext; element: IXMLDOMElement; profile: TFHIRStructureDefinition); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; element: TMXmlElement); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; element: TMXmlElement; profile: String); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; element: TMXmlElement; profiles: TValidationProfileSet); overload;
 
-    procedure validate(ctxt : TFHIRValidatorContext; document: IXMLDOMDocument); overload;
-    procedure validate(ctxt : TFHIRValidatorContext; document: IXMLDOMDocument; profile: String); overload;
-    procedure validate(ctxt : TFHIRValidatorContext; document: IXMLDOMDocument; profile: TFHIRStructureDefinition); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; document: TMXmlDocument); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; document: TMXmlDocument; profile: String); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; document: TMXmlDocument; profiles: TValidationProfileSet); overload;
 
     procedure validate(ctxt : TFHIRValidatorContext; source : TAdvBuffer; format : TFHIRFormat); overload;
     procedure validate(ctxt : TFHIRValidatorContext; source : TAdvBuffer; format : TFHIRFormat; profile : String); overload;
-    procedure validate(ctxt : TFHIRValidatorContext; source : TAdvBuffer; format : TFHIRFormat; profile : TFHIRStructureDefinition); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; source : TAdvBuffer; format : TFHIRFormat; profiles : TValidationProfileSet); overload;
 
     procedure validate(ctxt : TFHIRValidatorContext; resource : TFhirResource); overload;
     procedure validate(ctxt : TFHIRValidatorContext; resource : TFhirResource; profile : string); overload;
-    procedure validate(ctxt : TFHIRValidatorContext; resource : TFhirResource; profile : TFHIRStructureDefinition); overload;
+    procedure validate(ctxt : TFHIRValidatorContext; resource : TFhirResource; profiles : TValidationProfileSet); overload;
 
     function  describe(ctxt : TFHIRValidatorContext): TFHIROperationOutcome;
   end;
@@ -334,6 +348,14 @@ begin
   logicalPaths := TStringList.Create;
 end;
 
+constructor TNodeStack.Create(element: TFHIRMMElement);
+begin
+  inherited Create;
+  logicalPaths := TStringList.Create;
+  self.element := element;
+  literalPath := element.Name;
+end;
+
 destructor TNodeStack.Destroy;
 begin
   logicalPaths.Free;
@@ -418,11 +440,11 @@ end;
 
 { TFHIRValidator }
 
-constructor TFHIRValidator.Create(context: TWorkerContext);
+constructor TFHIRValidator.Create(context: TFHIRWorkerContext);
 begin
   inherited Create;
   FContext := context;
-  FPathEngine := TFHIRExpressionEngine.create(FContext.link);
+  FPathEngine := TFHIRPathEngine.create(FContext.link);
 end;
 
 destructor TFHIRValidator.Destroy;
@@ -433,28 +455,43 @@ begin
 end;
 
 
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: IXMLDOMElement);
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: TMXmlElement);
+var
+  profiles : TValidationProfileSet;
 begin
-  validate(ctxt, element, nil);
+  profiles := TValidationProfileSet.create;
+  try
+    validate(ctxt, element, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
 procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; obj: TJsonObject);
-begin
-  validate(ctxt, obj, nil);
-end;
-
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: IXMLDOMElement; profile: String);
 var
-  p: TFHIRStructureDefinition;
+  profiles : TValidationProfileSet;
 begin
-  p := TFHIRStructureDefinition(FContext.fetchResource(frtStructureDefinition, profile));
-  ctxt.FOwned.add(p);
-  if (p = nil) then
-    raise Exception.Create('StructureDefinition "' + profile + '" not found');
-  validate(ctxt, element, p);
+  profiles := TValidationProfileSet.create;
+  try
+    validate(ctxt, obj, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: IXMLDOMElement; profile: TFHIRStructureDefinition);
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: TMXmlElement; profile: String);
+var
+  profiles : TValidationProfileSet;
+begin
+  profiles := TValidationProfileSet.create(profile);
+  try
+    validate(ctxt, element, profiles);
+  finally
+    profiles.free;
+  end;
+end;
+
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: TMXmlElement; profiles: TValidationProfileSet);
 var
   w : TFHIRMMElement;
   x : TFHIRMMXmlParser;
@@ -464,7 +501,7 @@ begin
     x.setupValidation(fvpEverything, ctxt.errors.Link);
     w := x.Parse(element);
     try
-      validateResource(ctxt, w, nil, profile, ctxt.ResourceIdRule, nil);
+      validate(ctxt, w, profiles);
     finally
       w.free;
     end;
@@ -473,7 +510,7 @@ begin
   end;
 end;
 
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; obj: TJsonObject; profile: TFHIRStructureDefinition);
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; obj: TJsonObject; profiles: TValidationProfileSet);
 var
   w : TFHIRMMElement;
   j : TFHIRMMJsonParser;
@@ -483,7 +520,7 @@ begin
     j.setupValidation(fvpEverything, ctxt.errors.Link);
     w := j.Parse(obj);
     try
-      validateResource(ctxt, w, nil, profile, ctxt.ResourceIdRule, nil);
+        validate(ctxt, w, profiles);
     finally
       w.free;
     end;
@@ -495,38 +532,63 @@ end;
 procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; obj: TJsonObject; profile: String);
 var
   p: TFHIRStructureDefinition;
+  profiles : TValidationProfileSet;
 begin
-  p := TFHIRStructureDefinition(FContext.fetchResource(frtStructureDefinition, profile));
-  ctxt.FOwned.add(p);
-  if (p = nil) then
-    raise Exception.Create('StructureDefinition "' + profile + '" not found');
-  validate(ctxt, obj, p);
+  profiles := TValidationProfileSet.create(profile);
+  try
+    validate(ctxt, obj, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; document: IXMLDOMDocument);
-begin
-  validate(ctxt, document, nil);
-end;
-
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; document: IXMLDOMDocument; profile: String);
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; document: TMXmlDocument);
 var
-  p: TFHIRStructureDefinition;
+  profiles : TValidationProfileSet;
 begin
-  p := TFHIRStructureDefinition(FContext.fetchResource(frtStructureDefinition, profile));
-  ctxt.FOwned.add(p);
-  if (p = nil) then
-    raise Exception.Create('StructureDefinition "' + profile + '" not found');
-  validate(ctxt, document, p);
+  profiles := TValidationProfileSet.create;
+  try
+    validate(ctxt, document, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; document: IXMLDOMDocument; profile: TFHIRStructureDefinition);
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; document: TMXmlDocument; profile: String);
+var
+  profiles : TValidationProfileSet;
 begin
-  validate(ctxt, document.documentElement, profile);
+  profiles := TValidationProfileSet.create(profile);
+  try
+    validate(ctxt, document, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: TFHIRMMElement; profile: TFHIRStructureDefinition);
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; document: TMXmlDocument; profiles: TValidationProfileSet);
+begin
+  validate(ctxt, document.document, profiles);
+end;
+
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: TFHIRMMElement; profiles: TValidationProfileSet);
+var
+  stack : TNodeStack;
+  profile : TFHIRStructureDefinition;
 begin
   // all the other entry points end up here
+  // dstu2, the validator is not re-written for the mutlt-profile approach in stu3, but the API is kept consistent
+  profile := nil;
+  if (profiles <> nil) then
+    if profiles.FDefinitions.count > 0 then
+      profile := profiles.FDefinitions[0]
+    else if profiles.FCanonical.count > 0 then
+    begin
+      profile := TFHIRStructureDefinition(FContext.fetchResource(frtStructureDefinition, profiles.FCanonical[0]));
+      ctxt.FOwned.add(profile);
+      if (profile = nil) then
+        raise Exception.Create('StructureDefinition "' + profiles.FCanonical[0] + '" not found');
+    end;
   validateResource(ctxt, element, element, profile, ctxt.resourceIdRule, nil);
 end;
 
@@ -537,13 +599,14 @@ end;
 
 procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; element: TFHIRMMElement; profile: String);
 var
-  p: TFHIRStructureDefinition;
+  profiles : TValidationProfileSet;
 begin
-  p := TFHIRStructureDefinition(FContext.fetchResource(frtStructureDefinition, profile));
-  ctxt.FOwned.add(p);
-  if (p = nil) then
-    raise Exception.Create('StructureDefinition "' + profile + '" not found');
-  validate(ctxt, element, p);
+  profiles := TValidationProfileSet.create(profile);
+  try
+    validate(ctxt, element, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
 function describeReference(reference: TFHIRType): String;
@@ -2312,7 +2375,7 @@ end;
 
 procedure TFHIRValidator.checkPrimitive(ctxt : TFHIRValidatorContext; path: String; ty: String; context: TFHIRElementDefinition; e: TFHIRMMElement; profile : TFhirStructureDefinition);
 var
-  regex: TRegExpr;
+  regex: TRegEx;
   xhtml : TFhirXHtmlNode;
   ns : String;
 begin
@@ -2332,26 +2395,15 @@ begin
   if (ty = 'dateTime') then
   begin
     rule(ctxt, IssueTypeINVALID, e.locStart, e.locEnd, path, yearIsValid(e.primitiveValue), 'The value "' + e.primitiveValue + '" does not have a valid year');
-    regex := TRegExpr.Create;
-    try
-      regex.Expression :=
-        '-?[0-9]{4}(-(0[1-9]|1[0-2])(-(0[0-9]|[1-2][0-9]|3[0-1])(T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?(Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))?)?)?)?';
-      rule(ctxt, IssueTypeINVALID, e.locStart, e.locEnd, path, regex.Exec(e.primitiveValue), 'Not a valid date time');
-    finally
-      regex.Free;
-    end;
+    regex := TRegEx.Create('-?[0-9]{4}(-(0[1-9]|1[0-2])(-(0[0-9]|[1-2][0-9]|3[0-1])(T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?(Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))?)?)?)?', [roCompiled]);
+    rule(ctxt, IssueTypeINVALID, e.locStart, e.locEnd, path, regex.isMatch(e.primitiveValue), 'Not a valid date time');
     rule(ctxt, IssueTypeINVALID, e.locStart, e.locEnd, path, not hasTime(e.primitiveValue) or hasTimeZone(e.primitiveValue),
       'if a date has a time, it must have a timezone');
   end;
   if (ty = 'instant') then
   begin
-    regex := TRegExpr.Create;
-    try
-      regex.Expression := '-?[0-9]{4}-(0[1-9]|1[0-2])-(0[0-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?(Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))';
-      rule(ctxt, IssueTypeINVALID, e.locStart, e.locEnd, path, regex.Exec(e.primitiveValue), 'The instant "' + e.primitiveValue + '" is not valid (by regex)');
-    finally
-      regex.Free;
-    end;
+    regex := TRegEx.Create('-?[0-9]{4}-(0[1-9]|1[0-2])-(0[0-9]|[1-2][0-9]|3[0-1])T([01][0-9]|2[0-3]):[0-5][0-9]:[0-5][0-9](\.[0-9]+)?(Z|(\+|-)((0[0-9]|1[0-3]):[0-5][0-9]|14:00))',[roCompiled]);
+    rule(ctxt, IssueTypeINVALID, e.locStart, e.locEnd, path, regex.isMatch(e.primitiveValue), 'The instant "' + e.primitiveValue + '" is not valid (by regex)');
     rule(ctxt, IssueTypeINVALID, e.locStart, e.locEnd, path, yearIsValid(e.primitiveValue), 'The value "' + e.primitiveValue + '" does not have a valid year');
   end;
 
@@ -2485,22 +2537,23 @@ end;
 procedure TFHIRValidator.checkQuantity(ctxt : TFHIRValidatorContext; path: String; element: TFHIRMMElement; context: TFHIRElementDefinition);
 var
   code: String;
-  System: String;
+  System, version: String;
   units: String;
 begin
   code := element.getNamedChildValue('code');
   System := element.getNamedChildValue('system');
+  version := element.getNamedChildValue('version');
   units := element.getNamedChildValue('units');
 
   if (System <> '') and (code <> '') then
-    checkCode(ctxt, element, path, code, System, units);
+    checkCode(ctxt, element, path, code, System, version, units);
 end;
 
 procedure TFHIRValidator.checkCoding(ctxt : TFHIRValidatorContext; path: String; element: TFHIRMMElement; profile: TFHIRStructureDefinition;
   context: TFHIRElementDefinition; inCodeableConcept: boolean);
 var
   code: String;
-  System: String;
+  System, version: String;
   display: String;
   Binding: TFhirElementDefinitionBinding;
   vs: TFHIRValueSet;
@@ -2509,13 +2562,14 @@ var
 begin
   code := element.getNamedChildValue('code');
   System := element.getNamedChildValue('system');
+  version := element.getNamedChildValue('version');
   display := element.getNamedChildValue('display');
 
   rule(ctxt, IssueTypeCODEINVALID, element.locStart, element.locEnd, path, isAbsolute(System), 'Coding.system must be an absolute reference, not a local reference ('+system+')');
 
   if (System <> '') and (code <> '') then
   begin
-    if (checkCode(ctxt, element, path, code, System, display)) then
+    if (checkCode(ctxt, element, path, code, System, version, display)) then
       if (context <> nil) and (context.Binding <> nil) then
       begin
         Binding := context.Binding;
@@ -2674,14 +2728,14 @@ begin
   end;
 end;
 
-function TFHIRValidator.checkCode(ctxt : TFHIRValidatorContext; element: TFHIRMMElement; path: String; code, System, display: String): boolean;
+function TFHIRValidator.checkCode(ctxt : TFHIRValidatorContext; element: TFHIRMMElement; path: String; code, System, version, display: String): boolean;
 var
   s: TValidationResult;
 begin
   result := true;
-  if (FContext.supportsSystem(System)) then
+  if (FContext.supportsSystem(System, version)) then
   begin
-    s := FContext.validateCode(System, code, display);
+    s := FContext.validateCode(System, version, code, display);
     try
       if (s = nil) or (s.isOk()) then
         result := true
@@ -3113,12 +3167,12 @@ var
   inv : TFhirElementDefinitionConstraint;
   ok : boolean;
   msg : String;
-  expr : TFHIRExpressionNode;
+  expr : TFHIRPathExpressionNode;
 begin
   for inv in ed.constraintList do
     if inv.getExtensionString('http://hl7.org/fhir/StructureDefinition/structuredefinition-expression') <> '' then
     begin
-      expr := inv.Tag as TFHIRExpressionNode;
+      expr := inv.Tag as TFHIRPathExpressionNode;
       if (expr = nil) then
       begin
         expr := FPathEngine.parse(inv.getExtensionString('http://hl7.org/fhir/StructureDefinition/structuredefinition-expression'));
@@ -3286,23 +3340,31 @@ begin
   end;
 end;
 
-procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; source: TAdvBuffer; format: TFHIRFormat; profile: TFHirStructureDefinition);
+procedure TFHIRValidator.validate(ctxt : TFHIRValidatorContext; source: TAdvBuffer; format: TFHIRFormat; profiles : TValidationProfileSet);
 var
   p : TFHIRMMParserBase;
   element : TFHIRMMElement;
 begin
-  p := TFHIRMMManager.makeParser(context, format);
+  if (profiles = nil) then
+    profiles := TValidationProfileSet.create
+  else
+    profiles.link;
   try
-    p.setupValidation(fvpEVERYTHING, ctxt.FErrors.Link);
-    element := p.parse(source);
+    p := TFHIRMMManager.makeParser(context, format);
     try
-      if (element <> nil) then
-        validate(ctxt, element, profile);
+      p.setupValidation(fvpEVERYTHING, ctxt.FErrors.Link);
+      element := p.parse(source);
+      try
+        if (element <> nil) then
+          validate(ctxt, element, profiles);
+      finally
+        element.Free;
+      end;
     finally
-      element.Free;
+      p.Free;
     end;
   finally
-    p.Free;
+    profiles.free;
   end;
 end;
 
@@ -3321,26 +3383,41 @@ end;
 
 procedure TFHIRValidator.validate(ctxt: TFHIRValidatorContext; source: TAdvBuffer; format: TFHIRFormat; profile: String);
 var
-  p: TFHIRStructureDefinition;
+  profiles : TValidationProfileSet;
 begin
-  p := TFHIRStructureDefinition(FContext.fetchResource(frtStructureDefinition, profile));
-  ctxt.FOwned.add(p);
-  if (p = nil) then
-    raise Exception.Create('StructureDefinition "' + profile + '" not found');
-  validate(ctxt, source, format, p);
+  profiles := TValidationProfileSet.create(profile);
+  try
+    validate(ctxt, source, format, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
 procedure TFHIRValidator.validate(ctxt: TFHIRValidatorContext; source: TAdvBuffer; format: TFHIRFormat);
+var
+  profiles : TValidationProfileSet;
 begin
-  validate(ctxt, source, format, nil);
+  profiles := TValidationProfileSet.create;
+  try
+    validate(ctxt, source, format, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
 procedure TFHIRValidator.validate(ctxt: TFHIRValidatorContext; resource: TFhirResource);
+var
+  profiles : TValidationProfileSet;
 begin
-  validate(ctxt, resource, nil);
+  profiles := TValidationProfileSet.create;
+  try
+    validate(ctxt, resource, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
-procedure TFHIRValidator.validate(ctxt: TFHIRValidatorContext; resource: TFhirResource; profile: TFHIRStructureDefinition);
+procedure TFHIRValidator.validate(ctxt: TFHIRValidatorContext; resource: TFhirResource; profiles: TValidationProfileSet);
 var
   loader : TFHIRMMResourceLoader;
   e : TFHIRMMElement;
@@ -3349,7 +3426,7 @@ begin
   try
     e := loader.parse(resource);
     try
-      validate(ctxt, e, profile);
+      validate(ctxt, e, profiles);
     finally
       e.free;
     end;
@@ -3360,13 +3437,14 @@ end;
 
 procedure TFHIRValidator.validate(ctxt: TFHIRValidatorContext; resource: TFhirResource; profile: string);
 var
-  p: TFHIRStructureDefinition;
+  profiles : TValidationProfileSet;
 begin
-  p := TFHIRStructureDefinition(FContext.fetchResource(frtStructureDefinition, profile));
-  ctxt.FOwned.add(p);
-  if (p = nil) then
-    raise Exception.Create('StructureDefinition "' + profile + '" not found');
-  validate(ctxt, resource, p);
+  profiles := TValidationProfileSet.create(profile);
+  try
+    validate(ctxt, resource, profiles);
+  finally
+    profiles.free;
+  end;
 end;
 
 { TChildIterator }
@@ -3467,6 +3545,36 @@ procedure TFHIRValidatorContext.SetErrors(const Value: TFhirOperationOutcomeIssu
 begin
   FErrors.Free;
   FErrors := Value;
+end;
+
+
+{ TValidationProfileSet }
+
+constructor TValidationProfileSet.create;
+begin
+  inherited;
+  FCanonical := TStringList.create;
+  FDefinitions := TFHIRStructureDefinitionList.create;
+
+end;
+
+constructor TValidationProfileSet.create(profile: String);
+begin
+  Create;
+  FCanonical.add(profile);
+end;
+
+constructor TValidationProfileSet.create(profile: TFHIRStructureDefinition);
+begin
+  Create;
+  FDefinitions.add(profile.link);
+end;
+
+destructor TValidationProfileSet.Destroy;
+begin
+  FCanonical.Free;
+  FDefinitions.Free;
+  inherited;
 end;
 
 

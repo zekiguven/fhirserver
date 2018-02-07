@@ -19,20 +19,19 @@ are permitted provided that the following conditions are met:
 THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND 
 ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED 
 WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED. 
-IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, 
-INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT 
-NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR 
-PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, 
-WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) 
-ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE 
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
 POSSIBILITY OF SUCH DAMAGE.
 }
 
 interface
 
 uses
-  SysUtils, {$IFNDEF VER130} RTLConsts, {$ENDIF} MathSupport,
-  AdvObjects, AdvStreams;
+  Sysutils, RTLConsts, AdvObjects, AdvStreams, MathSupport;
 
 Type
   TAdvTextReader = class (TAdvObject)
@@ -48,21 +47,38 @@ Type
     Function ReadString(Var s : String; iLength : Integer) : Integer;
   end;
 
+  TAdvStringReader = class(TAdvTextReader)
+  private
+    FContent : String;
+    FCursor : integer;
+  public
+    constructor Create(content : String);
+    function Peek: Integer; override;
+    function Read: Integer; overload; override;
+    function Read(const Buffer: TCharArray; Index, Count: Integer): Integer; overload; override;
+    function ReadBlock(const Buffer: TCharArray; Index, Count: Integer): Integer; override;
+    function ReadLine: string; override;
+    function ReadToEnd: string; override;
+    procedure Close; override;
+  end;
+
   TAdvStreamReader = class(TAdvTextReader)
   private
-    FBufferedData: TStringBuilder;
+    FBufferedData: TCharArray;
+    FBufferStart : Integer;
+    FBufferEnd : Integer;
     FBufferSize: Integer;
     FDetectBOM: Boolean;
     FNoDataInStream: Boolean;
     FSkipPreamble: Boolean;
     FStream: TAdvStream;
     FCursor : Integer;
-    {$IFNDEF VER130}
     FEncoding: TEncoding;
+    FCheckEncoding : boolean;
+    FClosed : boolean;
     function DetectBOM(var Encoding: TEncoding; Buffer: TBytes): Integer;
     function SkipPreamble(Encoding: TEncoding; Buffer: TBytes): Integer;
     procedure FillBuffer(var Encoding: TEncoding);
-    {$ENDIF}
     function GetEndOfStream: Boolean;
   protected
     Property Stream : TAdvStream read FStream;
@@ -71,10 +87,8 @@ Type
     constructor Create(aStream: TAdvStream; DetectBOM: Boolean); overload;
     constructor Create(const Filename: string); overload;
     constructor Create(const Filename: string; DetectBOM: Boolean); overload;
-    {$IFNDEF VER130}
-    constructor Create(aStream: TAdvStream; Encoding: TEncoding; DetectBOM: Boolean = False; BufferSize: Integer = 1024); overload;
-    constructor Create(const Filename: string; Encoding: TEncoding; DetectBOM: Boolean = False; BufferSize: Integer = 1024); overload;
-    {$ENDIF}
+    constructor Create(aStream: TAdvStream; Encoding: TEncoding; DetectBOM: Boolean = False; BufferSize: Integer = 0); overload;
+    constructor Create(const Filename: string; Encoding: TEncoding; DetectBOM: Boolean = False; BufferSize: Integer = 0); overload;
     destructor Destroy; override;
     procedure Close; override;
     procedure DiscardBufferedData;
@@ -86,242 +100,9 @@ Type
     function ReadLine: string; override;
     function ReadToEnd: string; override;
     property BaseStream: TAdvStream read FStream;
-    {$IFNDEF VER130}
     property CurrentEncoding: TEncoding read FEncoding;
-    {$ENDIF}
     property EndOfStream: Boolean read GetEndOfStream;
   end;
-
-{
-
-  TTextWriter = class
-  public
-    procedure Close; virtual; abstract;
-    procedure Flush; virtual; abstract;
-    procedure Write(Value: Boolean); overload; virtual; abstract;
-    procedure Write(Value: Char); overload; virtual; abstract;
-    procedure Write(const Value: TCharArray); overload; virtual; abstract;
-    procedure Write(Value: Double); overload; virtual; abstract;
-    procedure Write(Value: Integer); overload; virtual; abstract;
-    procedure Write(Value: Int64); overload; virtual; abstract;
-    procedure Write(Value: TObject); overload; virtual; abstract;
-    procedure Write(Value: Single); overload; virtual; abstract;
-    procedure Write(const Value: string); overload; virtual; abstract;
-    procedure Write(Value: Cardinal); overload; virtual; abstract;
-    procedure Write(Value: UInt64); overload; virtual; abstract;
-    procedure Write(const Format: string; Args: array of const); overload; virtual; abstract;
-    procedure Write(const Value: TCharArray; Index, Count: Integer); overload; virtual; abstract;
-    procedure WriteLine; overload; virtual; abstract;
-    procedure WriteLine(Value: Boolean); overload; virtual; abstract;
-    procedure WriteLine(Value: Char); overload; virtual; abstract;
-    procedure WriteLine(const Value: TCharArray); overload; virtual; abstract;
-    procedure WriteLine(Value: Double); overload; virtual; abstract;
-    procedure WriteLine(Value: Integer); overload; virtual; abstract;
-    procedure WriteLine(Value: Int64); overload; virtual; abstract;
-    procedure WriteLine(Value: TObject); overload; virtual; abstract;
-    procedure WriteLine(Value: Single); overload; virtual; abstract;
-    procedure WriteLine(const Value: string); overload; virtual; abstract;
-    procedure WriteLine(Value: Cardinal); overload; virtual; abstract;
-    procedure WriteLine(Value: UInt64); overload; virtual; abstract;
-    procedure WriteLine(const Format: string; Args: array of const); overload; virtual; abstract;
-    procedure WriteLine(const Value: TCharArray; Index, Count: Integer); overload; virtual; abstract;
-  end;
-
-  TBinaryReader = class
-  strict private
-    FStream: TStream;
-    FEncoding: TEncoding;
-    FTwoBytesPerChar: Boolean;
-    FCharBytes: TBytes;
-    FOneChar: TCharArray;
-    FMaxCharsSize: Integer;
-    function InternalReadChar: Integer;
-    function InternalReadChars(const Chars: TCharArray; Index, Count: Integer): Integer;
-  protected
-    function GetBaseStream: TStream; virtual;
-    function Read7BitEncodedInt: Integer; virtual;
-  public
-    constructor Create(Stream: TStream; AEncoding: TEncoding = nil); overload;
-    constructor Create(Stream: TStream; AEncoding: TEncoding; AOwnsStream: Boolean = False); overload;
-    constructor Create(const Filename: string; Encoding: TEncoding = nil); overload;
-    destructor Destroy; override;
-    procedure Close; virtual;
-    function PeekChar: Integer; virtual;
-    function Read: Integer; overload; virtual;
-    function Read(const Buffer: TCharArray; Index, Count: Integer): Integer; overload; virtual;
-    function Read(const Buffer: TBytes; Index, Count: Integer): Integer; overload; virtual;
-    function ReadBoolean: Boolean; virtual;
-    function ReadByte: Byte; virtual;
-    function ReadBytes(Count: Integer): TBytes; virtual;
-    function ReadChar: Char; virtual;
-    function ReadChars(Count: Integer): TCharArray; virtual;
-    function ReadDouble: Double; virtual;
-    function ReadShortInt: ShortInt; virtual;
-    function ReadInt16: ShortInt; inline;
-    function ReadInteger: Integer; virtual;
-    function ReadInt32: Integer; inline;
-    function ReadInt64: Int64; virtual;
-    function ReadSmallInt: SmallInt; virtual;
-    function ReadSByte: SmallInt; inline;
-    function ReadSingle: Single; virtual;
-    function ReadString: string; virtual;
-    function ReadWord: Word; virtual;
-    function ReadUInt16: Word; inline;
-    function ReadCardinal: Cardinal; virtual;
-    function ReadUInt32: Cardinal; inline;
-    function ReadUInt64: UInt64; virtual;
-    property BaseStream: TStream read GetBaseStream;
-  end;
-
-  TBinaryWriter = class
-  strict private
-    FStream: TStream;
-    FEncoding: TEncoding;
-    class var FNull: TBinaryWriter;
-    class destructor Destroy;
-    class function GetNull: TBinaryWriter; static;
-  protected
-    function GetBaseStream: TStream; virtual;
-    procedure Write7BitEncodedInt(Value: Integer); virtual;
-    constructor Create; overload;
-  public
-    constructor Create(Stream: TStream); overload;
-    constructor Create(Stream: TStream; Encoding: TEncoding); overload;
-    constructor Create(Stream: TStream; Encoding: TEncoding; AOwnsStream: Boolean); overload;
-    constructor Create(const Filename: string; Append: Boolean = False); overload;
-    constructor Create(const Filename: string; Append: Boolean; Encoding: TEncoding); overload;
-    destructor Destroy; override;
-    procedure Close; virtual;
-    function Seek(const Offset: Int64; Origin: TSeekOrigin): Int64; virtual;
-    procedure Write(Value: Byte); overload; virtual;
-    procedure Write(Value: Boolean); overload; virtual;
-    procedure Write(Value: Char); overload; virtual;
-    procedure Write(const Value: TCharArray); overload; virtual;
-    procedure Write(const Value: TBytes); overload; virtual;
-    procedure Write(Value: Double); overload; virtual;
-    procedure Write(Value: Integer); overload; virtual;
-    procedure Write(Value: SmallInt); overload; virtual;
-    procedure Write(Value: ShortInt); overload; virtual;
-    procedure Write(Value: Word); overload; virtual;
-    procedure Write(Value: Cardinal); overload; virtual;
-    procedure Write(Value: Int64); overload; virtual;
-    procedure Write(Value: Single); overload; virtual;
-    procedure Write(const Value: string); overload; virtual;
-    procedure Write(Value: UInt64); overload; virtual;
-    procedure Write(const Value: TCharArray; Index, Count: Integer); overload; virtual;
-    procedure Write(const Value: TBytes; Index, Count: Integer); overload; virtual;
-    property BaseStream: TStream read GetBaseStream;
-    class property Null: TBinaryWriter read GetNull;
-  end;
-
-  TStringReader = class(TTextReader)
-  private
-    FData: string;   //String Data being read
-    FIndex: Integer; //Next character index to be read
-  public
-    constructor Create(S: string);
-    procedure Close; override;
-    function Peek: Integer; override;
-    function Read: Integer; overload; override;
-    function Read(const Buffer: TCharArray; Index, Count: Integer): Integer; overload; override;
-    function ReadBlock(const Buffer: TCharArray; Index, Count: Integer): Integer; override;
-    function ReadLine: string; override;
-    function ReadToEnd: string; override;
-  end;
-
-  TStringWriter = class(TTextWriter)
-  private
-    FBuilder: TStringBuilder;
-    FOwnsBuilder: Boolean;
-  public
-    constructor Create; overload;
-    constructor Create(Builder: TStringBuilder); overload;
-    destructor Destroy; override;
-    procedure Close; override;
-    procedure Flush; override;
-    procedure Write(Value: Boolean); override;
-    procedure Write(Value: Char); override;
-    procedure Write(const Value: TCharArray); override;
-    procedure Write(Value: Double); override;
-    procedure Write(Value: Integer); override;
-    procedure Write(Value: Int64); override;
-    procedure Write(Value: TObject); override;
-    procedure Write(Value: Single); override;
-    procedure Write(const Value: string); override;
-    procedure Write(Value: Cardinal); override;
-    procedure Write(Value: UInt64); override;
-    procedure Write(const Format: string; Args: array of const); override;
-    procedure Write(const Value: TCharArray; Index, Count: Integer); override;
-    procedure WriteLine; override;
-    procedure WriteLine(Value: Boolean); override;
-    procedure WriteLine(Value: Char); override;
-    procedure WriteLine(const Value: TCharArray); override;
-    procedure WriteLine(Value: Double); override;
-    procedure WriteLine(Value: Integer); override;
-    procedure WriteLine(Value: Int64); override;
-    procedure WriteLine(Value: TObject); override;
-    procedure WriteLine(Value: Single); override;
-    procedure WriteLine(const Value: string); override;
-    procedure WriteLine(Value: Cardinal); override;
-    procedure WriteLine(Value: UInt64); override;
-    procedure WriteLine(const Format: string; Args: array of const); override;
-    procedure WriteLine(const Value: TCharArray; Index, Count: Integer); override;
-    function ToString: string; override;
-  end;
-
-  TStreamWriter = class(TTextWriter)
-  private
-    FStream: TStream;
-    FEncoding: TEncoding;
-    FNewLine: string;
-    FAutoFlush: Boolean;
-    FBufferIndex: Integer;
-    FBuffer: TBytes;
-    procedure WriteBytes(Bytes: TBytes);
-  public
-    constructor Create(Stream: TStream); overload;
-    constructor Create(Stream: TStream; Encoding: TEncoding; BufferSize: Integer = 1024); overload;
-    constructor Create(const Filename: string; Append: Boolean = False); overload;
-    constructor Create(const Filename: string; Append: Boolean; Encoding: TEncoding; BufferSize: Integer = 1024); overload;
-    destructor Destroy; override;
-    procedure Close; override;
-    procedure Flush; override;
-    procedure OwnStream; inline;
-    procedure Write(Value: Boolean); override;
-    procedure Write(Value: Char); override;
-    procedure Write(const Value: TCharArray); override;
-    procedure Write(Value: Double); override;
-    procedure Write(Value: Integer); override;
-    procedure Write(Value: Int64); override;
-    procedure Write(Value: TObject); override;
-    procedure Write(Value: Single); override;
-    procedure Write(const Value: string); override;
-    procedure Write(Value: Cardinal); override;
-    procedure Write(Value: UInt64); override;
-    procedure Write(const Format: string; Args: array of const); override;
-    procedure Write(const Value: TCharArray; Index, Count: Integer); override;
-    procedure WriteLine; override;
-    procedure WriteLine(Value: Boolean); override;
-    procedure WriteLine(Value: Char); override;
-    procedure WriteLine(const Value: TCharArray); override;
-    procedure WriteLine(Value: Double); override;
-    procedure WriteLine(Value: Integer); override;
-    procedure WriteLine(Value: Int64); override;
-    procedure WriteLine(Value: TObject); override;
-    procedure WriteLine(Value: Single); override;
-    procedure WriteLine(const Value: string); override;
-    procedure WriteLine(Value: Cardinal); override;
-    procedure WriteLine(Value: UInt64); override;
-    procedure WriteLine(const Format: string; Args: array of const); override;
-    procedure WriteLine(const Value: TCharArray; Index, Count: Integer); override;
-    property AutoFlush: Boolean read FAutoFlush write FAutoFlush;
-    property NewLine: string read FNewLine write FNewLine;
-    property Encoding: TEncoding read FEncoding;
-    property BaseStream: TStream read FStream;
-  end;
-
-}
-
 
 implementation
 
@@ -340,7 +121,7 @@ begin
   Create(aStream, TEncoding.UTF8, DetectBOM);
 end;
 
-constructor TAdvStreamReader.Create(aStream: TAdvStream; Encoding: TEncoding; DetectBOM: Boolean = False; BufferSize: Integer = 1024);
+constructor TAdvStreamReader.Create(aStream: TAdvStream; Encoding: TEncoding; DetectBOM: Boolean = False; BufferSize: Integer = 0);
 begin
   Create;
 
@@ -349,11 +130,17 @@ begin
   if not Assigned(Encoding) then
     raise EArgumentException.CreateResFmt(@SParamIsNil, ['Encoding']); // DO NOT LOCALIZE
 
-  FBufferedData := TStringBuilder.Create;
-  FEncoding := Encoding;
   FBufferSize := BufferSize;
-  if FBufferSize < 128 then
+  if FBufferSize = 0 then
+    FBufferSize := aStream.Readable;
+  if FBufferSize = 0 then
     FBufferSize := 128;
+  SetLength(FBufferedData, BufferSize);
+  FBufferEnd := 0;
+  FBufferStart := 0;
+  FClosed := false;
+
+  FEncoding := Encoding;
   FNoDataInStream := False;
   FStream := aStream;
   FDetectBOM := DetectBOM;
@@ -361,13 +148,12 @@ begin
   FCursor := 0;
 end;
 
-constructor TAdvStreamReader.Create(const Filename: string; Encoding: TEncoding; DetectBOM: Boolean = False; BufferSize: Integer = 1024);
+constructor TAdvStreamReader.Create(const Filename: string; Encoding: TEncoding; DetectBOM: Boolean = False; BufferSize: Integer = 0);
 var
   oFile : TAdvFile;
 begin
-  oFile := TAdvFile.Create;
+  oFile := TAdvFile.Create(FileName, fmOpenRead);
   Try
-    oFile.OpenRead;
     Create(oFile.Link, Encoding, DetectBOM, BufferSize);
   Finally
     oFile.Free;
@@ -395,18 +181,16 @@ begin
   FStream.Free;
   FStream := nil;
 
-  if FBufferedData <> nil then
-  begin
-    FBufferedData.Free;
-    FBufferedData := nil;
-  end;
+  DiscardBufferedData;
+  FClosed := true;
 end;
 
 procedure TAdvStreamReader.DiscardBufferedData;
 begin
-  if FBufferedData <> nil then
+  if not FClosed then
   begin
-    FBufferedData.Remove(0, FBufferedData.Length);
+    FBufferEnd := 0;
+    FBufferStart := 0;
     FNoDataInStream := False;
   end;
 end;
@@ -439,6 +223,7 @@ var
   StartIndex: Integer;
   ByteBufLen: Integer;
   ok : boolean;
+  tries : integer;
 begin
   SetLength(LBuffer, FBufferSize + BufferPadding);
 
@@ -459,60 +244,80 @@ begin
   // Convert to string and calc byte count for the string
   ByteBufLen := BytesRead - StartIndex;
   ok := false;
+  tries := 0;
   repeat
     try
+      if FCheckEncoding and (FEncoding.GetCharCount(LBuffer, StartIndex, ByteBufLen) = 0) then
+      begin
+        SetLength(LBuffer, Length(LBuffer) + BufferPadding);
+        FStream.Read(LBuffer[ByteBufLen], 1);
+        inc(ByteBufLen);
+        inc(tries);
+      end;
+
       LString := FEncoding.GetString(LBuffer, StartIndex, ByteBufLen);
       ok := true;
     except
-      SetLength(LBuffer, Length(LBuffer) + BufferPadding);
-      FStream.Read(LBuffer[ByteBufLen], 1);
-      inc(ByteBufLen);
+      if FCheckEncoding and (tries > FEncoding.GetMaxByteCount(1)) then
+        raise
+      else
+        FCheckEncoding := true;
     end;
   until ok;
 
-  // Add string to character data buffer
-  FBufferedData.Append(LString);
+  if (Length(LString) > 0) then
+  begin
+    // Add string to character data buffer
+    if (FBufferStart > 0) and (FBufferEnd = FBufferStart) then
+    begin
+      FBufferStart := 0;
+      FBufferEnd := 0;
+    end;
+    if Length(FBufferedData) < FBufferEnd + length(LString) then
+      SetLength(FBufferedData, Length(FBufferedData) + length(LString) * 2);
+
+    Move(LString[1], FBufferedData[FBufferEnd], length(LString) * SizeOf(Char));
+    inc(FBufferEnd, length(LString));
+  end;
 end;
 
 function TAdvStreamReader.GetEndOfStream: Boolean;
 begin
-  if not FNoDataInStream and (FBufferedData <> nil) and (FBufferedData.Length < 1) then
+  if not FNoDataInStream and (not FClosed) and (FBufferEnd <= FBufferStart) then
     FillBuffer(FEncoding);
-  Result := FNoDataInStream and ((FBufferedData = nil) or (FBufferedData.Length = 0));
+  Result := FNoDataInStream and ((FClosed) or (FBufferEnd = FBufferStart));
 end;
 
 function TAdvStreamReader.Peek: Integer;
 begin
   Result := -1;
-  if (FBufferedData <> nil) and (not EndOfStream) then
+  if (not FClosed) and (not EndOfStream) then
   begin
-    if FBufferedData.Length < 1 then
+    if FBufferEnd < 1 + FBufferStart  then
       FillBuffer(FEncoding);
-    Result := Integer(FBufferedData.Chars[0]);
+    Result := Integer(FBufferedData[FBufferStart]);
   end;
 end;
 
-function TAdvStreamReader.Read(const Buffer: TCharArray; Index,
-  Count: Integer): Integer;
+function TAdvStreamReader.Read(const Buffer: TCharArray; Index, Count: Integer): Integer;
 begin
   Result := -1;
-  if (FBufferedData <> nil) and (not EndOfStream) then
+  if (not FClosed) and (not EndOfStream) then
   begin
-    while (FBufferedData.Length < Count) and (not EndOfStream) and (not FNoDataInStream) do
+    while (FBufferEnd < Count + FBufferStart) and (not EndOfStream) and (not FNoDataInStream) do
       FillBuffer(FEncoding);
 
-    if FBufferedData.Length > Count then
+    if FBufferEnd > Count + FBufferStart then
       Result := Count
     else
-      Result := FBufferedData.Length;
+      Result := FBufferEnd - FBufferStart;
 
-    FBufferedData.CopyTo(0, Buffer, Index, Result);
-    FBufferedData.Remove(0, Result);
+    move(FBufferedData[FBufferStart], buffer[0], result * Sizeof(char));
+    inc(FBufferStart, result);
   end;
 end;
 
-function TAdvStreamReader.ReadBlock(const Buffer: TCharArray; Index,
-  Count: Integer): Integer;
+function TAdvStreamReader.ReadBlock(const Buffer: TCharArray; Index, Count: Integer): Integer;
 begin
   Result := Read(Buffer, Index, Count);
 end;
@@ -520,32 +325,33 @@ end;
 function TAdvStreamReader.Read: Integer;
 begin
   Result := -1;
-  if (FBufferedData <> nil) and (not EndOfStream) then
+  if (not FClosed) and (not EndOfStream) then
   begin
-    if FBufferedData.Length < 1 then
+    if FBufferEnd < 1 + FBufferStart then
       FillBuffer(FEncoding);
-    Result := Integer(FBufferedData.Chars[0]);
-    FBufferedData.Remove(0, 1);
+    Result := Integer(FBufferedData[FBufferStart]);
+    inc(FBufferStart);
   end;
 end;
 
 function TAdvStreamReader.ReadLine: string;
-var
+{var
   NewLineIndex: Integer;
-  PostNewLineIndex: Integer;
+  PostNewLineIndex: Integer;}
 begin
-  Result := '';
-  if FBufferedData = nil then
+  raise Exception.Create('This needs debugging for buffer changes');
+{  Result := '';
+  if FClosed then
     Exit;
   NewLineIndex := 0;
   PostNewLineIndex := 0;
 
   while True do
   begin
-    if (NewLineIndex + 2 > FBufferedData.Length) and (not FNoDataInStream) then
+    if (NewLineIndex + 2 > FBufferEnd + FBufferStart) and (not FNoDataInStream) then
       FillBuffer(FEncoding);
 
-    if NewLineIndex >= FBufferedData.Length then
+    if NewLineIndex >= FBufferEnd + FBufferStart then
     begin
       if FNoDataInStream then
       begin
@@ -555,23 +361,23 @@ begin
       else
       begin
         FillBuffer(FEncoding);
-        if FBufferedData.Length = 0 then
+        if FBufferEnd = FBufferStart then
           Break;
       end;
     end;
-    if FBufferedData[NewLineIndex] = #10 then
+    if FBufferedData[NewLineIndex + FBufferStart] = #10 then
     begin
       PostNewLineIndex := NewLineIndex + 1;
       Break;
     end
     else
-    if (FBufferedData[NewLineIndex] = #13) and (NewLineIndex + 1 < FBufferedData.Length) and (FBufferedData[NewLineIndex + 1] = #10) then
+    if (FBufferedData[NewLineIndex + FBufferStart] = #13) and (NewLineIndex + 1 < FBufferEnd + FBufferStart) and (FBufferedData[NewLineIndex + 1] = #10) then
     begin
       PostNewLineIndex := NewLineIndex + 2;
       Break;
     end
     else
-    if FBufferedData[NewLineIndex] = #13 then
+    if FBufferedData[NewLineIndex + FBufferStart] = #13 then
     begin
       PostNewLineIndex := NewLineIndex + 1;
       Break;
@@ -580,21 +386,24 @@ begin
     Inc(NewLineIndex);
   end;
 
-  Result := FBufferedData.ToString;
+  Result := FBufferedData.ToString.Substring(FBufferStart);
   SetLength(Result, NewLineIndex);
-  FBufferedData.Remove(0, PostNewLineIndex);
+  inc(FBufferStart, PostNewLineIndex);}
 end;
 
 function TAdvStreamReader.ReadToEnd: string;
 begin
+  raise Exception.Create('This needs debugging for FBufferStart');
   Result := '';
-  if (FBufferedData <> nil) and (not EndOfStream) then
+  if (not FClosed) and (not EndOfStream) then
   begin
     repeat
       FillBuffer(FEncoding);
     until FNoDataInStream;
-    Result := FBufferedData.ToString;
-    FBufferedData.Remove(0, FBufferedData.Length);
+    SetLength(result, FBufferEnd - FBufferStart);
+    Move(FBufferedData[FBufferStart], result[1], length(result) * Sizeof(Char));
+    FBufferEnd := 0;
+    FBufferStart := 0;
   end;
 end;
 
@@ -634,6 +443,59 @@ begin
   SetLength(oBuffer, iLength);
   result := ReadBlock(oBuffer, 0, iLength);
   SetString(s, pchar(oBuffer), result);
+end;
+
+{ TAdvStringReader }
+
+procedure TAdvStringReader.Close;
+begin
+ // nothing
+end;
+
+constructor TAdvStringReader.Create(content: String);
+begin
+  inherited Create;
+  FContent := content;
+  FCursor := 1;
+end;
+
+function TAdvStringReader.Peek: Integer;
+begin
+  if FCursor > FContent.Length then
+    result := -1
+  else
+    result := ord(FContent[FCursor]);
+end;
+
+function TAdvStringReader.Read: Integer;
+begin
+  if FCursor > FContent.Length then
+    result := -1
+  else
+  begin
+    result := ord(FContent[FCursor]);
+    inc(FCursor);
+  end;
+end;
+
+function TAdvStringReader.Read(const Buffer: TCharArray; Index, Count: Integer): Integer;
+begin
+  raise Exception.Create('Not done yet');
+end;
+
+function TAdvStringReader.ReadBlock(const Buffer: TCharArray; Index, Count: Integer): Integer;
+begin
+  raise Exception.Create('Not done yet');
+end;
+
+function TAdvStringReader.ReadLine: string;
+begin
+  raise Exception.Create('Not done yet');
+end;
+
+function TAdvStringReader.ReadToEnd: string;
+begin
+  raise Exception.Create('Not done yet');
 end;
 
 end.

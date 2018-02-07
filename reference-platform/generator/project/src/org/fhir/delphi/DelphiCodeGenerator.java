@@ -87,11 +87,14 @@ public class DelphiCodeGenerator extends OutputStreamWriter {
   public List<String> procs = new ArrayList<String>();
   public List<String> procsPub = new ArrayList<String>();
 
-  private int dstuID;
+  private String dstuID;
 
-  public DelphiCodeGenerator(OutputStream out, int dstuID) throws UnsupportedEncodingException {
+  private String sfxDstuID;
+
+  public DelphiCodeGenerator(OutputStream out, String dstuID, String sfxDstuID) throws UnsupportedEncodingException {
     super(out, "ASCII");
     this.dstuID = dstuID;
+    this.sfxDstuID = sfxDstuID;
   }
 
   public void start() throws Exception {
@@ -112,7 +115,13 @@ public class DelphiCodeGenerator extends OutputStreamWriter {
         s.append("''");
       else
         s.append(c);
-    return s.toString();
+    String r = s.toString();
+    int i = 250;
+    while (i < r.length()) {
+      r = r.substring(0, i)+"'+'"+r.substring(i);
+      i = i + 253;
+    }
+    return r;
   }
 
   public void finish() throws Exception {
@@ -125,10 +134,12 @@ public class DelphiCodeGenerator extends OutputStreamWriter {
       }
       write("\r\n");
     }
-    write("unit "+name+";\r\n");
+    write("unit "+name+sfxDstuID+";\r\n");
+    write("\r\n");
+    write("{$I fhir.inc}\r\n");
     write("\r\n");
     write("{\r\n"+FULL_LICENSE_CODE+"}\r\n");
-    write("\r\n"+VERSION_MARK.replace("%%", Integer.toString(dstuID))+"\r\n");
+    write("\r\n"+VERSION_MARK.replace("%%", dstuID)+"\r\n");
     write("\r\n");
     write("interface\r\n");
     write("\r\n");
@@ -219,6 +230,19 @@ public class DelphiCodeGenerator extends OutputStreamWriter {
     write("\r\n");
     flush();
     close();
+  }
+
+  public void ifdef(String n) {
+    classFwds.add("{$IFDEF FHIR_"+n+"}\r\n");
+    classDefs.add("{$IFDEF FHIR_"+n+"}\r\n");
+    classImpls.add("{$IFDEF FHIR_"+n+"}\r\n");
+
+  }
+
+  public void endif(String n) {
+    classFwds.add("{$ENDIF FHIR_"+n+"}\r\n");
+    classDefs.add("{$ENDIF FHIR_"+n+"}\r\n");
+    classImpls.add("{$ENDIF FHIR_"+n+"}\r\n");
   }
 
 

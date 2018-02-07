@@ -1,62 +1,81 @@
 unit SearchProcessor;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
   SysUtils, Classes, Generics.Collections, System.Character,
   ParseMap,
   StringSupport, EncodeSupport,
-  AdvObjects, DateAndTime, DecimalSupport, AdvGenerics,
+  AdvObjects, DateSupport, DecimalSupport, AdvGenerics,
   FHIRBase, FHIRResources, FHIRLang, FHIRConstants, FHIRTypes,
-  FHIRIndexManagers, FHIRDataStore, FHIRUtilities, FHIRSearchSyntax, FHIRSupport, ServerUtilities,
+  KDBManager, KDBDialects,
+  FHIRIndexBase, FHIRIndexManagers, FHIRUtilities, FHIRSearchSyntax, FHIRSupport, ServerUtilities, FHIRServerContext, FHIRClient,
   UcumServices;
-
-const
-  SEARCH_PARAM_NAME_ID = 'search-id';
-  HISTORY_PARAM_NAME_ID = 'history-id';
-  SEARCH_PARAM_NAME_OFFSET = 'search-offset';
-  SEARCH_PARAM_NAME_TEXT = '_text';
-  SEARCH_PARAM_NAME_COUNT = '_count';
-  SEARCH_PARAM_NAME_SORT = '_sort';
-  SEARCH_PARAM_NAME_SUMMARY = '_summary';
-  SEARCH_PARAM_NAME_FILTER = '_filter';
-  SEARCH_PAGE_DEFAULT = 50;
-  SEARCH_PAGE_LIMIT = 1000;
-  SUMMARY_SEARCH_PAGE_LIMIT = 10000;
-  SUMMARY_TEXT_SEARCH_PAGE_LIMIT = 10000;
-
 
 type
   TQuantityOperation = (qopEqual, qopNotEqual, qopLess, qopLessEqual, qopGreater, qopGreaterEqual, qopStartsAfter, qopEndsBefore, qopApproximate);
 
-  TSearchProcessor = class (TAdvObject)
+  TSearchProcessor = class (TFHIRServerWorker)
   private
-    FResConfig: TADvMap<TFHIRResourceConfig>;
     FLink: String;
     FSort: String;
     FFilter: String;
     FTypeKey: integer;
-    FCompartmentId: String;
-    FCompartments: String;
+    FCompartment: TFHIRCompartmentId;
+    FSessionCompartments : TAdvList<TFHIRCompartmentId>;
     FParams: TParseMap;
     FType: String;
     FBaseURL: String;
     FIndexes: TFhirIndexInformation;
     FLang: String;
-    FRepository: TFHIRDataStore;
     FSession : TFhirSession;
 //    FLeftOpen: boolean;
     FcountAllowed: boolean;
     FReverse: boolean;
+    FStrict : boolean;
+    FConnection: TKDBConnection;
+    FWarnings : TFhirOperationOutcomeIssueList;
+    FResConfig : TAdvMap<TFHIRResourceConfig>;
 
-    function processValueSetMembership(vs : String) : String;
+    function order(s : String) : String;
+    function fetchGroup(id : String) : TFHIRGroup;
+    procedure warning(issue : TFhirIssueTypeEnum; location, message : String);
+    function processValueSetMembership(code, vs : String) : String;
     function BuildFilter(filter : TFSFilter; parent : char; issuer : TFSCharIssuer; types : TArray<String>) : String;
     function BuildFilterParameter(filter : TFSFilterParameter; path : TFSFilterParameterPath; parent : char; issuer : TFSCharIssuer; types : TArray<String>) : String;
     function BuildFilterLogical  (filter : TFSFilterLogical;   parent : char; issuer : TFSCharIssuer; types : TArray<String>) : String;
     Function ProcessSearchFilter(value : String) : String;
     Function ProcessParam(types : TArray<String>; name : String; value : String; nested : boolean; var bFirst : Boolean; var bHandled : Boolean) : String;
     procedure SetIndexes(const Value: TFhirIndexInformation);
-    procedure SetRepository(const Value: TFHIRDataStore);
     procedure SplitByCommas(value: String; list: TStringList);
     function findPrefix(var value: String; subst: String): boolean;
     procedure checkDateFormat(s : string);
@@ -71,37 +90,44 @@ type
     procedure processNumberValue(value : TSmartDecimal; op : TQuantityOperation; var minv, maxv : String);
     procedure SetSession(const Value: TFhirSession);
     function filterTypes(types: TArray<String>): TArray<String>;
-    procedure ProcessDateParam(date: TDateAndTime; var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
+    procedure ProcessDateParam(date: TDateTimeEx; var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
     procedure ProcessStringParam(var Result: string; name, modifier, value: string; key: Integer; var pfx: string; var sfx: string; types : TArray<String>);
     procedure ProcessUriParam(var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
     procedure ProcessTokenParam(var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
     procedure ProcessReferenceParam(var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
     procedure ProcessQuantityParam(var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
     procedure ProcessNumberParam(var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
+    procedure SetConnection(const Value: TKDBConnection);
+    procedure SetCompartment(const Value: TFHIRCompartmentId);
+    procedure SetSessionCompartments(const Value: TAdvList<TFHIRCompartmentId>);
+    procedure SetResConfig(const Value: TAdvMap<TFHIRResourceConfig>);
   public
-    constructor create(ResConfig: TADvMap<TFHIRResourceConfig>);
+    constructor create(serverContext : TAdvObject);
     Destructor Destroy; override;
     procedure Build;
 //procedure TFhirOperation.ProcessDefaultSearch(typekey : integer; aType : TFHIRResourceType; params : TParseMap; baseURL, compartments, compartmentId : String; id, key : string; var link, sql : String; var total : Integer; var wantSummary : boolean);
 
     // inbound
+    property resConfig : TAdvMap<TFHIRResourceConfig> read FResConfig write SetResConfig;
     property typekey : integer read FTypeKey write FTypeKey;
     property type_ : String read FType write FType;
-    property compartmentId : String read FCompartmentId write FCompartmentId;
-    property compartments : String read FCompartments write FCompartments;
+    property compartment : TFHIRCompartmentId read FCompartment write SetCompartment;
+    property sessionCompartments : TAdvList<TFHIRCompartmentId> read FSessionCompartments write SetSessionCompartments;
     property baseURL : String read FBaseURL write FBaseURL;
     property lang : String read FLang write FLang;
     property params : TParseMap read FParams write FParams;
     property indexes : TFhirIndexInformation read FIndexes write SetIndexes;
-    property repository : TFHIRDataStore read FRepository write SetRepository;
     property session : TFhirSession read FSession write SetSession;
     property countAllowed : boolean read FcountAllowed write FcountAllowed;
+    property Connection : TKDBConnection read FConnection write SetConnection;
 
     // outbound
     property link_ : String read FLink write FLink;
     property sort : String read FSort write FSort;
     property filter : String read FFilter write FFilter;
     property reverse : boolean read FReverse write FReverse;
+    property strict : boolean read FStrict write FStrict;
+    property Warnings : TFhirOperationOutcomeIssueList read FWarnings;
   end;
 
 
@@ -141,6 +167,11 @@ begin
 end;
 
 
+function knownParam(name : String) : boolean;
+begin
+  result := StringArrayExistsSensitive(['_id', '_lastUpdated', '_tag', '_profile', '_security', '_text', '_content', '_list', '_has', '_type', '_query', '_sort', '_count', '_include', '_revinclude', '_summary', '_elements', '_contained', '_containedType'], name);
+end;
+
 { TSearchProcessor }
 
 procedure TSearchProcessor.Build;
@@ -150,23 +181,24 @@ var
   i, j : integer;
   ix : TFhirIndex;
   ts : TStringList;
+  c : TFHIRCompartmentId;
 begin
   if typekey = 0 then
-    filter := 'Ids.MasterResourceKey is null'
+  begin
+    filter := 'Ids.MasterResourceKey is null';
+    type_ := '*';
+  end
   else
     filter := 'Ids.MasterResourceKey is null and Ids.ResourceTypeKey = '+inttostr(typekey);
 
-  if (compartmentId <> '') then
-    filter := filter +' and Ids.ResourceKey in (select ResourceKey from Compartments where TypeKey = '+inttostr(FResConfig['Patient'].key)+' and Id = '''+compartmentId+''')';
-
-  if (compartments <> '') then
-    filter := filter +' and Ids.ResourceKey in (select ResourceKey from Compartments where TypeKey = '+inttostr(FResConfig['Patient'].key)+' and Id in ('+compartments+'))';
+  filter := filter + buildCompartmentsSQL(resConfig, compartment, sessionCompartments);
 
   link_ := '';
   first := false;
   ts := TStringList.create;
   try
-    for i := 0 to params.Count - 1 do
+    i := 0;
+    while i < params.Count do
     begin
       ts.Clear;
       ts.assign(params.List(i));
@@ -176,10 +208,13 @@ begin
       for j := 0 to ts.count - 1 do
       begin
         handled := false;
-        filter := filter + processParam([type_], params.VarName(i), ts[j], false, first, handled);
+        filter := filter + processParam(TArray<String>.create(type_), params.VarName(i), ts[j], false, first, handled);
         if handled then
-          link_ := link_ + '&'+params.VarName(i)+'='+EncodeMIME(ts[j]);
+          link_ := link_ + '&'+params.VarName(i)+'='+EncodeMIME(ts[j])
+        else if strict and not (knownParam(params.VarName(i))) then
+          Raise Exception.create(StringFormat(GetFhirMessage('MSG_PARAM_UNKNOWN', lang), [params.VarName(i)]));
       end;
+      inc(i);
     end;
   finally
     ts.free;
@@ -346,9 +381,9 @@ begin
   else if modifier = 'text' then
     result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 like ''' + sqlwrapString(lowercase(RemoveAccents(value))) + '%'')'
   else if modifier = 'in' then
-    result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and ' + processValueSetMembership(value) + ')'
+    result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and ' + processValueSetMembership(name, value) + ')'
   else if modifier = 'not-in' then
-    result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (' + processValueSetMembership(value) + '))'
+    result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (' + processValueSetMembership(name, value) + '))'
   else
   begin
     if value.Contains('|') then
@@ -370,13 +405,24 @@ begin
     else if modifier = 'not' then
     begin
       if (system = '--') then
-        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (Value = ''' + sqlwrapString(value) + '''))'
+        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (Value = ''' + sqlwrapString(value) + ''') and not (value = ''''))'
       else if (system = '') then
-        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (SpaceKey = null and Value = ''' + sqlwrapString(code) + '''))'
+        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (SpaceKey = null and Value = ''' + sqlwrapString(code) + ''') and not (value = ''''))'
       else if (code = '') then // this variation (no code, only system) is not described in the spec
-        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (SpaceKey = (Select SpaceKey from Spaces where Space = ''' + sqlwrapstring(system) + ''')))'
+        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (SpaceKey = (Select SpaceKey from Spaces where Space = ''' + sqlwrapstring(system) + ''')) and not (value = ''''))'
       else
-        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (SpaceKey = (Select SpaceKey from Spaces where Space = ''' + sqlwrapstring(system) + ''') and Value = ''' + sqlwrapString(code) + '''))';
+        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and not (SpaceKey = (Select SpaceKey from Spaces where Space = ''' + sqlwrapstring(system) + ''') and Value = ''' + sqlwrapString(code) + ''') and not (value = ''''))';
+    end
+    else if modifier = 'excludes' then
+    begin
+      if (system = '--') then
+        result := result + 'not (IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and (Value = ''' + sqlwrapString(value) + '''))'
+      else if (system = '') then
+        result := result + 'not (IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and (SpaceKey = null and Value = ''' + sqlwrapString(code) + '''))'
+      else if (code = '') then // this variation (no code, only system) is not described in the spec
+        result := result + 'not (IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and (SpaceKey = (Select SpaceKey from Spaces where Space = ''' + sqlwrapstring(system) + ''')))'
+      else
+        result := result + 'not (IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and (SpaceKey = (Select SpaceKey from Spaces where Space = ''' + sqlwrapstring(system) + ''') and Value = ''' + sqlwrapString(code) + '''))';
     end
     else if modifier = 'above' then
       raise exception.create(StringFormat(GetFhirMessage('MSG_PARAM_MODIFIER_INVALID', lang), [modifier]))
@@ -461,7 +507,7 @@ begin
   result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value ' + pfx + sqlwrapString(v) + sfx + ')';
 end;
 
-procedure TSearchProcessor.ProcessDateParam(date: TDateAndTime; var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
+procedure TSearchProcessor.ProcessDateParam(date: TDateTimeEx; var Result: string; name, modifier, value: string; key: Integer; types : TArray<String>);
 var
   qop: TQuantityOperation;
 begin
@@ -478,22 +524,17 @@ begin
   else if findPrefix(value, 'eb') then qop := qopEndsBefore
   else if findPrefix(value, 'ap') then qop := qopApproximate;
   CheckDateFormat(value);
-  date := TDateAndTime.CreateXML(value);
-  try
-    case qop of
-      qopEqual:        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value >= ''' + date.AsUTCDateTimeMinHL7 + ''' and Value2 <= ''' + date.AsUTCDateTimeMaxHL7 + ''')';
-      qopNotEqual:     result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and (Value < ''' + date.AsUTCDateTimeMinHL7 + ''' or Value2 > ''' + date.AsUTCDateTimeMaxHL7 + '''))';
-      qopLess:         result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value <= ''' + date.AsUTCDateTimeMinHL7 + ''')';
-      qopLessEqual:    result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value <= ''' + date.AsUTCDateTimeMaxHL7 + ''')';
-      qopGreater:      result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 >= ''' + date.AsUTCDateTimeMaxHL7 + ''')';
-      qopGreaterEqual: result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 >= ''' + date.AsUTCDateTimeMinHL7 + ''')';
-      qopStartsAfter:  result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 >= ''' + date.AsUTCDateTimeMinHL7 + ''')';
-      qopEndsBefore:   result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 >= ''' + date.AsUTCDateTimeMinHL7 + ''')';
-      qopApproximate:  result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value <= ''' + date.AsUTCDateTimeMaxHL7 + ''' and Value2 >= ''' + date.AsUTCDateTimeMinHL7 + ''')';
-    end;
-  finally
-    date.free;
-    date := nil;
+  date := TDateTimeEx.fromXml(value);
+  case qop of
+    qopEqual:        result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value >= ''' + date.Min.UTC.toHL7 + ''' and Value2 <= ''' + date.Max.UTC.toHL7 + ''')';
+    qopNotEqual:     result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and (Value < ''' + date.Min.UTC.toHL7 + ''' or Value2 > ''' + date.Max.UTC.toHL7 + '''))';
+    qopLess:         result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value <= ''' + date.Min.UTC.toHL7 + ''')';
+    qopLessEqual:    result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value <= ''' + date.Max.UTC.toHL7 + ''')';
+    qopGreater:      result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 >= ''' + date.Max.UTC.toHL7 + ''')';
+    qopGreaterEqual: result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 >= ''' + date.Min.UTC.toHL7 + ''')';
+    qopStartsAfter:  result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 >= ''' + date.Min.UTC.toHL7 + ''')';
+    qopEndsBefore:   result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value2 >= ''' + date.Min.UTC.toHL7 + ''')';
+    qopApproximate:  result := result + '(IndexKey = ' + inttostr(Key) + ' /*' + name + '*/ and Value <= ''' + date.Max.UTC.toHL7 + ''' and Value2 >= ''' + date.Min.UTC.toHL7 + ''')';
   end;
 end;
 
@@ -627,32 +668,28 @@ end;
 
 function TSearchProcessor.buildParameterDate(index: Integer; n: Char; j: string; name : String; op : TFSCompareOperation; value: string) : String;
 var
-  date: TDateAndTime;
+  date: TDateTimeEx;
 begin
   begin
-    date := TDateAndTime.CreateXML(value);
-    try
-      case op of
-        fscoEQ:
-          result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value = ''' + date.AsUTCDateTimeMinHL7 + ''' and ' + n + '.Value2 = ''' + date.AsUTCDateTimeMaxHL7 + '''' + j + ')';
-        fscoNE:
-          result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and (' + n + '.Value <> ''' + date.AsUTCDateTimeMinHL7 + ''' or ' + n + '.Value2 <> ''' + date.AsUTCDateTimeMaxHL7 + ''')' + j + ')';
-        fscoGT:
-          result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value2 >= ''' + date.AsUTCDateTimeMaxHL7 + '''' + j + ')';
-        fscoLT:
-          result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value <= ''' + date.AsUTCDateTimeMinHL7 + '''' + j + ')';
-        fscoGE:
-          result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value2 >= ''' + date.AsUTCDateTimeMinHL7 + '''' + j + ')';
-        fscoLE:
-          result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value <= ''' + date.AsUTCDateTimeMaxHL7 + '''' + j + ')';
-        fscoPO:
-          result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and (' + n + '.Value >= ''' + date.AsUTCDateTimeMaxHL7 + ''' or ' + n + '.Value2 <= ''' + date.AsUTCDateTimeMinHL7 + ''')' + j + ')';
-      else
-        // fscoSS, fscoSB, fscoIN, fscoRE, fscoCO, fscoSW, fscoEW
-        raise Exception.Create('The operation ''' + CODES_CompareOperation[op] + ''' is not supported for parameter types of date');
-      end;
-    finally
-      date.free;
+    date := TDateTimeEx.fromXml(value);
+    case op of
+      fscoEQ:
+        result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value = ''' + date.Min.UTC.toHL7 + ''' and ' + n + '.Value2 = ''' + date.Max.UTC.toHL7 + '''' + j + ')';
+      fscoNE:
+        result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and (' + n + '.Value <> ''' + date.Min.UTC.toHL7 + ''' or ' + n + '.Value2 <> ''' + date.Max.UTC.toHL7 + ''')' + j + ')';
+      fscoGT:
+        result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value2 >= ''' + date.Max.UTC.toHL7 + '''' + j + ')';
+      fscoLT:
+        result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value <= ''' + date.Min.UTC.toHL7 + '''' + j + ')';
+      fscoGE:
+        result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value2 >= ''' + date.Min.UTC.toHL7 + '''' + j + ')';
+      fscoLE:
+        result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and ' + n + '.Value <= ''' + date.Max.UTC.toHL7 + '''' + j + ')';
+      fscoPO:
+        result := 'ResourceKey in (select ResourceKey from IndexEntries as ' + n + ' where Flag <> 2 and ' + n + '.IndexKey = ' + inttostr(index) + ' and (' + n + '.Value >= ''' + date.Max.UTC.toHL7 + ''' or ' + n + '.Value2 <= ''' + date.Min.UTC.toHL7 + ''')' + j + ')';
+    else
+      // fscoSS, fscoSB, fscoIN, fscoRE, fscoCO, fscoSW, fscoEW
+      raise Exception.Create('The operation ''' + CODES_CompareOperation[op] + ''' is not supported for parameter types of date');
     end;
   end;
 end;
@@ -852,7 +889,7 @@ begin
     try
       specified.Value := value;
       specified.UnitCode := space;
-      canonical := repository.TerminologyServer.Ucum.getCanonicalForm(specified);
+      canonical := TFHIRServerContext(ServerContext).TerminologyServer.Ucum.getCanonicalForm(specified);
       try
         mincv := normaliseDecimal(canonical.Value.lowerBound.AsDecimal);
         maxcv := normaliseDecimal(canonical.Value.upperBound.AsDecimal);
@@ -869,14 +906,34 @@ begin
     space := ns+'#'+space;
 end;
 
+function TSearchProcessor.fetchGroup(id: String): TFHIRGroup;
+var
+  client : TFhirClient;
+begin
+  client := TFHIRServerContext(ServerContext).Storage.createClient(lang, ServerContext, TFHIRServerContext(ServerContext).ValidatorContext.link, FSession.link);
+  try
+    result := client.readResource(frtGroup, id) as TFhirGroup;
+    if result = nil then
+      raise Exception.Create('Unable to find group '+id);
+  finally
+    client.Free;
+  end;
+end;
+
 Function TSearchProcessor.filterTypes(types : TArray<String>) : TArray<String>;
 var
   a : string;
+  res : TStringList;
 begin
-  result := [];
+  res := TStringList.Create;
+  try
   for a in types do
     if session.canRead(a) then
-      result := result + [a];
+        res.add(a);
+    result := res.ToStringArray;
+  finally
+    res.free;
+  end;
 end;
 
 function isCommonSearchParameter(name : String): boolean;
@@ -888,15 +945,18 @@ Function TSearchProcessor.processParam(types : TArray<String>; name : String; va
 var
   key, i : integer;
   left, right, op, modifier, tl : String;
-  f : Boolean;
+  f, isReverse : Boolean;
   ts : TStringList;
-  pfx, sfx : String;
-  date : TDateAndTime;
+  pfx, sfx, n : String;
+  date : TDateTimeEx;
   a : String;
   type_ : TFhirSearchParamTypeEnum;
+  group : TFHIRGroup;
+  each: TObject;
+  characteristic : TFhirGroupCharacteristic;
 begin
+  isReverse := false;
   a := '';
-  date := nil;
   result := '';
   op := '';
   bHandled := false;
@@ -914,9 +974,53 @@ begin
     bHandled := true;
     result:= processSearchFilter(value);
   end
+  else if (name = '_type') then
+  begin
+    types := value.Split([',']);
+    for a in types do
+      tl := tl+','+inttostr(TFHIRServerContext(ServerContext).ResConfig[a].key);
+    if (tl <> '') then
+      tl := tl.Substring(1);
+    result := result + '(ResourceTypeKey in ('+tl+'))';
+    bHandled := true;
+  end
+  else if (name = '_list') then
+  begin
+    result := result + '(IndexKey = '+inttostr(FIndexes.ListItemIndex)+' /*'+left+'*/ and ResourceKey in (select ResourceKey from Ids where ResourceTypeKey = '+inttostr(TFHIRServerContext(ServerContext).ResConfig['List'].key)+' and Id = '''+SQLWrapString(value)+'''))';
+    bHandled := true;
+    isReverse :=true;
+  end
+  else if (name = '_group') then
+  begin
+    group := fetchGroup(value);
+    try
+      if group.memberList.Count > 0 then
+      begin
+        result := result + '(IndexKey = '+inttostr(FIndexes.GroupMemberIndex)+' /*'+left+'*/ and ResourceKey in (select ResourceKey from Ids where ResourceTypeKey = '+inttostr(TFHIRServerContext(ServerContext).ResConfig['Group'].key)+' and Id = '''+SQLWrapString(value)+'''))';
+        bHandled := true;
+        isReverse := true;
+      end
+      else if group.characteristicList.Count > 0 then
+      begin
+        for characteristic in group.characteristicList do
+        begin
+          n := characteristic.code.fromSystem(['http://hl7.org/fhir/StructureDefinition/Patient', 'http://hl7.org/fhir/StructureDefinition/Practitioner', 'http://hl7.org/fhir/StructureDefinition/Device', 'http://hl7.org/fhir/StructureDefinition/Medication', 'http://hl7.org/fhir/StructureDefinition/Substance']);
+          if n = 'Patient.gender' then
+            params.addItem('gender', (characteristic.value as TFhirCodeableConcept).fromSystem('http://hl7.org/fhir/ValueSet/administrative-gender', true));
+        end;
+      end
+      else
+        raise Exception.Create('Unable to process group "'+group.name+'": it has no members or characteristics');
+    finally
+      group.Free;
+    end;
+  end
   else if (name = '_text') then
   begin
-    result := '(IndexKey = '+inttostr(FIndexes.NarrativeIndex)+' and CONTAINS(Xhtml, '''+SQLWrapString(value)+'''))';
+    if Connection.owner.platform = kdbSQLServer then
+      result := '(IndexKey = '+inttostr(FIndexes.NarrativeIndex)+' and CONTAINS(Xhtml, '''+SQLWrapString(value)+'''))';
+    if Connection.owner.platform = kdbMySQL then
+      result := '(IndexKey = '+inttostr(FIndexes.NarrativeIndex)+' and MATCH (Xhtml) AGAINST ('''+SQLWrapString(value)+'''))';
   end
   else if pos('.', name) > 0 then
   begin
@@ -926,7 +1030,7 @@ begin
       StringSplit(left, ':', left, modifier);
       if not StringArrayExistsInSensitive(CODES_TFHIRResourceType, modifier) then
         raise Exception.create(StringFormat(GetFhirMessage('MSG_UNKNOWN_TYPE', lang), [modifier]));
-      types := filterTypes([modifier]);
+      types := filterTypes(TArray<String>.create(modifier));
     end
     else
     begin
@@ -938,7 +1042,7 @@ begin
     f := true;
     tl := '';
     for a in types do
-      tl := tl+','+inttostr(FRepository.ResConfig[a].key);
+      tl := tl+','+inttostr(TFHIRServerContext(ServerContext).ResConfig[a].key);
     if (tl <> '') then
       tl := tl.Substring(1);
     if (tl = '') then
@@ -1006,6 +1110,8 @@ begin
                 SearchParamTypeReference : ProcessReferenceParam(Result, name, modifier, value, key, types);
                 SearchParamTypeQuantity : ProcessQuantityParam(Result, name, modifier, value, key, types);
                 SearchParamTypeNumber : ProcessNumberParam(Result, name, modifier, value, key, types);
+                SearchParamTypeNull : if (name = '_id') then
+                  ProcessTokenParam(Result, name, modifier, value, key, types);
               else if type_ <> SearchParamTypeNull then
                 raise exception.create('not done yet: type = '+CODES_TFhirSearchParamTypeEnum[type_]);
               end;
@@ -1023,7 +1129,11 @@ begin
   if result <> '' then
   begin
     if not nested and (name <> 'tag') then
-      result := 'Ids.ResourceKey in (select ResourceKey from IndexEntries where Flag <> 2 and '+result+')';
+      if isReverse then
+      // This last ORDER BY is to workaround MariaDB Issue where a subquery in an IN clause may not give the results if there is an ORDER BY.
+        result := 'Ids.ResourceKey in (select Target from IndexEntries where Flag <> 2 and '+result+order(' order by Target DESC')+')'
+      else
+        result := 'Ids.ResourceKey in (select ResourceKey from IndexEntries where Flag <> 2 and '+result+order(' order by resourcekey DESC')+')';
     if not bfirst then
       result := ' and '+result;
   end;
@@ -1041,7 +1151,7 @@ begin
   try
     filter := TFSFilterParser.parse(value);
     try
-      result := '('+BuildFilter(filter, ' ', issuer, [FType])+')';
+      result := '('+BuildFilter(filter, ' ', issuer, TArray<String>.create(FType))+')';
     finally
       filter.Free;
     end;
@@ -1050,14 +1160,15 @@ begin
   end;
 end;
 
-function TSearchProcessor.processValueSetMembership(vs: String): String;
+function TSearchProcessor.processValueSetMembership(code, vs: String): String;
 var
   vso : TFHIRValueSet;
+  key : integer;
 begin
   // firstly, the vs can be a logical reference or a literal reference
   if (vs.StartsWith('valueset/')) then
   begin
-    vso := FRepository.TerminologyServer.getValueSetByUrl(vs);
+    vso := TFHIRServerContext(ServerContext).TerminologyServer.getValueSetByUrl(vs);
     try
       if vso = nil then
         vs := 'not-found'
@@ -1067,7 +1178,10 @@ begin
       vso.Free;
     end;
   end;
-  result := 'Concept in (select ConceptKey from ValueSetMembers where ValueSetKey in (select ValueSetKey from ValueSets where URL = '''+sqlWrapString(vs)+'''))';
+  key := FConnection.CountSQL('select ValueSetKey from ValueSets where URL = '''+sqlWrapString(vs)+'''');
+  if key = 0 then
+    warning(IssueTypeNotFound, 'http.url.'+code, 'The value set "'+vs+'" is not indexed, and cannot be searched on');
+  result := 'Concept in (select ConceptKey from ValueSetMembers where ValueSetKey = '+inttostr(key)+')';
 end;
 
 procedure TSearchProcessor.replaceNames(paramPath: TFSFilterParameterPath; components: TDictionary<String, String>);
@@ -1091,24 +1205,41 @@ begin
     replaceNames(TFSFilterParameter(filter).ParamPath, components);
 end;
 
+procedure TSearchProcessor.SetCompartment(const Value: TFHIRCompartmentId);
+begin
+  FCompartment.Free;
+  FCompartment := Value;
+end;
+
+procedure TSearchProcessor.SetConnection(const Value: TKDBConnection);
+begin
+  FConnection.Free;
+  FConnection := Value;
+end;
+
 procedure TSearchProcessor.SetIndexes(const Value: TFhirIndexInformation);
 begin
   FIndexes.Free;
   FIndexes := Value;
 end;
 
-procedure TSearchProcessor.SetRepository(const Value: TFHIRDataStore);
+
+procedure TSearchProcessor.SetResConfig(const Value: TAdvMap<TFHIRResourceConfig>);
 begin
-  FRepository.Free;
-  FRepository := Value;
+  FResConfig.Free;
+  FResConfig := Value;
 end;
-
-
 
 procedure TSearchProcessor.SetSession(const Value: TFhirSession);
 begin
   FSession.Free;
   FSession := Value;
+end;
+
+procedure TSearchProcessor.SetSessionCompartments(const Value: TAdvList<TFHIRCompartmentId>);
+begin
+  FSessionCompartments.Free;
+  FSessionCompartments := Value;
 end;
 
 procedure TSearchProcessor.SplitByCommas(value : String; list : TStringList);
@@ -1119,11 +1250,31 @@ begin
     list.add(s);
 end;
 
+procedure TSearchProcessor.warning(issue: TFhirIssueTypeEnum; location, message: String);
+var
+  iss : TFhirOperationOutcomeIssue;
+begin
+  iss := FWarnings.Append;
+  iss.severity := IssueSeverityWarning;
+  iss.code := issue;
+  iss.details := TFhirCodeableConcept.Create;
+  iss.details.text := message;
+  iss.locationList.add(location);
+end;
+
 function TSearchProcessor.findPrefix(var value : String; subst : String) : boolean;
 begin
   result := value.StartsWith(subst);
   if result then
     value := value.Substring(subst.Length);
+end;
+
+function TSearchProcessor.order(s: String): String;
+begin
+  if Connection.owner.platform = kdbMySQL then
+    result := s
+  else
+    result := '';
 end;
 
 function TSearchProcessor.BuildFilter(filter: TFSFilter; parent: char; issuer: TFSCharIssuer; types : TArray<String>): String;
@@ -1259,18 +1410,22 @@ begin
     raise exception.create(StringFormat(GetFhirMessage('MSG_DATE_FORMAT', lang), [s]));
 end;
 
-constructor TSearchProcessor.create(ResConfig: TADvMap<TFHIRResourceConfig>);
+constructor TSearchProcessor.create(serverContext : TAdvObject);
 begin
-  Inherited Create;
-  FResConfig := ResConfig;
+  Inherited Create(serverContext);
+  FStrict := false;
+  FWarnings := TFhirOperationOutcomeIssueList.create;
 end;
 
 destructor TSearchProcessor.Destroy;
 begin
-  FRepository.Free;
+  FResConfig.Free;
+  FSessionCompartments.Free;
+  FCompartment.Free;
+  FWarnings.Free;
+  FConnection.Free;
   FSession.Free;
   FIndexes.Free;
-  FResConfig.Free;
   inherited;
 end;
 

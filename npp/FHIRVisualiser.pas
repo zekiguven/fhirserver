@@ -1,5 +1,34 @@
 unit FHIRVisualiser;
 
+
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
 interface
 
 uses
@@ -10,7 +39,7 @@ uses
   FHIRPathDocumentation, Vcl.Buttons, Vcl.OleCtrls, SHDocVw, TextUtilities, FHIRBase,
   AdvGenerics, PluginUtilities, VirtualTrees, kCritSct, AdvBuffers, ShellSupport,
   IdSocketHandle, IdContext, IdHTTPServer, IdCustomHTTPServer, SmartOnFhirUtilities,
-  GUIDSupport, CDSBrowserForm;
+  GUIDSupport, CDSBrowserForm, CDSHooksClientManager;
 
 const
   UMSG = WM_USER + 1;
@@ -75,9 +104,9 @@ type
     FLastHtml : String;
     FValList : TAdvList<TFHIRAnnotation>;
     FMatchList : TAdvList<TFHIRAnnotation>;
-    FExpression : TFHIRExpressionNode;
+    FExpression : TFHIRPathExpressionNode;
     FFocusPath : String;
-    FFocusObjects : TAdvList<TFHIRBase>;
+    FFocusObjects : TAdvList<TFHIRObject>;
     FCDSManager : TCDSHooksManager;
 
     FLock : TCriticalSection;
@@ -86,11 +115,11 @@ type
     FWebServer : TIdHTTPServer;
     FWebCache : TAdvMap<TWebBuffer>;
 
-    function generateBasicCard(path: String; focus: TFHIRBase): TCDSHookCard;
-    procedure generateTypeCard(focus, next: TFHIRBase);
+    function generateBasicCard(path: String; focus: TFHIRObject): TCDSHookCard;
+    procedure generateTypeCard(focus, next: TFHIRObject);
     function differentObjects(focus: array of TFHIRObject): boolean;
-    procedure queryCDS(coding : TFHIRCoding; context : TFhirResource);
-    procedure queryCDSPatient(coding : TFHIRCoding; patient : TFhirPatient);
+    procedure queryCDS(hook : string; context : TFhirResource);
+    procedure queryCDSPatient(hook : string; patient : TFhirPatient);
 
     procedure DoCommandGet(AContext: TIdContext; ARequestInfo: TIdHTTPRequestInfo; AResponseInfo: TIdHTTPResponseInfo);
     function postToWeb(contentType : String; bytes : TBytes) : String; overload;
@@ -103,7 +132,7 @@ type
     { Public declarations }
     procedure setNarrative(s : String);
     procedure setValidationOutcomes(errors : TAdvList<TFHIRAnnotation>);
-    procedure setPathOutcomes(matches : TAdvList<TFHIRAnnotation>; expression : TFHIRExpressionNode);
+    procedure setPathOutcomes(matches : TAdvList<TFHIRAnnotation>; expression : TFHIRPathExpressionNode);
     procedure setFocusInfo(path : String; focus : Array of TFHIRObject);
 
     property CDSManager : TCDSHooksManager read FCDSManager;
@@ -209,7 +238,7 @@ begin
   VisualiserMode := TVisualiserMode(PageControl1.TabIndex+1);
   FCards := TAdvList<TCDSHookCard>.create;
   FCDSErrors := TStringList.Create;
-  FFocusObjects := TAdvList<TFHIRBase>.create;
+  FFocusObjects := TAdvList<TFHIRObject>.create;
 
   FLock := TCriticalSection.Create('vis.web');
   FWebCache := TAdvMap<TWebBuffer>.create;
@@ -229,9 +258,9 @@ var
   server : TRegisteredFHIRServer;
 begin
   FCDSManager.clearServers;
-  for i := 0 to Settings.ServerCount - 1 do
+  for i := 0 to Settings.ServerCount('') - 1 do
   begin
-    server := Settings.serverInfo(i);
+    server := Settings.serverInfo('', i);
     try
       if server.cdshooks.Count > 0 then
         FCDSManager.registerServer(server);
@@ -254,6 +283,7 @@ begin
   FCDSManager.Free;
   FCDSErrors.Free;
   FCards.Free;
+  FWebServer.Free;
 end;
 
 procedure TFHIRVisualizer.FormDock(Sender: TObject);
@@ -366,14 +396,14 @@ begin
   end;
 end;
 
-procedure TFHIRVisualizer.queryCDS(coding : TFHIRCoding; context: TFhirResource);
+procedure TFHIRVisualizer.queryCDS(hook : string; context: TFhirResource);
 var
   req : TCDSHookRequest;
 begin
   req := TCDSHookRequest.Create;
   try
-    req.activity := coding;
-    req.activityInstance := 'notepad++.fhirgplugin.instance';  // arbitrary global
+    req.hook := hook;
+    req.hookInstance := 'notepad++.fhirgplugin.instance';  // arbitrary global
     req.redirect := 'http://localhost:45654/redirect';
     req.context.Add(context.Link);
     if context is TFHIRPatient then
@@ -384,20 +414,19 @@ begin
   end;
 end;
 
-procedure TFHIRVisualizer.queryCDSPatient(coding: TFHIRCoding; patient: TFhirPatient);
+procedure TFHIRVisualizer.queryCDSPatient(hook : string; patient: TFhirPatient);
 var
   req : TCDSHookRequest;
   entry : TFHIRBundleEntry;
 begin
   req := TCDSHookRequest.Create;
   try
-    req.activity := coding;
-    req.activityInstance := 'notepad++.fhirgplugin.instance';  // arbitrary global
+    req.hook := hook;
+    req.hookInstance := 'notepad++.fhirgplugin.instance';  // arbitrary global
     req.redirect := 'http://localhost:45654/redirect';
     req.patient := patient.id;
-    req.preFetchData := TFhirBundle.Create(BundleTypeCollection);
-    req.preFetchData.id := NewGuidId;
-    entry := req.preFetchData.entryList.Append;
+    entry := TFhirBundleEntry.Create;
+    req.preFetch.add('patient', entry);
     entry.resource := patient.Link;
     FCDSManager.makeRequest(req, OnCDSResponse, nil);
   finally
@@ -405,11 +434,11 @@ begin
   end;
 end;
 
-function TFHIRVisualizer.generateBasicCard(path: String; focus: TFHIRBase) : TCDSHookCard;
+function TFHIRVisualizer.generateBasicCard(path: String; focus: TFHIRObject) : TCDSHookCard;
 begin
   result := TCDSHookCard.Create;
   try
-    result.summary := path+' : '+TFHIRBase(focus).FhirType;
+    result.summary := path+' : '+TFHIRObject(focus).FhirType;
     result.sourceLabel := 'Object Model';
 
     result.Link;
@@ -418,7 +447,7 @@ begin
   end;
 end;
 
-procedure TFHIRVisualizer.generateTypeCard(focus, next: TFHIRBase);
+procedure TFHIRVisualizer.generateTypeCard(focus, next: TFHIRObject);
 var
   att : TFhirAttachment;
   md : TFhirMarkdown;
@@ -504,8 +533,8 @@ begin
     FFocusPath := path;
     FFocusObjects.clear;
     for f in focus do
-      if f is TFHIRBase then
-      FFocusObjects.Add(TFHIRBase(f).Link);
+      if f is TFHIRObject then
+      FFocusObjects.Add(TFHIRObject(f).Link);
     FLock.Lock;
     try
       FCards.Clear;
@@ -540,7 +569,7 @@ begin
   end;
 end;
 
-procedure TFHIRVisualizer.setPathOutcomes(matches : TAdvList<TFHIRAnnotation>; expression : TFHIRExpressionNode);
+procedure TFHIRVisualizer.setPathOutcomes(matches : TAdvList<TFHIRAnnotation>; expression : TFHIRPathExpressionNode);
 var
   a : TFHIRAnnotation;
   li : TListItem;
@@ -644,7 +673,7 @@ procedure TFHIRVisualizer.vtExpressionsInitNode(Sender: TBaseVirtualTree;
   ParentNode, Node: PVirtualNode; var InitialStates: TVirtualNodeInitStates);
 var
   p, pp : PTreeDataPointer;
-  pe : TFHIRExpressionNode;
+  pe : TFHIRPathExpressionNode;
   i : integer;
 begin
   p := vtExpressions.GetNodeData(Node);

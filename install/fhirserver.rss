@@ -3,11 +3,579 @@
 	<channel>
 		<title>FHIRServer (reference server) Release history</title>
 		<link>http://www.healthintersections.com.au/FhirServer</link>
+		<item><title>FHIRServer release 1.0.195 2018-01-14</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.195.exe</link>
+			<description>2018-01-14 (v1.0.195): Major upgrade - Javascript events, Java validator, fix expansion error</description>
+		</item>
+<item><title>FHIRServer release 1.0.199 2017-12-24</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.199.exe</link>
+			<description>2017-12-24 (v1.0.199): Wrap up of post 3.2 fixes</description>
+		</item>
+		<item><title>FHIRServer release 1.0.198 2017-12-20</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.198.exe</link>
+			<description>2017-12-20 (v1.0.198): Support for release 3.2.0</description>
+		</item>
+		<item><title>FHIRServer release 1.0.197 2017-12-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.197.exe</link>
+			<description>2017-12-06 (v1.0.197): fix bug in populating fullUrl on included resources</description>
+		</item>
+		<item><title>FHIRServer release 1.0.196 2017-12-05</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.196.exe</link>
+			<description>2017-12-05 (v1.0.196): Fix bug processing _includes from broken .net client</description>
+		</item>
+		<item><title>FHIRServer release 1.0.195 2017-11-23</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.195.exe</link>
+			<description>2017-11-23 (v1.0.195): fix bug in transaction handling</description>
+		</item>
+		<item><title>FHIRServer release 1.0.194 2017-11-17</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.194.exe</link>
+			<description>2017-11-17 (v1.0.194): fix bug in $everything</description>
+		</item>
+		<item><title>FHIRServer release 1.0.193 2017-11-16</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.193.exe</link>
+			<description>2017-11-16 (v1.0.193): fix bugs in cds-hooks implementation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.192 2017-11-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.192.exe</link>
+			<description>2017-11-10 (v1.0.192): fix bug in coverage form</description>
+		</item>
+		<item><title>FHIRServer release 1.0.191 2017-11-08</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.191.exe</link>
+			<description>2017-11-08 (v1.0.191): fix bug in registering clients</description>
+		</item>
+		<item><title>FHIRServer release 1.0.190 2017-10-27</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.190.exe</link>
+			<description>2017-10-27 (v1.0.190): more support for flattening operations in graphQL</description>
+		</item>
+		<item><title>FHIRServer release 1.0.189 2017-10-26</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.189.exe</link>
+			<description>2017-10-26 (v1.0.189): add support for @flatten and @first in graphQL</description>
+		</item>
+		<item><title>FHIRServer release 1.0.188 2017-10-26</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.188.exe</link>
+			<description>2017-10-26 (v1.0.188): fix slow loading issue</description>
+		</item>
+		<item><title>FHIRServer release 1.0.187 2017-10-25</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.187.exe</link>
+			<description>2017-10-25 (v1.0.187): fix synthea load</description>
+		</item>
+		<item><title>FHIRServer release 1.0.186 2017-10-25</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.186.exe</link>
+			<description>2017-10-25 (v1.0.186): temporay fix for synthea support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.185 2017-10-24</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.185.exe</link>
+			<description>2017-10-24 (v1.0.185): support for _list and _group search parameters</description>
+		</item>
+		<item><title>FHIRServer release 1.0.184 2017-10-24</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.184.exe</link>
+			<description>2017-10-24 (v1.0.184): Add coverage form + handler</description>
+		</item>
+		<item><title>FHIRServer release 1.0.183 2017-10-20</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.183.exe</link>
+			<description>2017-10-20 (v1.0.183): remove debugging code that was accidentally released</description>
+		</item>
+		<item><title>FHIRServer release 1.0.182 2017-10-17</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.182.exe</link>
+			<description>2017-10-17 (v1.0.182): implement _elements + fix bugs in compartment handing</description>
+		</item>
+		<item><title>FHIRServer release 1.0.181 2017-10-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.181.exe</link>
+			<description>2017-10-03 (v1.0.181): fix bug in XML validation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.180 2017-09-23</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.180.exe</link>
+			<description>2017-09-23 (v1.0.180): support for backend services</description>
+		</item>
+		<item><title>FHIRServer release 1.0.179 2017-09-16</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.179.exe</link>
+			<description>2017-09-16 (v1.0.179): try fix stability issue</description>
+		</item>
+		<item><title>FHIRServer release 1.0.178 2017-09-15</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.178.exe</link>
+			<description>2017-09-15 (v1.0.178): fix bug in $lookup</description>
+		</item>
+		<item><title>FHIRServer release 1.0.177 2017-09-15</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.177.exe</link>
+			<description>2017-09-15 (v1.0.177): add $convert</description>
+		</item>
+		<item><title>FHIRServer release 1.0.176 2017-09-14</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.176.exe</link>
+			<description>2017-09-14 (v1.0.176): NDJson support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.175 2017-09-12</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.175.exe</link>
+			<description>2017-09-12 (v1.0.175): debugging for semaphore release problem</description>
+		</item>
+		<item><title>FHIRServer release 1.0.174 2017-09-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.174.exe</link>
+			<description>2017-09-10 (v1.0.174): fix OAuth login problems</description>
+		</item>
+		<item><title>FHIRServer release 1.0.173 2017-09-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.173.exe</link>
+			<description>2017-09-10 (v1.0.173): fix bug with :not</description>
+		</item>
+		<item><title>FHIRServer release 1.0.172 2017-09-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.172.exe</link>
+			<description>2017-09-10 (v1.0.172): fix bug in value set expansion caching</description>
+		</item>
+		<item><title>FHIRServer release 1.0.171 2017-09-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.171.exe</link>
+			<description>2017-09-10 (v1.0.171): Fix bug in subsumes for SNOMED CT</description>
+		</item>
+		<item><title>FHIRServer release 1.0.170 2017-09-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.170.exe</link>
+			<description>2017-09-10 (v1.0.170): Updated R4 build</description>
+		</item>
+		<item><title>FHIRServer release 1.0.169 2017-09-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.169.exe</link>
+			<description>2017-09-10 (v1.0.169): Updated R4 build</description>
+		</item>
+		<item><title>FHIRServer release 1.0.168 2017-09-09</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.168.exe</link>
+			<description>2017-09-09 (v1.0.168): add Genomics search parameters</description>
+		</item>
+		<item><title>FHIRServer release 1.0.167 2017-09-09</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.167.exe</link>
+			<description>2017-09-09 (v1.0.167): clean install preparation for connectathon</description>
+		</item>
+		<item><title>FHIRServer release 1.0.165 2017-09-02</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.165.exe</link>
+			<description>2017-09-02 (v1.0.165): MySQL beta release + bug fixes and LOINC improvements</description>
+		</item>
+		<item><title>FHIRServer release 1.0.165 2017-09-02</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver64-1.0.165.exe</link>
+			<description>2017-09-02 (v1.0.165): MySQL beta release + bug fixes and LOINC improvements</description>
+		</item>
+		<item><title>FHIRServer release 1.0.164 2017-08-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.164.exe</link>
+			<description>2017-08-10 (v1.0.164): client application verification service</description>
+		</item>
+		<item><title>FHIRServer release 1.0.163 2017-08-07</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.163.exe</link>
+			<description>2017-08-07 (v1.0.163): more hacking health work</description>
+		</item>
+		<item><title>FHIRServer release 1.0.162 2017-08-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.162.exe</link>
+			<description>2017-08-06 (v1.0.162): more hacking health work</description>
+		</item>
+		<item><title>FHIRServer release 1.0.161 2017-08-04</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.161.exe</link>
+			<description>2017-08-04 (v1.0.161): implement Consumer Directed Exchange interface</description>
+		</item>
+		<item><title>FHIRServer release 1.0.160 2017-08-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.160.exe</link>
+			<description>2017-08-03 (v1.0.160): fix validation errors in cds-hooks service</description>
+		</item>
+		<item><title>FHIRServer release 1.0.159 2017-08-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.159.exe</link>
+			<description>2017-08-03 (v1.0.159): Fix bug in cds-hooks implementation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.158 2017-08-01</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.158.exe</link>
+			<description>2017-08-01 (v1.0.158): implement $lastN</description>
+		</item>
+		<item><title>FHIRServer release 1.0.157 2017-08-01</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.157.exe</link>
+			<description>2017-08-01 (v1.0.157): support for GraphDefinition</description>
+		</item>
+		<item><title>FHIRServer release 1.0.156 2017-07-25</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.156.exe</link>
+			<description>2017-07-25 (v1.0.156): Add turtle support, fix bug with mime type</description>
+		</item>
+		<item><title>FHIRServer release 1.0.155 2017-07-11</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.155.exe</link>
+			<description>2017-07-11 (v1.0.155): fix bug with pre-fetch</description>
+		</item>
+		<item><title>FHIRServer release 1.0.154 2017-07-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.154.exe</link>
+			<description>2017-07-10 (v1.0.154): Support for Hacking Health 2017</description>
+		</item>
+		<item><title>FHIRServer release 1.0.153 2017-07-07</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.153.exe</link>
+			<description>2017-07-07 (v1.0.153): Add Code Generation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.152 2017-07-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.152.exe</link>
+			<description>2017-07-06 (v1.0.152): fix bug expanding</description>
+		</item>
+		<item><title>FHIRServer release 1.0.151 2017-07-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.151.exe</link>
+			<description>2017-07-06 (v1.0.151): fix LOINC database</description>
+		</item>
+		<item><title>FHIRServer release 1.0.150 2017-07-05</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.150.exe</link>
+			<description>2017-07-05 (v1.0.150): fix bug initialising database</description>
+		</item>
+		<item><title>FHIRServer release 1.0.149 2017-07-04</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.149.exe</link>
+			<description>2017-07-04 (v1.0.149): fix significant stability issue, and add DirectTrust support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.148 2017-06-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.148.exe</link>
+			<description>2017-06-10 (v1.0.148): fix bugs in terminology service initialization and expansion</description>
+		</item>
+		<item><title>FHIRServer release 1.0.147 2017-06-04</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.147.exe</link>
+			<description>2017-06-04 (v1.0.147): loing multi-lingual support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.146 2017-05-30</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.146.exe</link>
+			<description>2017-05-30 (v1.0.146): fix graphql responses</description>
+		</item>
+		<item><title>FHIRServer release 1.0.145 2017-05-28</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.145.exe</link>
+			<description>2017-05-28 (v1.0.145): More GraphQL support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.144 2017-05-27</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.144.exe</link>
+			<description>2017-05-27 (v1.0.144): More GraphQL support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.143 2017-05-23</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.143.exe</link>
+			<description>2017-05-23 (v1.0.143): fix bug in Patient/$everything operation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.142 2017-05-22</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.142.exe</link>
+			<description>2017-05-22 (v1.0.142): GraphQL support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.141 2017-05-11</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.141.exe</link>
+			<description>2017-05-11 (v1.0.141): fix delete bugs</description>
+		</item>
+		<item><title>FHIRServer release 1.0.140 2017-05-08</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.140.exe</link>
+			<description>2017-05-08 (v1.0.140): fix fhirpath bug from Madrid Connectathon</description>
+		</item>
+		<item><title>FHIRServer release 1.0.139 2017-05-07</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.139.exe</link>
+			<description>2017-05-07 (v1.0.139): fix validation bug</description>
+		</item>
+		<item><title>FHIRServer release 1.0.138 2017-05-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.138.exe</link>
+			<description>2017-05-06 (v1.0.138): fix validation bug</description>
+		</item>
+		<item><title>FHIRServer release 1.0.137 2017-05-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.137.exe</link>
+			<description>2017-05-03 (v1.0.137): ReverseProxy support for SSL</description>
+		</item>
+		<item><title>FHIRServer release 1.0.136 2017-04-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.136.exe</link>
+			<description>2017-04-03 (v1.0.136): fix to correct FHIR version in installer</description>
+		</item>
+		<item><title>FHIRServer release 1.0.135 2017-04-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.135.exe</link>
+			<description>2017-04-03 (v1.0.135): test upgrade bug fix</description>
+		</item>
+		<item><title>FHIRServer release 1.0.134 2017-04-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.134.exe</link>
+			<description>2017-04-03 (v1.0.134): ReverseProxy support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.133 2017-04-01</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.133.exe</link>
+			<description>2017-04-01 (v1.0.133): Update error in value set based searching when no explicit value set exists</description>
+		</item>
+		<item><title>FHIRServer release 1.0.132 2017-03-23</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.132.exe</link>
+			<description>2017-03-23 (v1.0.132): Final Release 3 Version</description>
+		</item>
+		<item><title>FHIRServer release 1.0.131 2017-03-16</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.131.exe</link>
+			<description>2017-03-16 (v1.0.131): upgrade to FHIR Release 3 Candidate</description>
+		</item>
+		<item><title>FHIRServer release 1.0.130 2017-03-09</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.130.exe</link>
+			<description>2017-03-09 (v1.0.130): fix OAuth process for reverse proxy</description>
+		</item>
+		<item><title>FHIRServer release 1.0.129 2017-03-07</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.129.exe</link>
+			<description>2017-03-07 (v1.0.129): fix OAuth process for reverse proxy</description>
+		</item>
+		<item><title>FHIRServer release 1.0.128 2017-03-07</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.128.exe</link>
+			<description>2017-03-07 (v1.0.128): fix problem generating snomed displays</description>
+		</item>
+		<item><title>FHIRServer release 1.0.127 2017-03-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.127.exe</link>
+			<description>2017-03-06 (v1.0.127): More Reverse Proxy Support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.126 2017-03-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.126.exe</link>
+			<description>2017-03-06 (v1.0.126): Reverse Proxy Support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.125 2017-03-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.125.exe</link>
+			<description>2017-03-03 (v1.0.125): fix bug in language implementation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.124 2017-03-02</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.124.exe</link>
+			<description>2017-03-02 (v1.0.124): More R2 fixes</description>
+		</item>
+		<item><title>FHIRServer release 1.0.123 2017-03-02</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.123.exe</link>
+			<description>2017-03-02 (v1.0.123): fix R2 support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.122 2017-03-01</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.122.exe</link>
+			<description>2017-03-01 (v1.0.122): More quality fixes for freeze</description>
+		</item>
+		<item><title>FHIRServer release 1.0.121 2017-02-28</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.121.exe</link>
+			<description>2017-02-28 (v1.0.121): fix index definitions</description>
+		</item>
+		<item><title>FHIRServer release 1.0.120 2017-02-28</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.120.exe</link>
+			<description>2017-02-28 (v1.0.120): Add support for better language validation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.119 2017-02-25</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.119.exe</link>
+			<description>2017-02-25 (v1.0.119): QA release for STU3 candidate release</description>
+		</item>
+		<item><title>FHIRServer release 1.0.118 2017-02-21</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.118.exe</link>
+			<description>2017-02-21 (v1.0.118): r3 final candidate</description>
+		</item>
+		<item><title>FHIRServer release 1.0.117 2017-02-10</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.117.exe</link>
+			<description>2017-02-10 (v1.0.117): fix cvx support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.116 2017-02-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.116.exe</link>
+			<description>2017-02-06 (v1.0.116): $diff support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.115 2017-01-18</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.115.exe</link>
+			<description>2017-01-18 (v1.0.115): fix bug with count</description>
+		</item>
+		<item><title>FHIRServer release 1.0.114 2017-01-16</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.114.exe</link>
+			<description>2017-01-16 (v1.0.114): implement $compose</description>
+		</item>
+		<item><title>FHIRServer release 1.0.113 2017-01-15</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.113.exe</link>
+			<description>2017-01-15 (v1.0.113): more fixing subscription issues</description>
+		</item>
+		<item><title>FHIRServer release 1.0.112 2017-01-15</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.112.exe</link>
+			<description>2017-01-15 (v1.0.112): fix subscription issues</description>
+		</item>
+		<item><title>FHIRServer release 1.0.111 2017-01-15</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.111.exe</link>
+			<description>2017-01-15 (v1.0.111): even more diagnostics on background thread</description>
+		</item>
+		<item><title>FHIRServer release 1.0.110 2017-01-15</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.110.exe</link>
+			<description>2017-01-15 (v1.0.110): more diagnostics on background thread</description>
+		</item>
+		<item><title>FHIRServer release 1.0.109 2017-01-15</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.109.exe</link>
+			<description>2017-01-15 (v1.0.109): fix subscription problem</description>
+		</item>
+		<item><title>FHIRServer release 1.0.108 2017-01-15</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.108.exe</link>
+			<description>2017-01-15 (v1.0.108): fix error validating codes</description>
+		</item>
+		<item><title>FHIRServer release 1.0.107 2017-01-14</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.107.exe</link>
+			<description>2017-01-14 (v1.0.107): update pre-connectathon</description>
+		</item>
+		<item><title>FHIRServer release 1.0.106 2017-01-05</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.106.exe</link>
+			<description>2017-01-05 (v1.0.106): fix loading error</description>
+		</item>
+		<item><title>FHIRServer release 1.0.105 2017-01-04</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.105.exe</link>
+			<description>2017-01-04 (v1.0.105): OpenMHealth support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.104 2016-12-09</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.104.exe</link>
+			<description>2016-12-09 (v1.0.104): add Observation.$stats</description>
+		</item>
+		<item><title>FHIRServer release 1.0.103 2016-12-08</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.103.exe</link>
+			<description>2016-12-08 (v1.0.103): fix access violation expanding value sets</description>
+		</item>
+		<item><title>FHIRServer release 1.0.102 2016-12-07</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.102.exe</link>
+			<description>2016-12-07 (v1.0.102): fix loading bug</description>
+		</item>
+		<item><title>FHIRServer release 1.0.101 2016-12-06</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.101.exe</link>
+			<description>2016-12-06 (v1.0.101): Upgrade to 1.8.0</description>
+		</item>
+		<item><title>FHIRServer release 1.0.100 2016-12-05</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.100.exe</link>
+			<description>2016-12-05 (v1.0.100): UPdate to STU3 QA candidate</description>
+		</item>
+		<item><title>FHIRServer release 1.0.99 2016-11-21</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.99.exe</link>
+			<description>2016-11-21 (v1.0.99): Fix bug in DSTU2 server</description>
+		</item>
+		<item><title>FHIRServer release 1.0.98 2016-11-17</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.98.exe</link>
+			<description>2016-11-17 (v1.0.98): fix bug in SCT implicit value sets</description>
+		</item>
+		<item><title>FHIRServer release 1.0.97 2016-11-17</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.97.exe</link>
+			<description>2016-11-17 (v1.0.97): fix bug 2</description>
+		</item>
+		<item><title>FHIRServer release 1.0.96 2016-11-17</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.96.exe</link>
+			<description>2016-11-17 (v1.0.96): fix bug</description>
+		</item>
+		<item><title>FHIRServer release 1.0.95 2016-11-16</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.95.exe</link>
+			<description>2016-11-16 (v1.0.95): Updates for DevDays</description>
+		</item>
+		<item><title>FHIRServer release 1.0.94 2016-11-09</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.94.exe</link>
+			<description>2016-11-09 (v1.0.94): Fix validation error</description>
+		</item>
+		<item><title>FHIRServer release 1.0.93 2016-11-08</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.93.exe</link>
+			<description>2016-11-08 (v1.0.93): more sct script features</description>
+		</item>
+		<item><title>FHIRServer release 1.0.92 2016-11-08</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.92.exe</link>
+			<description>2016-11-08 (v1.0.92): update SCT analysis and ongoing FHIR updates</description>
+		</item>
+		<item><title>FHIRServer release 1.0.91 2016-11-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.91.exe</link>
+			<description>2016-11-03 (v1.0.91): various fixes for connectathon related issues</description>
+		</item>
+		<item><title>FHIRServer release 1.0.90 2016-11-01</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.90.exe</link>
+			<description>2016-11-01 (v1.0.90): More SCT updates</description>
+		</item>
+		<item><title>FHIRServer release 1.0.89 2016-10-26</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.89.exe</link>
+			<description>2016-10-26 (v1.0.89): Update for better snomed ct support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.88 2016-10-17</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.88.exe</link>
+			<description>2016-10-17 (v1.0.88): Update for better snomed ct support</description>
+		</item>
+		<item><title>FHIRServer release 1.0.87 2016-10-13</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.87.exe</link>
+			<description>2016-10-13 (v1.0.87): fix bug in DSTU2 server validation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.86 2016-10-12</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.86.exe</link>
+			<description>2016-10-12 (v1.0.86): Fix CORS issue + add TestReport</description>
+		</item>
+		<item><title>FHIRServer release 1.0.85 2016-10-12</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.85.exe</link>
+			<description>2016-10-12 (v1.0.85): upgrade STU3 version for many changes to conformance resources</description>
+		</item>
+		<item><title>FHIRServer release 1.0.84 2016-10-07</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.84.exe</link>
+			<description>2016-10-07 (v1.0.84): Update for changes to ValueSet.compose.import</description>
+		</item>
+		<item><title>FHIRServer release 1.0.83 2016-10-05</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.83.exe</link>
+			<description>2016-10-05 (v1.0.83): minor terminology server bug fixes</description>
+		</item>
+		<item><title>FHIRServer release 1.0.82 2016-10-03</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.82.exe</link>
+			<description>2016-10-03 (v1.0.82): Add support for SNOMED CT Post-Coordination</description>
+		</item>
+		<item><title>FHIRServer release 1.0.81 2016-09-26</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.81.exe</link>
+			<description>2016-09-26 (v1.0.81): major rebuild of installer + fix issues running as a windows service</description>
+		</item>
+		<item><title>FHIRServer release 1.0.80 2016-09-20</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.80.exe</link>
+			<description>2016-09-20 (v1.0.80): remove debugging code</description>
+		</item>
+		<item><title>FHIRServer release 1.0.79 2016-09-20</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.79.exe</link>
+			<description>2016-09-20 (v1.0.79): fix validation bug</description>
+		</item>
+		<item><title>FHIRServer release 1.0.78 2016-09-19</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.78.exe</link>
+			<description>2016-09-19 (v1.0.78): fix installation bug with value sets (and upgrade to FHIR 1.7.0)</description>
+		</item>
+		<item><title>FHIRServer release 1.0.77 2016-09-18</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.77.exe</link>
+			<description>2016-09-18 (v1.0.77): fix instal bug</description>
+		</item>
+		<item><title>FHIRServer release 1.0.76 2016-09-18</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.76.exe</link>
+			<description>2016-09-18 (v1.0.76): Combiine DSTU2 and STU3 versions to a single install + fix bug accepting value sets</description>
+		</item>
+		<item><title>FHIRServer release 1.0.75 2016-09-18 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.75.exe</link>
+			<description>DSTU3. 2016-09-18 (v1.0.75): fix duplicate value sets</description>
+		</item>
+		<item><title>FHIRServer release 1.0.74 2016-09-18 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.74.exe</link>
+			<description>DSTU3. 2016-09-18 (v1.0.74): fix validation bugs</description>
+		</item>
+		<item><title>FHIRServer release 1.0.73 2016-09-09 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.73.exe</link>
+			<description>DSTU3. 2016-09-09 (v1.0.73): updates for terminology server</description>
+		</item>
+		<item><title>FHIRServer release 1.0.72 2016-09-07 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.72.exe</link>
+			<description>DSTU3. 2016-09-07 (v1.0.72): fix back to 1.6.0, and make restful API changes for 1.6.0</description>
+		</item>
+		<item><title>FHIRServer release 1.0.71 2016-09-06 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.71.exe</link>
+			<description>DSTU3. 2016-09-06 (v1.0.71): Overhaul to fix parsers, fluentpath, and validaition for STU3</description>
+		</item>
+		<item><title>FHIRServer release 1.0.70 2016-08-26 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.70.exe</link>
+			<description>DSTU3. 2016-08-26 (v1.0.70): change way unsupported code system validation problems are reqported</description>
+		</item>
+		<item><title>FHIRServer release 1.0.69 2016-08-25 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.69.exe</link>
+			<description>DSTU3. 2016-08-25 (v1.0.69): fix bug in server code validation</description>
+		</item>
+		<item><title>FHIRServer release 1.0.68 2016-08-25 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.68.exe</link>
+			<description>DSTU3. 2016-08-25 (v1.0.68): change validation return codes</description>
+		</item>
+		<item><title>FHIRServer release 1.0.67 2016-08-11 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.67.exe</link>
+			<description>DSTU3. 2016-08-11 (v1.0.67): fix for acess violation that accidently slipped through</description>
+		</item>
+		<item><title>FHIRServer release 1.0.66 2016-08-11 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.66.exe</link>
+			<description>DSTU3. 2016-08-11 (v1.0.66): upgrade STU3 server to v1.6.0 (Baltimore Connectathon version)</description>
+		</item>
+		<item><title>FHIRServer release 1.0.65 2016-08-08 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.65.exe</link>
+			<description>DSTU3. 2016-08-08 (v1.0.65): Fix for removing spec from server (again)</description>
+		</item>
+		<item><title>FHIRServer release 1.0.64 2016-08-08 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.64.exe</link>
+			<description>DSTU3. 2016-08-08 (v1.0.64): Fix for removing spec from server</description>
+		</item>
+		<item><title>FHIRServer release 1.0.63 2016-08-08 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.63.exe</link>
+			<description>DSTU3. 2016-08-08 (v1.0.63): update for DSTU 3 ballot reloaction of IGs</description>
+		</item>
+		<item><title>FHIRServer release 1.0.62 2016-07-24 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.62.exe</link>
+			<description>DSTU3. 2016-07-24 (v1.0.62): update for DSTU 3 freeze</description>
+		</item>
+		<item><title>FHIRServer release 1.0.62 2016-07-24 (DSTU2)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver2-1.0.62.exe</link>
+			<description>DSTU2. 2016-07-24 (v1.0.62): update for DSTU 3 freeze</description>
+		</item>
+		<item><title>FHIRServer release 1.0.61 2016-07-19 (DSTU3)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.61.exe</link>
+			<description>DSTU3. 2016-07-19 (v1.0.61): Start of STU3 QA Freeze period (update STU3 and many minor bug fixes)</description>
+		</item>
+		<item><title>FHIRServer release 1.0.61 2016-07-19 (DSTU2)</title>
+			<link>http://www.healthintersections.com.au/FhirServer/fhirserver2-1.0.61.exe</link>
+			<description>DSTU2. 2016-07-19 (v1.0.61): Start of STU3 QA Freeze period (update STU3 and many minor bug fixes)</description>
+		</item>
 		<item><title>FHIRServer release 1.0.60 2016-06-24 (DSTU3)</title>
 			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.60.exe</link>
 			<description>DSTU3. 2016-06-24 (v1.0.60): change return type when initialising closure table</description>
 		</item>
-<item><title>FHIRServer release 1.0.59 2016-06-22 (DSTU3)</title>
+		<item><title>FHIRServer release 1.0.59 2016-06-22 (DSTU3)</title>
 			<link>http://www.healthintersections.com.au/FhirServer/fhirserver3-1.0.59.exe</link>
 			<description>DSTU3. 2016-06-22 (v1.0.59): fix that expansion logic is ignoring the modifier extension http://hl7.org/fhir/StructureDefinition/codesystem-subsumes</description>
 		</item>

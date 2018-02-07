@@ -33,17 +33,20 @@ Interface
 
 
 Uses
-  Windows;
+  {$IFDEF MACOS} OSXUtils {$ELSE} Windows {$ENDIF};
 
 
 Type
+  TInstallerCallback = procedure(IntParam: Integer; StrParam: String) of object;
   TThreadID = Cardinal;
   TThreadHandle = THandle;
 
 
 Procedure ThreadSleep(iTime : Cardinal); Overload;
 Function ThreadID : TThreadID; Overload;
+{$IFDEF MSWINDOWS}
 Function ThreadHandle : TThreadHandle; Overload;
+{$ENDIF}
 Procedure ThreadYield; Overload;
 Procedure ThreadBreakpoint; Overload;
 
@@ -54,19 +57,21 @@ Implementation
 
 Procedure ThreadSleep(iTime : Cardinal);
 Begin
-  Windows.Sleep(iTime);
+  Sleep(iTime);
 End;
 
 Function ThreadID : TThreadID;
 Begin
-  Result := Windows.GetCurrentThreadID;
+  Result := GetCurrentThreadID;
 End;
 
 
+{$IFDEF MSWINDOWS}
 Function ThreadHandle : TThreadHandle;
 Begin
-  Result := Windows.GetCurrentThread;
+  Result := GetCurrentThread;
 End;
+{$ENDIF}
 
 
 

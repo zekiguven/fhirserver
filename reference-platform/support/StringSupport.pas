@@ -107,6 +107,7 @@ Function StringFormat(Const sFormat : String; Const aArgs : Array Of Const) : St
 Function StringArrayIndexOfInsensitive(Const aNames : Array Of String; Const sName : String): Integer; Overload;
 Function StringArrayIndexOfSensitive(Const aNames : Array Of String; Const sName : String): Integer; Overload;
 Function StringArrayIndexOf(Const aNames : Array Of String; Const sName: String) : Integer; Overload;
+Function StringArrayToString(Const aNames : Array Of String): String; Overload;
 
 Function StringArrayExistsInsensitive(Const aNames : Array Of String; Const sName : String) : Boolean; Overload;
 Function StringArrayExistsSensitive(Const aNames : Array Of String; Const sName : String) : Boolean; Overload;
@@ -217,6 +218,8 @@ Function StringExcludeAfter(Const sText, sSymbol : String) : String; Overload;
 
 
 function jsonEscape(s : String; isString : boolean) : String;
+
+function StringFindEndOfNumber(const s : String; index : integer) : integer;
 
 Implementation
 
@@ -665,6 +668,15 @@ Begin
     Dec(Result);
 End;
 
+Function StringArrayToString(Const aNames : Array Of String): String;
+var
+  s : String;
+begin
+  result := '';
+  for s in aNames do
+    result := ', '+s;
+  result := result.Substring(1).trim;
+end;
 
 Function StringArrayIndexOf(Const aNames: Array Of String; Const sName: String): Integer;
 Begin
@@ -1312,7 +1324,7 @@ end;
 function StrToUINT64(Value:String):UInt64;
 begin
   if not TryStrToUINT64(Value,result) then
-    raise EConvertError.Create('Invalid uint64 value');
+    raise EConvertError.Create('Invalid uint64 value "'+value+'"');
 end;
 
 function StrToUInt64Def(Value:String; def : UInt64):UInt64;
@@ -1532,6 +1544,29 @@ begin
   end;
 end;
 
+function StringFindEndOfNumber(const s : String; index : integer) : integer;
+var
+  dec : boolean;
+begin
+  result := index;
+  if s.Length <= index then
+    exit;
+  if s[index] = '-' then
+    inc(index);
+  if s.Length <= result then
+    exit;
+  if CharInSet(s[index], ['0'..'9']) then
+  begin
+    dec := false;
+    while (index <= s.Length) and (CharInSet(s[index], ['0'..'9']) or (not dec and (s[index] = '.'))) do
+    begin
+      if s[index] = '.' then
+        dec := true;
+      inc(index);
+    end;
+    exit(index-1);
+  end;
+end;
 
 Initialization
 

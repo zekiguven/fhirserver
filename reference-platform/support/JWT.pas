@@ -1,12 +1,41 @@
 ﻿unit JWT;
 
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
+
 interface
 
 uses
-  SysUtils, EncdDecd, Classes,
+  SysUtils, EncdDecd, Classes, {$IFNDEF VER260} System.NetEncoding, {$ENDIF}
   IdSSLOpenSSLHeaders, IdHMACSHA1,
-  
-  EncodeSupport, BytesSupport, StringSupport,
+
+  EncodeSupport, BytesSupport, StringSupport, DateSupport, FileSupport, SystemSupport,
   AdvObjects, AdvObjectLists,
   AdvJSON, HMAC, libeay32;
 
@@ -91,16 +120,16 @@ Type
 
   TJWKList = class (TAdvObjectList)
   private
-    FObj: TJsonObject;
     function GetKey(index: integer): TJWK;
     procedure Setkey(index: integer; const Value: TJWK);
-    procedure setObj(const Value: TJsonObject);
   protected
     function ItemClass : TAdvObjectClass; override;
   public
-    constructor create(_obj : TJsonObject); overload;
+    constructor create(obj : TJsonObject); overload;
+    constructor create(source : String); overload;
     destructor Destroy; override;
-    Property obj : TJsonObject read FObj write setObj;
+    procedure readFromJson(obj : TJsonObject);
+    procedure writeToJson(obj : TJsonObject);
 
     property Key[index : integer] : TJWK read GetKey write Setkey; default;
   end;
@@ -144,6 +173,7 @@ Type
   private
     FHeader : TJsonObject;
     FPayLoad : TJsonObject;
+    FOriginalSource: String;
 
     procedure setHeader(const Value: TJsonObject);
     procedure setPayload(const Value: TJsonObject);
@@ -213,7 +243,12 @@ Type
   public
     constructor Create; override;
     constructor Create(header, payload : TJsonObject); overload;
+
+    function Link : TJWT; overload;
+
     destructor Destroy; override;
+
+    property originalSource : String read FOriginalSource write FOriginalSource;
 
     // the header is provided to get/set extra properties beyond those used in packing/unpacking.
     // you don't need to do anything with it if you don't use extra properties
@@ -258,12 +293,15 @@ Type
     property addressRegion : string read GetaddressRegion write SetaddressRegion; // 'address.region'  State, province, prefecture, or region component.
     property addressPostCode : string read GetaddressPostCode write SetaddressPostCode; // 'address.postal_code'  Zip code or postal code component.
     property addressCountry : string read GetaddressCountry write SetaddressCountry; // 'address.country'  Country name component.
+
+    function userName : String;
   end;
 
   TJWTUtils = class (TAdvObject)
   private
     class function loadRSAPrivateKey(pemfile, pempassword : AnsiString) : PRSA;
-    class function loadRSAPublicKey(pemfile : AnsiString) : PRSA;
+    class function loadRSAPublicKey(pemfile : AnsiString) : PRSA; overload;
+    class function loadRSAPublicKey(contents : TBytes) : PRSA; overload;
 //    class function loadDSAPrivateKey(pemfile, pempassword : AnsiString) : PDSA;
     class function loadDSAPublicKey(pemfile, pempassword : AnsiString) : PDSA;
 
@@ -272,11 +310,12 @@ Type
     class function Sign_Hmac_RSA256(input : TBytes; key: TJWK) : TBytes; overload;
     class procedure Verify_Hmac_RSA256(input : TBytes; sig : TBytes; header : TJsonObject; keys: TJWKList);
   public
-    class function Sign_Hmac_RSA256(input : TBytes; pemfile, pempassword : AnsiString) : TBytes; overload;
+    class function Sign_Hmac_RSA256(input : TBytes; pemfile, pempassword : String) : TBytes; overload;
 
 
     // general use: pack a JWT using the key speciifed. No key needed if method = none
     class function pack(jwt : TJWT; method : TJWTAlgorithm; key : TJWK) : String; overload;
+    class function pack(jwt : TJWT; method : TJWTAlgorithm; key : TJWK; pemfile, pempassword : String) : String; overload;
 
     // special use - use an existing PEM to sign the JWT
     class function rsa_pack(jwt : TJWT; method : TJWTAlgorithm; pem_file, pem_password : String) : String; overload;
@@ -293,9 +332,13 @@ Type
     class function unpack(token : string; verify : boolean; keys : TJWKList) : TJWT;
 
     // load the publi key details from the provided filename
-    class function loadKeyFromRSACert(filename : AnsiString) : TJWK;
     class function loadKeyFromDSACert(filename, password : AnsiString) : TJWK;
+    class function loadKeyFromRSACert(filename : AnsiString) : TJWK; overload;
+    class function loadKeyFromRSACert(content : TBytes) : TJWK; overload;
   end;
+
+function DateTimeToUnix(ConvDate: TDateTime): Longint;
+function UnixToDateTime(USec: Longint): TDateTime;
 
 implementation
 
@@ -655,15 +698,27 @@ end;
 
 { TJWKList }
 
-constructor TJWKList.create(_obj: TJsonObject);
+constructor TJWKList.create(obj: TJsonObject);
 begin
   Create;
-  Obj := _obj;  // note assign to property
+  ReadFromJson(obj);
+end;
+
+constructor TJWKList.create(source: String);
+var
+  json : TJsonObject;
+begin
+  Create;
+  json := TJSONParser.Parse(source);
+  try
+    readFromJson(json);
+  finally
+    json.Free;
+  end;
 end;
 
 destructor TJWKList.Destroy;
 begin
-  FObj.Free;
   inherited;
 end;
 
@@ -682,28 +737,34 @@ begin
   ObjectByIndex[index] := value;
 end;
 
-procedure TJWKList.setObj(const Value: TJsonObject);
+procedure TJWKList.readFromJson(obj : TJsonObject);
 var
   arr : TJsonArray;
   i : integer;
 begin
-  FObj.Free;
-  FObj := nil;
   clear;
 
-  if Value.has('kty') then
+  if obj.has('kty') then
   begin
-    Add(TJWK.create(value))
+    Add(TJWK.create(obj))
   end
-  else if Value.has('keys') then
+  else if obj.has('keys') then
   begin
-    FObj := Value;
-    arr := FObj.Arr['keys'];
+    arr := obj.Arr['keys'];
     for i := 0 to arr.Count  - 1 do
       Add(TJWK.create(arr.Obj[i].Link));
   end
-  else
-    raise Exception.Create('Unable to read Keys');
+end;
+
+procedure TJWKList.writeToJson(obj: TJsonObject);
+var
+  arr : TJsonArray;
+  i : integer;
+begin
+  arr := obj.forceArr['keys'];
+  arr.clear;
+  for i := 0 to count - 1 do
+    arr.add(Key[i].obj.Link);
 end;
 
 { TJWT }
@@ -787,7 +848,7 @@ end;
 
 function TJWT.Getexpires : TDateTime;
 begin
-  result := UnixToDateTime(StrToIntDef(payload.num['exp'], 0));
+  result := UnixToDateTime(trunc(StrToFloat(payload.num['exp'])));
 end;
 
 procedure TJWT.Setexpires(value : TDateTime);
@@ -913,9 +974,24 @@ begin
   result := payload['website'];
 end;
 
+function TJWT.Link: TJWT;
+begin
+  result := TJWT(inherited Link);
+end;
+
 procedure TJWT.Setwebsite(value : string);
 begin
   payload['website'] := value;
+end;
+
+function TJWT.userName: String;
+begin
+  if name <> '' then
+    result := name
+  else if email <> '' then
+    result := email
+  else
+    result := subject;
 end;
 
 function TJWT.Getemail : string;
@@ -1096,6 +1172,32 @@ begin
   result := BytesAsString(input)+'.'+BytesAsString(JWTBase64URL(sig));
 end;
 
+class function TJWTUtils.pack(jwt: TJWT; method: TJWTAlgorithm; key: TJWK; pemfile, pempassword : String): String;
+var
+  input, sig : TBytes;
+begin
+  jwt.header['typ'] := 'JWT';
+  case method of
+    jwt_none : jwt.header['alg'] := 'none';
+    jwt_hmac_sha256 : jwt.header['alg'] := 'HS256';
+    jwt_hmac_rsa256 : jwt.header['alg'] := 'RS256';
+  else
+    raise Exception.Create('Unsupported Message Encryption Format');
+  end;
+  if (key <> nil) and (method <> jwt_none) and (key.id <> '') then
+    jwt.header['kid'] := key.id;
+
+  input := JWTBase64URL(TJSONWriter.writeObject(jwt.header));
+  input := BytesAdd(input, Byte('.'));
+  input := BytesAdd(input, JWTBase64URL(TJSONWriter.writeObject(jwt.payload)));
+  case method of
+    jwt_none: SetLength(sig, 0);
+    jwt_hmac_sha256: sig := Sign_Hmac_SHA256(input, key);
+    jwt_hmac_rsa256: sig := Sign_Hmac_RSA256(input, pemfile, pempassword);
+  end;
+  result := BytesAsString(input)+'.'+BytesAsString(JWTBase64URL(sig));
+end;
+
 
 class function TJWTUtils.loadKeyFromRSACert(filename: AnsiString): TJWK;
 var
@@ -1121,6 +1223,18 @@ begin
   end;
 end;
 
+class function TJWTUtils.loadKeyFromRSACert(content: TBytes): TJWK;
+var
+  key : PRSA;
+begin
+  key := PRSA(LoadRSAPublicKey(content));
+  try
+    result := TJWK.create(key, false);
+  finally
+    RSA_free(key);
+  end;
+end;
+
 class function TJWTUtils.loadRSAPrivateKey(pemfile, pempassword: AnsiString): PRSA;
 var
   bp: pBIO;
@@ -1135,6 +1249,19 @@ begin
   result := PEM_read_bio_RSAPrivateKey(bp, @pk, nil, pp);
   if result = nil then
     raise Exception.Create('Private key failure.' + GetSSLErrorMessage);
+end;
+
+class function TJWTUtils.loadRSAPublicKey(contents: TBytes): PRSA;
+var
+  fn : String;
+begin
+  fn := Path([SystemTemp, TDateTimeEx.makeUTC.toString('yyyymmddhhnnss.zzz')+'.cer']);
+  BytesToFile(contents, fn);
+  try
+    result := loadRSAPublicKey(fn);
+  finally
+    DeleteFile(fn)
+  end;
 end;
 
 //class function TJWTUtils.loadDSAPrivateKey(pemfile, pempassword: AnsiString): PDSA;
@@ -1237,7 +1364,7 @@ begin
   input := JWTBase64URL(TJSONWriter.writeObject(jwt.header));
   input := BytesAdd(input, Byte('.'));
   input := BytesAdd(input, JWTBase64URL(TJSONWriter.writeObject(jwt.payload)));
-  sig := Sign_Hmac_RSA256(input, AnsiString(pem_file), AnsiString(pem_password));
+  sig := Sign_Hmac_RSA256(input, pem_file, pem_password);
   result := BytesAsString(input)+'.'+BytesAsString(JWTBase64URL(sig));
 end;
 
@@ -1275,6 +1402,7 @@ begin
           raise Exception.Create('Unknown Algorithm '+h['alg']);
       end;
       result := TJWT.create(h.Link, p.Link);
+      result.originalSource := token;
     finally
       p.free;
     end;
@@ -1283,7 +1411,7 @@ begin
   end;
 end;
 
-class function TJWTUtils.Sign_Hmac_RSA256(input: TBytes; pemfile, pempassword: AnsiString): TBytes;
+class function TJWTUtils.Sign_Hmac_RSA256(input: TBytes; pemfile, pempassword: String): TBytes;
 var
   ctx : EVP_MD_CTX;
   keysize : integer;
@@ -1297,7 +1425,7 @@ begin
   keys := TJWKList.create;
   try
     // 1. Load the RSA private Key from FKey
-    rkey := loadRSAPrivateKey(pemfile, pempassword);
+    rkey := loadRSAPrivateKey(AnsiString(pemfile), AnsiString(pempassword));
     try
       pkey := EVP_PKEY_new;
       try

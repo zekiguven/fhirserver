@@ -1,0 +1,976 @@
+object MasterToolsForm: TMasterToolsForm
+  Left = 0
+  Top = 0
+  Caption = 'FHIR Client Tools'
+  ClientHeight = 480
+  ClientWidth = 674
+  StyleBook = StyleBook1
+  FormFactor.Width = 320
+  FormFactor.Height = 480
+  FormFactor.Devices = [Desktop]
+  OnActivate = FormActivate
+  OnCreate = FormCreate
+  OnCloseQuery = FormCloseQuery
+  OnDestroy = FormDestroy
+  DesignerMasterStyle = 1
+  object tbMain: TTabControl
+    Align = Client
+    Size.Width = 492.000000000000000000
+    Size.Height = 454.000000000000000000
+    Size.PlatformDefault = False
+    StyleLookup = 'tbMainStyle1'
+    TabIndex = 0
+    TabOrder = 0
+    TabPosition = PlatformDefault
+    Sizes = (
+      492s
+      428s)
+    object TabItem1: TTabItem
+      CustomIcon = <
+        item
+        end>
+      IsSelected = True
+      Size.Width = 63.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      StyleLookup = 'TabItem1Style1'
+      TabOrder = 0
+      Text = '  Home'
+      ExplicitSize.cx = 53.000000000000000000
+      ExplicitSize.cy = 26.000000000000000000
+      object Panel1: TPanel
+        Align = Top
+        Size.Width = 492.000000000000000000
+        Size.Height = 145.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 0
+        object Label2: TLabel
+          Position.X = 8.000000000000000000
+          Position.Y = 8.000000000000000000
+          Size.Width = 49.000000000000000000
+          Size.Height = 17.000000000000000000
+          Size.PlatformDefault = False
+          Text = 'Servers'
+          TabOrder = 0
+        end
+        object lbServers: TListBox
+          Anchors = [akLeft, akTop, akRight, akBottom]
+          HelpContext = 1
+          HelpType = htKeyword
+          Position.X = 8.000000000000000000
+          Position.Y = 32.000000000000000000
+          Size.Width = 397.000000000000000000
+          Size.Height = 105.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 1
+          OnClick = lbServersClick
+          OnDblClick = btnConnectClick
+          DisableFocusEffect = True
+          DefaultItemStyles.ItemStyle = ''
+          DefaultItemStyles.GroupHeaderStyle = ''
+          DefaultItemStyles.GroupFooterStyle = ''
+          Viewport.Width = 397.000000000000000000
+          Viewport.Height = 105.000000000000000000
+        end
+        object btnConnect: TButton
+          Anchors = [akTop, akRight]
+          Enabled = False
+          Position.X = 412.000000000000000000
+          Position.Y = 32.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 2
+          Text = 'Connect'
+          OnClick = btnConnectClick
+        end
+        object btnAddServer: TButton
+          Anchors = [akTop, akRight]
+          Position.X = 412.000000000000000000
+          Position.Y = 68.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 3
+          Text = 'Add'
+          OnClick = btnAddServerClick
+        end
+        object btnRemoveServer: TButton
+          Anchors = [akTop, akRight]
+          Enabled = False
+          Position.X = 412.000000000000000000
+          Position.Y = 116.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 5
+          Text = 'Remove'
+          OnClick = btnRemoveServerClick
+        end
+        object btnEditServer: TButton
+          Anchors = [akTop, akRight]
+          Enabled = False
+          Position.X = 412.000000000000000000
+          Position.Y = 92.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 4
+          Text = 'Edit'
+          OnClick = btnEditServerClick
+        end
+      end
+      object Splitter1: TSplitter
+        Align = Top
+        Cursor = crVSplit
+        MinSize = 20.000000000000000000
+        Position.Y = 145.000000000000000000
+        ShowGrip = False
+        Size.Width = 492.000000000000000000
+        Size.Height = 8.000000000000000000
+        Size.PlatformDefault = False
+      end
+      object Panel2: TPanel
+        Align = Client
+        Size.Width = 492.000000000000000000
+        Size.Height = 275.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 2
+        object Label1: TLabel
+          Position.X = 8.000000000000000000
+          Position.Y = 8.000000000000000000
+          Text = 'Files'
+          TabOrder = 0
+        end
+        object lbFiles: TListBox
+          Anchors = [akLeft, akTop, akRight, akBottom]
+          HelpContext = 2
+          Position.X = 8.000000000000000000
+          Position.Y = 32.000000000000000000
+          Size.Width = 397.000000000000000000
+          Size.Height = 234.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 6
+          OnClick = lbFilesClick
+          OnDblClick = btnReopenClick
+          DisableFocusEffect = True
+          DefaultItemStyles.ItemStyle = ''
+          DefaultItemStyles.GroupHeaderStyle = ''
+          DefaultItemStyles.GroupFooterStyle = ''
+          Viewport.Width = 397.000000000000000000
+          Viewport.Height = 234.000000000000000000
+        end
+        object btnReopen: TButton
+          Anchors = [akTop, akRight]
+          Enabled = False
+          Position.X = 412.000000000000000000
+          Position.Y = 32.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 2
+          Text = 'Reopen'
+          OnClick = btnReopenClick
+        end
+        object btnRemoveFile: TButton
+          Anchors = [akTop, akRight]
+          Enabled = False
+          Position.X = 412.000000000000000000
+          Position.Y = 60.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 3
+          Text = 'Remove'
+          OnClick = btnRemoveFileClick
+        end
+        object btnOpen: TButton
+          Anchors = [akTop, akRight]
+          Position.X = 412.000000000000000000
+          Position.Y = 136.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 5
+          Text = 'Open'
+          OnClick = btnOpenClick
+        end
+        object btnNew: TButton
+          Anchors = [akTop, akRight]
+          Position.X = 412.000000000000000000
+          Position.Y = 164.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 4
+          Text = 'New'
+          OnClick = btnNewClick
+        end
+        object btnCopy: TButton
+          Anchors = [akTop, akRight]
+          Enabled = False
+          Position.X = 412.000000000000000000
+          Position.Y = 88.000000000000000000
+          Size.Width = 72.000000000000000000
+          Size.Height = 22.000000000000000000
+          Size.PlatformDefault = False
+          TabOrder = 1
+          Text = 'Copy Name'
+          OnClick = btnCopyClick
+        end
+      end
+    end
+  end
+  object pnlToolbar: TPanel
+    Align = Top
+    Size.Width = 674.000000000000000000
+    Size.Height = 26.000000000000000000
+    Size.PlatformDefault = False
+    TabOrder = 1
+    object ToolBar1: TToolBar
+      Align = Client
+      Size.Width = 674.000000000000000000
+      Size.Height = 26.000000000000000000
+      Size.PlatformDefault = False
+      TabOrder = 0
+      object tbnNew: TButton
+        Hint = 'Create a New File'
+        Images = ToolbarImages
+        ImageIndex = 0
+        Position.X = 2.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = btnNewClick
+      end
+      object tbnOpen: TButton
+        Hint = 'Open a File'
+        Images = ToolbarImages
+        ImageIndex = 1
+        Position.X = 26.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = btnOpenClick
+      end
+      object tbnConnect: TButton
+        Hint = 'Connect to Server'
+        Images = ToolbarImages
+        ImageIndex = 2
+        Position.X = 50.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = btnAddServerClick
+      end
+      object tbnSave: TButton
+        Hint = 'Save Resource to a File'
+        Images = ToolbarImages
+        ImageIndex = 3
+        Position.X = 74.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 1
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = tbnSaveClick
+      end
+      object tbnSaveAs: TButton
+        Hint = 'Save Resource to a new File'
+        Images = ToolbarImages
+        ImageIndex = 4
+        Position.X = 98.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 6
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = tbnSaveAsClick
+      end
+      object tbnClose: TButton
+        Anchors = [akTop, akRight]
+        Images = ToolbarImages
+        ImageIndex = 5
+        Position.X = 650.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 7
+        OnClick = tbnCloseClick
+      end
+      object tbnSource: TButton
+        Hint = 'See the resource source (and Diff)'
+        Images = ToolbarImages
+        ImageIndex = 6
+        Position.X = 126.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 5
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = tbnSourceClick
+      end
+      object tbnHelpContext: TButton
+        Hint = 'Show the Help Panel'
+        Images = ToolbarImages
+        ImageIndex = 7
+        Position.X = 300.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 4
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = tbnHelpContextClick
+      end
+      object btnSettings: TButton
+        Hint = 'Settings'
+        Images = ToolbarImages
+        ImageIndex = 8
+        Position.X = 268.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 3
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = btnSettingsClick
+      end
+      object Button1: TButton
+        Hint = 'registry.fhir.org'
+        Images = ToolbarImages
+        ImageIndex = 10
+        Position.X = 244.000000000000000000
+        Position.Y = 2.000000000000000000
+        Size.Width = 22.000000000000000000
+        Size.Height = 22.000000000000000000
+        Size.PlatformDefault = False
+        TabOrder = 2
+        ParentShowHint = False
+        ShowHint = True
+        OnClick = mnuRegistryClick
+      end
+    end
+  end
+  object odFile: TOpenDialog
+    Filter = 'Resource Files|*.xml;*.json;*.ttl;*.fhir|All Files|*.*'
+    Options = [ofHideReadOnly, ofFileMustExist, ofEnableSizing]
+    Left = 584
+    Top = 372
+  end
+  object StyleBook1: TStyleBook
+    Styles = <
+      item
+      end
+      item
+        Platform = 'Windows 10 Desktop'
+        ResourcesBin = {
+          464D585F5354594C4520322E3501060C50616E656C345374796C653103B70000
+          545046300A5452656374616E676C6500095374796C654E616D65060C50616E65
+          6C345374796C653105416C69676E070643656E7465720A46696C6C2E436F6C6F
+          72070E636C61466C6F72616C77686974650748697454657374080A53697A652E
+          57696474680500000000000000A406400B53697A652E48656967687405000000
+          00000000DD07401453697A652E506C6174666F726D44656661756C74080C5374
+          726F6B652E436F6C6F7207097846464343434343430000}
+      end>
+    Left = 584
+    Top = 424
+  end
+  object Timer1: TTimer
+    Interval = 100
+    OnTimer = Timer1Timer
+    Left = 96
+    Top = 429
+  end
+  object sdFile: TSaveDialog
+    Filter = 'XML Format|*.xml|JSON Format|*.json|Turtle Format|*.ttl'
+    Title = 'Save Resource'
+    Left = 136
+    Top = 429
+  end
+  object MainMenu1: TMainMenu
+    Images = ToolbarImages
+    Left = 184
+    Top = 429
+    object mnuFile: TMenuItem
+      Text = '&File'
+      object mnuFileNew: TMenuItem
+        Locked = True
+        Text = '&New'
+        ImageIndex = 0
+        OnClick = btnNewClick
+      end
+      object mnuFileOpen: TMenuItem
+        Locked = True
+        Text = '&Open'
+        ImageIndex = 1
+        OnClick = btnOpenClick
+      end
+      object mnuFileSave: TMenuItem
+        Locked = True
+        Text = '&Save'
+        ImageIndex = 3
+        OnClick = tbnSaveClick
+      end
+      object mnuFileSaveAs: TMenuItem
+        Locked = True
+        Text = 'Save &As'
+        ImageIndex = 4
+        OnClick = tbnSaveAsClick
+      end
+      object mnuFileClose: TMenuItem
+        Locked = True
+        Text = '&Close'
+        ImageIndex = 5
+        OnClick = tbnCloseClick
+      end
+      object MenuItem1: TMenuItem
+        Locked = True
+        Text = '-'
+      end
+      object mnuFileSource: TMenuItem
+        Locked = True
+        Text = 'View &Resource Source'
+        ImageIndex = 6
+      end
+      object MenuItem6: TMenuItem
+        Locked = True
+        Text = '-'
+      end
+      object mnuFileExit: TMenuItem
+        Locked = True
+        Text = 'E&xit'
+        OnClick = CloseButtonClick
+      end
+    end
+    object MenuItem3: TMenuItem
+      Text = '&Resource'
+      object mnuResourceLanguage: TMenuItem
+        Locked = True
+        Text = '&Language'
+        OnClick = mnuResourceLanguageClick
+      end
+    end
+    object MenuItem2: TMenuItem
+      Text = '&Tools'
+      object mnuRegistry: TMenuItem
+        Locked = True
+        Text = 'registry.fhir.org'
+        OnClick = mnuRegistryClick
+      end
+      object MenuItem4: TMenuItem
+        Locked = True
+        Text = '&Settings'
+        OnClick = btnSettingsClick
+      end
+    end
+    object mnuHelp: TMenuItem
+      Text = '&Help'
+      object mnuHelpContext: TMenuItem
+        Locked = True
+        Text = '&Context'
+        OnClick = tbnHelpContextClick
+      end
+      object mnuCheckVersion: TMenuItem
+        Locked = True
+        Text = 'Check for &Updates'
+        OnClick = mnuCheckVersionClick
+      end
+      object MenuItem5: TMenuItem
+        Locked = True
+        Text = '-'
+      end
+      object mnuHelpAbout: TMenuItem
+        Locked = True
+        Text = '&About'
+        OnClick = mnuHelpAboutClick
+      end
+    end
+  end
+  object pnlHelp: TPanel
+    Align = Right
+    Position.X = 498.000000000000000000
+    Position.Y = 26.000000000000000000
+    Size.Width = 176.000000000000000000
+    Size.Height = 454.000000000000000000
+    Size.PlatformDefault = False
+    StyleLookup = 'Panel3Style1'
+    TabOrder = 8
+    object webHelp: TWebBrowser
+      Align = Client
+      Size.Width = 164.000000000000000000
+      Size.Height = 442.000000000000000000
+      Size.PlatformDefault = False
+      Margins.Left = 6.000000000000000000
+      Margins.Top = 6.000000000000000000
+      Margins.Right = 6.000000000000000000
+      Margins.Bottom = 6.000000000000000000
+    end
+  end
+  object splitHelp: TSplitter
+    Align = Right
+    Cursor = crHSplit
+    MinSize = 20.000000000000000000
+    Position.X = 492.000000000000000000
+    Position.Y = 26.000000000000000000
+    ShowGrip = False
+    Size.Width = 6.000000000000000000
+    Size.Height = 454.000000000000000000
+    Size.PlatformDefault = False
+  end
+  object ToolbarImages: TImageList
+    Source = <
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap.TransparentColor = 536870912
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              01D449444154384F8D53CB6A1B4110ACD56E2CC91182086C3006E71A1474D025
+              39047233D817FF45C07F60B031C6189C0FF07F0472497E200F10E894A321871C
+              422C48E407F13E6667D6D533B3A335389046A59E9EEDAEAE6E6923787BFFE5A2
+              6A2FB57C44ABC2172266A5F34B4C26DF717AB0156AC442F06132AB5E8F06BECE
+              153AEFCEE7E7BFF0EEEB4F2C271DECBF1987BAD032895B78DC89D113741387E5
+              47C4924592C488E30857C3E7D83B9BFA0E0D0263B43FDD37CDD482485585F43A
+              45FEFB0FBE0D9E62F7ED674B1208AAB2F4A78519292C0C6E3283DEA08F8D9536
+              D67E4CF172F609EBC5B5CDF9A7025BAC0C32E236D368F7BAD8DC7981579B633C
+              1BADFAAC06011A0A5C3125B37B5AD2738EBFB9C1FCA680E93C417F63E8339B0A
+              B423A865678546563A0539BD833CD3D071C7E68A2D76A0DD08193B5BD9D25931
+              E6B525629C6B921012D71608344790EB54692B5B0A3226A7A528112212B2D0C1
+              FE00D60281528AB33A05B23C2BD97A1042A8BD17B20714A88204942CD25D3759
+              1E15899711E4CC7B79C64FB04050DAD938A78574AE3DC18A3A36FC7B375F86C5
+              0EA8CA7667522ADBE6D9A9102FCF0CDC9AEF5B2090A95415A1207F8D5C50B590
+              51B2E1BB1235505B507372FCB131D9FFD9E1D1767407277D5016D2FB11CC0000
+              000049454E44AE426082}
+            FileName = 'C:\data\Images\glyfx\16x16\new16.bmp'
+          end>
+        Name = 'new16'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap.TransparentColor = 536870912
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              020649444154384F95524D48545114FE4614135D048AC818891B5BB851D1B298
+              854D2554CCCE45445026D82217562E041711D226CA9682D0A645429B16620A42
+              D08F908C8894F99368A4CD8C591233CC78DF9B9FF73AE7DC372F47EDEFE3DD7B
+              CE3BE79EEF7EE7DEEBC13EA8B85B623BAE60A32FBEEF3AC66F138CFF21FA2398
+              A879B4DADE4DC8C873EC5F519C5784FAA6EA3DAA5C492F1E14E624FCB7CC1CB9
+              5C1838DF8891D1E99C56C4E1E2961B8A7E8625C8181BB88A9A5A9FF307F866A6
+              D07EC18FE5950DBC09CEBB241EB738F318AE049B72F479EF5D77021A5D97CE61
+              F37B144FC7279D48F60CD423D8A92440C34EA68034FB26C2DD0F25DD76F604BA
+              2F07904FCB6B0E7B11F0354A9C5568051DF765F7B7C3FD30B7A392DC898B4601
+              AEB5B5A2A2EC2066163E61E465104F0ED046847C9EACA4828A6DC15350829337
+              23B08D2045DD734298E8BD03A771E6581D26A666B1DEF30E56C6C0E460BD2680
+              69E0EBF234BC474EC18A3EA3763E4B384BC1EA429D775039741BAF8EB6C0B216
+              11991B939C9C814D0ABEAD7D40E9A126588AF63315916E93E5A17D8BC6972BBD
+              24370D6432587D3D2457AD094C132AFE0345C56540220218096A838A65B0AFC4
+              B714F96926D0FD3384602BFC11A5950DB428A6173A85DA6A1F594B37140BCF4B
+              31430836434B28AF3A0E3B11DA21FF97746E852D92062948E1FDF37EF7A5CAB4
+              FB19FF0B3401F0131AC01568FD3D80BD0000000049454E44AE426082}
+            FileName = 'C:\data\Images\glyfx\16x16\open16.bmp'
+          end>
+        Name = 'open16'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap.TransparentColor = 536870912
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              028149444154384F6D93CD4FD3601CC7BFEDD86BE9C6BAB11736047124269218
+              889E08C6172081A3F16C3C78E1E6D13FC4F81F783621261A1034448C0709E850
+              4089B8B18D976E5DBB6EB4EBD63ED6E689B1844FF24B0FFD3CDFE6FBFC520617
+              30303530181E0EDF0C047C49D32066FDA4BE57DA286D4044932AFF7005083921
+              3CF1E8C6C3A1D1DC7C3C2B5C6502DD0803C6D2AA56A5F0A5B8F9F9D5A717876B
+              07CB547770055C7F32FE7CF6E9DC82C1129CA10104BA80C58035FC107C023E6E
+              AE5A5B0B5B0F945DE5253D02963E1D0289D0C8CFD23E0E8A05C8928C96A24295
+              1B10C51AF27BDF110D24D860841BA3BA832BC0D488E6E743F0857A016F3F0893
+              7486F5C6100C07E1F107D1697734AA3BB802D482AC4A7911FA691D96DE0231DB
+              F6E8E83615A8FB5554567E4313F513AA3BB80222B948DCE3F3A0B1DF4075FD17
+              8E977770BCB40371BD886651436484079F09A5A8EEE00A202631FAAE25909A8C
+              217D5B40E65E1CD9997E7BE2C8CC64C08FC66075EC5BFD8F7315D4A694AF4197
+              7410CB5E91DF6BDF450F4CC3B4DF35515E2DA125EA22D51D5C01FC653E6ADBA8
+              E7551CBD97507A7382D2EB6354DE4990BF49E0927E70292E4675075780FDCDAE
+              309E46FA56BF3D51A4A6A218B8134376DAAE3277097D6389BF3D3D5476385FC1
+              A8E72518721B4C0F0B6FD88F1ECE0742085A872DA78276AA2954777005848779
+              8E74DAA86ECA28BF1571B8584171F108E52511D2D72AB884EF6F8508D51D5C01
+              04C4484C6691994DDB1BB037713786CC740C83F3490CDDBF02613C05CBB45C67
+              5C7D94DD468D1076A21351E33CCF33DE5EBF6DB03014FB62B7157DFB59FE4379
+              A5F098EA0E17FECE1ECE33CDC5B99C87F7F6C184D5AE69D29974F6035DAC5185
+              02FC01C9CB0D06780FFFB20000000049454E44AE426082}
+            FileName = 
+              'C:\data\Images\programming images\glyphs\network\PNG\Regular\16x' +
+              '16\Data 0 0.png'
+          end>
+        Name = 'Data 0 0'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              02ED49444154384F7D924B68134118C7FFB38FD94D6A139398481F6A6D7D3F2A
+              12A950415444ACA2875AA8221E3C89A017154F0A1ED48377050F7AF271F220A2
+              A0825051C48AA01605ABD8364D5B934D1FEE6EF7957D38BB215E447F30739899
+              FF6FBEF9760918EB0F9DDB636ADA59D522FCDA15AD4F478A9343803D587C766B
+              26DCFF1F9100AB7A2E6633C6856D7BCED289590F55AD849232554DC5518E897C
+              614AA97C6E6F59F8A5ACE89F86CBA57718BCAB4639462420F9E3579BCDD4F98E
+              DD795E471284E3E1BB04221560192A78B8B02D0330A6C0ABDF607AF2BBEFCF6F
+              7485592E9C02BB1AD3E5F7C4D435B642C1C752E01B53B03D028F88305C0AAFA1
+              0D3A598C8424229DCB7686B9904800D7937D33C3B9A60E1F2284E452C8B9F590
+              9B3A4133AB2166DA41736B104BA4605026526C3FCA316A82AA2D792C6CFD52A0
+              4E0C63E6EB1BCCFCF808BD3409C7B4E1BA02024F624FA3508A0514E795281652
+              6B62DBFE7B92A31E696D5F0335EC0121207C0C8436B2B100448803F24240FF06
+              6FF42D4C9F9AEA97BB6CB12E68ED79100FD4DE5CF352FCFCC5812701389E1547
+              D8E044048455C06EA7641E500BF0248E099E4582DA1308911DC763CDD4203825
+              587305D86A998D0ACCB99FB06627E0CC8EC3D12A081C278AD48904244EA9EF73
+              182F94B0AC2587A3BD3BD0DE9C00A9AAF0D87B292C4802EB9B6BB1A282285827
+              1250814BC41BD3F0031FBD077761E3D61E9C3C7502AF9FDCC4B1C30710A30144
+              4F439C1276468882752281CFD1F95832834CB6058B92313C7E3D020319E437AF
+              C3AD4B87B065FB3E6886078B55CF49E92858870F27BF29FF90885C27719D953B
+              BBD722D1D60559F05018B88DE1EF63B0921B303A5E01150534B08B4C9B736D65
+              E8CA1F014A1FADEAE4877B165DF1AABF7FEFF499BE4D729C180D3CF1A5552B97
+              E3C5571D65454336BB98FD854B30AD177D7362E87218AD7DC67FE0FB7E771004
+              C7CF5DB93EF7E8CDD83A4BB37B96756C2063230346F1E5FD86F0CC7F057FD1DA
+              97E672F2694E80E90EDEB90600BF0185ED3310E2E39CF50000000049454E44AE
+              426082}
+            FileName = 'C:\data\Images\collection\16\Save.png'
+          end>
+        Name = 'Save'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              031B49444154384F8D915D681C5518869F33B3333BB3DBEC4F379B343FA62555
+              931A8C48A4828A8A96421A2BD278A16091DE28A2DE9828288A7AA152EF55BC28
+              5E9488375E2854694BA15E94D284B6DAD25A1B35754D36D99F6EB2B3939D9DD9
+              9D198FE9AA45107CE0BBF8CEE17DBFEFBC478C4C4EEF766AB529AB21D41DB7F6
+              1F5D58CC5F047776F1D8A10AFF03C1EDE36F6533F537EFDF3DA52FADFA346B05
+              0AA5E5663A46D1D4D4DC72A97C69B02F75B958B22F5C2D16E6989DB1DADA0D84
+              183BF07EAF937E6DFBAE31D526895054829640D32334EA162A2DDC461DEACBA8
+              D63C8E6FCCFD7CFCE39D6D3D4AE8364DDB382B1CBB263B1DD54CA376A4717D81
+              2F34EA2D1D3FBE0D5B7493886A6CEECA8EB6B51B28B47C2370324ACBB109D088
+              240730BA46307A46D13343689941F4AE61CC449ABA2E8D4A6ED0D66EA0D074A3
+              BE1437AA25ACA5AB547E3A4DE5D71FB00B793CC7A5D58A10FA51F9349DD2628E
+              C5F5525B7A03C1B689CFA39EF574FFE030D69F190881504D84DE216B13221203
+              2305F63CFEB5333881EE589767E4E10D04FDE35FC6426B5F57EF002B55055584
+              28AA226F64291AA1901BC8E9BA58072B871F55A4C1B1BF0D1439D2F03C9FD0AD
+              11F10A34D672B856515619676D85C6EA12DEEAEF78B532A1E7B565FF20C4D013
+              C745B9B80BBFC98E91DB181B1D64F6EC1516722B785260C6136C7DB2C6964CAF
+              CCA349441532F7A65C5050AC5E971F175112B18ECD0461C0BEC71FE1CE7BC779
+              E1A5E739F5CDA7EC7F6A2FA61E9288A7A848B3751A9C78E32B9951C872354FC3
+              735002455F37931932D93E3A9326474E2D5027C3D8DD7770E89D49EE79700FBE
+              DF22123430652E3262D2660703DD9D6CEDDE22BBBB9E4DC5356546B3D7F6BCFB
+              CA244BDA4E529AC340E5089A6172DA1AE18BF997B970F02446C460532C89E3C9
+              404378F1F033D2E02F7A1F7BF4B34FA627F64F3CF0F0F94BD7B6AFFE7631714B
+              4F9A0F8F56F92EFF36F1CE80ACA173E2F5393EF8FA39AADA797EFCC5BDC9E05F
+              0441705F188607A6DFFB68EDDBCAE169BDC74655AF736EAAC0C1937BC90EE7F9
+              FE4CFCBF0D6E66E8D587C2502D13D342D29A4E3CE1D3DF17E74ACEE10F5FC445
+              21D2F108360000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\Save Add.png'
+          end>
+        Name = 'Save As'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap.TransparentColor = 536870912
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              00E249444154384FA550410AC230108C158BA8E0513C7AF10F3EC1FF8A9E7D83
+              07EF8A2078E845AC2852676236A4E9D65A1C58369BDD999DC4FC8D5B6A0A862B
+              5B2371D90AB9632B248387E9B8F3CF22E15C854C4BFD403484CC844BFD1378C9
+              E280C8142777854C7801829B87C817C42E1039E19C23C76442B5BAEE9962860E
+              4923C4183151C8847A496CE9001EA69898D79089D21304749022A7A05D9157A8
+              6D434145608361AECB405960F319B9EBEEED40046F6D0FCB478CBC5CBD7C966D
+              8B407C6F0B36D9954E3C24D044FC139AC884F4C2E794FEE01B59108B3412EAF0
+              1130E60D3C2E4ED59E34E55F0000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\delete16_h.bmp'
+          end>
+        Name = 'delete16_h'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap.TransparentColor = 536870912
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              017C49444154384F636440034B961DFA0F656205315176287AB01AA0E3600BE5
+              21C09DCBA718A445C518EEDE788C620813944601CC4051740C02BA5A320CCA1A
+              B228AE844AA10216A0283A86019021A6262A7043E04E3172AFC0F0FB8AA5ED50
+              1604ECD9B611CA82003E1621880120CD2FA3EBC08230A07B269EE1D54D658635
+              CB11869C3E7E8CE1FFFF7F40FC1F8CFF7D61646044D76C7C2B174CCBF8DC6478
+              F9F213C3FD695E0C1B56420C7970FF1E98868147D79F32B040D9608D46E1FF18
+              7E6AFE60B8B65B8CE1F96E51862FBF39C072CC508F2A2B294118500032002978
+              1818B864BF01F1770635DF1B0C9F1FB2335C53D904166761FA8F158300C20096
+              D70C477A7818BE7FFFC6F097F93B0397CC37A8046694C2300840290686B34A2B
+              18CEAA4D6678F7E037C387C77FC17C18C016AD200C024CE77676308A2F6D82F0
+              80E0E9E5BF0C8F2E409C07123FB4A90DAB66100601BCE9E0E89636280B3B58BB
+              FA089485044029ECF79F7F4461905AA843C807702FC0007246210C181800B5E8
+              B49CB3D100740000000049454E44AE426082}
+            FileName = 'C:\data\Images\glyfx\16x16\doc_web_16.bmp'
+          end>
+        Name = 'source'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              032749444154384F65924B685C7514C67FF7E6CE9D9974329947A233DAD13463
+              A33651AB8DC1401F8236118BA0011152B0826256B556BA72D98DAE6C12145CD8
+              858B5AA52EB2E8A23EA0A21141EB426B6C0B36C4C4242599C93CEEDCF7CBFF4C
+              06A1F5DB1CB8E77EDFFF9CF37DD2E94F7E7EFC9FC51B27FF5ADA2C86926A0412
+              86EF499AEDFAFAC0E0E0779EE378A6E779AE15D4A48E604B8D872B73EF4F9469
+              43D95C5FFE2819A98C0E0F44505495AE7894543A49369DE6DA62F94D351A2316
+              8D637912E5AACEAFBF2FAE08DE7DDB7421603981D4B7E7395CC723080C42DF64
+              D3F431453377CFDD24139DE47BBB192CF6908C5A1C7FAF6E5FDEE6B6A0A8F158
+              B951DF22A2A868A647A90286A8E52D1DD7B585B0C5EA5A89B1834566DEDE8B69
+              B8619BDB822CCB4A390C02AA0D1B9990170FF472727237AF8C15C4EB0A48108D
+              48C8922FBAE0FADEED027E105474CBA16178BC7420C7F38776B22BA3F3EA335D
+              BCF1C24E7CD7C0107DCFB32108B11DB74DDD86DC9D8C9434F1BAAA2A2CDCB8C9
+              B94FCF313135CBF4E77F32FE98CA40CEA456ADE2DAAEB8912FAAD3A66E431664
+              AFD9A86B0673F3553E9CDB20DFF708E3071FC5302C16AF5F114417CF77F1BD66
+              BD63854A45F36DDB46D774743360EFC8D39C9F9D126B984C9E98E6FAAA446757
+              8625CBE7E8073F91EECF3F387AEAB3FF4464D3361DC711B6592E9618CFA86D70
+              F1E2571C7B679A1F163C5285A7C83C9141BAFF01BE383DC9A963875173398E9C
+              B9D412913DDBB45DCF6F91EBB51AB1B8C2FE913DC4527DC4D3FD28FDC20981E6
+              DFCFCECCF3F2D92BACD56DB2F766183FF37D283B9623F89EB8AE83482D9AD620
+              959528660DF4DA2A0FE532E47BBAA99496F9F6C47E2EBC3E4C049B9B0DB82ADC
+              9103595D0EFC50D8E4B26347D3893586C667B87079854432831D4AFCB1D9E0AA
+              96221463641351AE8958FF5889D35013C85F9F3DFE4DA1D03B914A775FEA90D5
+              F52068847A7017B5508C1F4DB02E52782B9617B9CEB5566922547A605791C2DF
+              BF3573763B8EBCF5E56E718BD7AA5AF570BDA63DECEA8D44FDC97D348646599A
+              48531299199E8F31F8CB791666A7A4FF09DC8991A31F8FDDDAA8BCDBB16FE850
+              A7B1D6FE4A8B0CF02F5E848EFAE807FE970000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\Help Information.png'
+          end>
+        Name = 'Help Information'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              02D749444154384F8593CB6B135B18C07F99493BD3DC244D638CDE5A5A5FADAD
+              EF28A9825CAEBAF3414137EA427CFB1F286241D18588B871ED5A5D8828E556B8
+              B5553717BD5AF0018A2E529BA6D1B4316D27AF99C964324EE258B310FC36DFC0
+              F97EBF73CEF79D71511703030396F3F9DBE8EBEBABB1F3826432D9ED72B94674
+              5D0FA7BFA6C5CE159D2E312F30363D86E586AECE2E645946D774061F0E72F3D6
+              10430F6EBAECA5EF110C060F4A92D46A4B58DAB1B4A63E3F7791783CCE81FC3E
+              26C62788F6461104817038EC50203819CBB2F42A5C281450320AF9621EF58BCA
+              D63F7A194B8C319188333A3A8A6118F8FDCD0E552728A8AA59CDA228727FF03E
+              C94492AB1D9739113982EA565114A5264FA552B8ED9A1FF15390CBD572F59EA1
+              50889191619EBC7DCCC56B17686A94D8B9E36F02CD5E724A865249ABD556635E
+              208B960115344D65CB5FBB58DDB38AC4A70FAC58DECEE64D113C1E8F7DF416B4
+              92BD59517728986F622C6D7ADFA472AC6A97F0A9AF294A3DF8D747B14C833799
+              59666359F4921BD3B59848DB2F049FE602BEBBC3EFD81678CA99ED2FB973A389
+              17EA46C2924236576256B5F04B2536F4EEA1E7CF9F53981794F5BCD9BBB695CC
+              E41AAE0F09B446D7B1DFBB045DD7680DBA093566F99872A1086DA43EBF77A83A
+              812CB999998A31FCE85FA6141DC18AE1751B7C9DFEC2B9C3DD1CED6FA1FFD06D
+              46CC731CDBDDEE5075828A51C0A091655D1B596D4F624DB8C8C4548EB8B68BE7
+              C9492E9D8D31BEE0242BFD5D2833930E553705AD2490CDDB506A86F4F40CFD07
+              344E45DE934A8C3399B5B8F17F905749DD6EAA4E51FD451313D36A93282F6465
+              779492FDDE8F5F7966BFCE36162DE9B07731887802763F8A14CB32E9D98243D5
+              9DA09CFE6F509CBB67361819FBEE45E2428484B485969600B26F11DED032FC8B
+              D7D1246A64E2AF1DAAEE6FACC6E9BD7B3D0973AECD277B9BC506CFC246A96181
+              5D1228572C9F61943D8689974A256CE885F17F1E0E9D07F80675C12E06522D8A
+              CF0000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\Settings.png'
+          end>
+        Name = 'Settings'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap.TransparentColor = 536870912
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              02E449444154384F6D934B6C55551486BF7DCEB96F6E1FDCD220090C1A134B9A
+              AA633A68888F12D481864069B151D28498A8031FE9C030C4383024244E8C91B6
+              0A131327220A8C8C041D10428DB5208D454A534A7B7B5BEEE3DC7BCF636FD7B9
+              97D608FE39AFECB5F6BFFEFDAF7514FF830907D3994B91CD24306148B1E8B252
+              D6BCE99BC7F2FFB3106DEC7D7A17BB9FDF43B2BB17158B631E14D0F3B7284F4F
+              F1C7F43C37160346837F89363FCEA66C3370A89FDCF03168EDC0CCFE86999BC1
+              ACE751BE07A53582BBB3CC2DAD73F5AF90916A93A4F1882ABF3CB497DC5B63E8
+              A505CCB7A765F314F8F5288CD69A7AE0508F2BB46558A8C0F59BBE2841595142
+              4FCF0E72AF0E4AD5DFD1A74FC0B61CD88E1084044148CD8E61FA07A825D2147D
+              433AAD7862BBC405D6848DE9EE7B16AA2EE199CF505D3DD827BFC3FEE8737C3B
+              812B22626F7F4CCBA97338CFBD46C50DA868454B87CDB858E474B4C5496D6D47
+              FF721156E731D78A98F35FA15E1AC1D22149313135F80EA52B3F92FFF982A870
+              08B4941601E92D164E3A1DC3CA2FA2EFCC8A1E0B5D59A37A7C9498B249EE1F6E
+              C82CFD7A89B9F70EE1BA258278A2B166CBE19DB82545021F6ECFC0835542F1B4
+              2AB7EBF984EBAB8DC40861B948A55EC76B5AB609252DB04A72A6602D4F20AD72
+              434DCD49911EFB94CCD0BB142F9FA770F11BDA5E38C0939F4CE264DB65B022FD
+              60E41578066BAD6258F61475A1736B1AD5F722D9D7DFA778E5027F7E7098990F
+              87B97FEE6B3AF70DD2B9FF2061D56F549601C5AD487EC47669876D7A775A225D
+              E36F6925296EAFFCF43D6E7E0923B29D4C966DFB0E52B8FC035E7EB971F6C2B2
+              E6953B7EC4055F38CA3CF394434B4651F1B57434204CD828A7D96B23DDD0D500
+              2BE960C76D3C69EDDF373D8E7AA649106132A54C5797236DB1100ED9D55CDF40
+              941979E8D50C8BB7038E946518A2F546F421BE14251DDB6DF9156CA2E21BF45A
+              C84404C542C8CABDB051B91979846003E30965A22189C5242C972F6E57C5B037
+              6A8FFECEF00F51A146432DAEE6020000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\stop16.bmp'
+          end>
+        Name = 'stop16'
+      end
+      item
+        MultiResBitmap.LoadSize = 0
+        MultiResBitmap = <
+          item
+            Width = 16
+            Height = 16
+            PNG = {
+              89504E470D0A1A0A0000000D49484452000000100000001008060000001FF3FF
+              61000000017352474200AECE1CE90000000467414D410000B18F0BFC61050000
+              01A949444154384F9593DF2B436118C7BF6662B3365A49D2F2235BE19AB87069
+              37B8504A2977FE02E54629E502172E5C296E2825724DE2C294B0B596911F2DC4
+              3043A366271B8E3DCF794FCE89D3F2A9F77DDEF7DD79BFEFA7F39EE5C959F04F
+              F2B2882138A0677A03F15765417E53AA11BEF1765D00286076F3448E27E59C6D
+              74F58C1ED719B3C1DCD6296A5D2EB1644CF02C8AC10EB7CEC044DD472689C60A
+              2B9676A35C8DDA5B9AF7E8608399F5003CB5F562C9989D701423DD6E31536003
+              73818D4FD01AB8221E941DD4C0713FC5959A37D284A06F0CC78BE5D89F2CE100
+              33F7598EEE52E86DADE44AD01B69E88B418A2EC0D216C35726CEEBF7FE1614B9
+              3B11B95DE1391BBC4AA65F062A665B359EFD0348848671B1EC85746947EA5909
+              233880D01AA816C447F21296D22ADE64B5DB9096DEC52F0A1CE0B07CF115D14B
+              521B41DA644084C28F5C09ABB34C8CC42D88F12F48DD5ED78FCC930F52E20A89
+              F3000A9D2EDC1D6EA379E885BF0713757F41012F4FEBC82FF6F0E6F7D829EB6B
+              4FCF09D9ED4D38E4CFF4839CBA9997AFD7BA78AEB5FEF95318400FAB774EA8EA
+              629A3B80D09DA8D90C00DFB1FBF331675E429C0000000049454E44AE426082}
+            FileName = 'C:\data\Images\collection\16\list_security.gif'
+          end>
+        Name = 'registry'
+      end>
+    Destination = <
+      item
+        Layers = <
+          item
+            Name = 'new16'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'open16'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'Data 0 0'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'Save'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'Save As'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'delete16_h'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'source'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'Help Information'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'Settings'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'stop16'
+          end>
+      end
+      item
+        Layers = <
+          item
+            Name = 'registry'
+          end>
+      end>
+    Left = 24
+    Top = 428
+  end
+end

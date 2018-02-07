@@ -48,7 +48,7 @@ Type
       FField : String;
 
     Protected
-      Procedure Error(Const sMethod, sMessage : String); Override;
+      Procedure RaiseError(Const sMethod, sMessage : String); Override;
 
       Function GetField : String; Virtual;
       Function SetField(Const sField : String) : TAdvFiler; Virtual;
@@ -111,7 +111,6 @@ Type
   TLongString = StringSupport.TLongString;
   TShortString = StringSupport.TShortString;
   TColour = ColourSupport.TColour;
-  TDateTime = DateSupport.TDateTime;
   TDuration = DateSupport.TDuration;
   TCurrency = CurrencySupport.TCurrency;
 
@@ -150,9 +149,9 @@ Begin
 End;  
 
 
-Procedure TAdvFiler.Error(Const sMethod, sMessage: String);
+Procedure TAdvFiler.RaiseError(Const sMethod, sMessage: String);
 Begin
-  Error(EAdvFiler, sMethod, sMessage);
+  RaiseError(EAdvFiler, sMethod, sMessage);
 End;  
 
 

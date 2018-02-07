@@ -1,11 +1,41 @@
 unit FHIRPluginSettings;
 
+
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
 interface
 
 uses
-  SysUtils, Classes,
+  Windows, SysUtils, Classes,
   AdvObjects, AdvJson,
-  FHIRTypes, SmartOnFhirUtilities, CDSHooksUtilities;
+  FHIRTypes,
+  SmartOnFhirUtilities, CDSHooksUtilities, FHIRClientSettings;
 
 const
   DEF_ActivePage = 0;
@@ -15,16 +45,13 @@ const
   DEF_Height = 300;
 
 type
-  TFHIRPluginSettings = class
+  TDefinitionsVersion = (defV2, defV3);
+
+  TFHIRPluginSettings = class (TFHIRClientSettings)
   private
-    filename : String;
-    json : TJsonObject;
-    copy :  TJsonObject;
-    FShuttingDown: boolean;
-    procedure Save;
     function GetToolboxVisible: boolean;
     function GetVisualiserVisible: boolean;
-    function GetDefinitionsSource: string;
+    function GetDefinitionsVersion: TDefinitionsVersion;
     function GetAdditionalDefinitions: string;
     function GetTerminologyServer: string;
     function GetPath: String;
@@ -40,7 +67,7 @@ type
     function GetNoWelcomeScreen: boolean;
     function GetBuildPrompt: String;
 
-    procedure SetDefinitionsSource(const Value: string);
+    procedure SetDefinitionsVersion(const Value: TDefinitionsVersion);
     procedure SetAdditionalDefinitions(const Value: string);
     procedure SetTerminologyServer(const Value: string);
     procedure SetPath(const Value: String);
@@ -57,34 +84,16 @@ type
     procedure SetBackgroundValidation(const Value: boolean);
     procedure SetNoWelcomeScreen(const Value: boolean);
     procedure SetBuildPrompt(const Value: String);
-
-    procedure RegisterKnownServers;
+  protected
+    procedure initSettings; virtual;
   public
-    Constructor Create(folder: String);
-    Destructor Destroy; override;
-
-    procedure holdChanges;
-    procedure CommitChanges;
-    procedure AbandonChanges;
-    property ShuttingDown : boolean read FShuttingDown write FShuttingDown;
-
-    function SourceFile : String;
-
-    procedure ListServers(items : TStrings);
-    procedure registerServer(server : TRegisteredFHIRServer);
-    procedure updateServerInfo(index : integer; server : TRegisteredFHIRServer);
-    function serverInfo(index : integer) : TRegisteredFHIRServer;
-    function ServerCount : integer;
-    procedure DeleteServer(index : integer);
-    procedure moveServer(index, delta : integer);
-
     function FontName : String;
     Function FontSize : integer;
 
     property ToolboxVisible : boolean read GetToolboxVisible write SetToolboxVisible;
     property VisualiserVisible : boolean read GetVisualiserVisible write SetVisualiserVisible;
     property TerminologyServer : string read GetTerminologyServer write SetTerminologyServer;
-    property DefinitionsSource : string read GetDefinitionsSource write SetDefinitionsSource;
+    property DefinitionsVersion : TDefinitionsVersion read GetDefinitionsVersion write SetDefinitionsVersion;
     property AdditionalDefinitions : string read GetAdditionalDefinitions write SetAdditionalDefinitions;
     property Path : String read GetPath write SetPath;
     property NoPathSummary : boolean read GetNoPathSummary write SetNoPathSummary;
@@ -108,55 +117,13 @@ implementation
 
 { TFHIRPluginSettings }
 
-procedure TFHIRPluginSettings.AbandonChanges;
-begin
-  json.Free;
-  json := copy;
-  copy := nil;
-end;
 
-procedure TFHIRPluginSettings.CommitChanges;
+procedure TFHIRPluginSettings.initSettings;
 begin
-  copy.Free;
-  copy := nil;
-  Save;
-end;
-
-constructor TFHIRPluginSettings.Create(folder: String);
-var
-  f : TFileStream;
-begin
-  Inherited Create;
-  filename := IncludeTrailingPathDelimiter(folder)+'fhirplugin.json';
-  if not FileExists(filename) then
-  begin
-    json := TJsonObject.Create;
-    json.vStr['DefinitionsSource'] := IncludeTrailingBackslash(ExtractFilePath(GetModuleName(HInstance)))+'validation-min.xml.zip';
-    json.vStr['TerminologyServer'] := 'http://fhir2.healthintersections.com.au/open';
-    json.bool['BackgroundValidation'] := true;
-
-    RegisterKnownServers;
-  end
-  else
-  begin
-    f := TFileStream.Create(filename, fmOpenRead + fmShareDenyWrite);
-    try
-      json := TJSONParser.Parse(f)
-    finally
-      f.Free;
-    end;
-  end;
-end;
-
-procedure TFHIRPluginSettings.DeleteServer(index: integer);
-begin
-  json.forceArr['Servers'].remove(index);
-end;
-
-destructor TFHIRPluginSettings.Destroy;
-begin
-  json.Free;
   inherited;
+  json.vStr['DefinitionsVersion'] := 'r3';
+  json.vStr['TerminologyServer'] := 'http://tx.fhir.org/r3';
+  json.bool['BackgroundValidation'] := true;
 end;
 
 function TFHIRPluginSettings.FontName: String;
@@ -250,9 +217,15 @@ begin
     result := StrToIntDef(o.vStr['Width'], DEF_Width);
 end;
 
-function TFHIRPluginSettings.GetDefinitionsSource: string;
+function TFHIRPluginSettings.GetDefinitionsVersion: TDefinitionsVersion;
+var
+  s : string;
 begin
-  result := json.vStr['DefinitionsSource'];
+  s := json.vStr['DefinitionsVersion'];
+  if (s = 'r2') then
+    result := defV2
+  else
+    result := defv3;
 end;
 
 function TFHIRPluginSettings.GetNoPathSummary: boolean;
@@ -288,18 +261,6 @@ end;
 function TFHIRPluginSettings.GetVisualiserVisible: boolean;
 begin
   result := json.bool['Visualiser'];
-end;
-
-procedure TFHIRPluginSettings.holdChanges;
-var
-  f : TFileStream;
-begin
-  f := TFileStream.Create(filename, fmOpenRead + fmShareDenyWrite);
-  try
-    copy := TJSONParser.Parse(f)
-  finally
-    f.Free;
-  end;
 end;
 
 procedure TFHIRPluginSettings.SetAdditionalDefinitions(const Value: string);
@@ -382,9 +343,12 @@ begin
   Save;
 end;
 
-procedure TFHIRPluginSettings.SetDefinitionsSource(const Value: string);
+procedure TFHIRPluginSettings.SetDefinitionsVersion(const Value: TDefinitionsVersion);
 begin
-  json.vStr['DefinitionsSource'] := Value;
+  if value = defV2 then
+    json.vStr['DefinitionsVersion'] := 'r2'
+  else
+    json.vStr['DefinitionsVersion'] := 'r3';
   Save;
 end;
 
@@ -436,131 +400,5 @@ begin
   json.bool['Visualiser'] := Value;
   Save;
 end;
-
-function TFHIRPluginSettings.SourceFile: String;
-begin
-  result := filename;
-end;
-
-procedure TFHIRPluginSettings.updateServerInfo(index: integer; server: TRegisteredFHIRServer);
-var
-  arr : TJsonArray;
-  o : TJsonObject;
-  i : integer;
-  c : TFHIRCoding;
-begin
-  arr := json.arr['Servers'];
-
-  for i := 0 to arr.Count - 1 do
-    if i <> index then
-      if (arr.Obj[i].str['Name'] = server.name) then
-        raise exception.Create('Duplicate Server Name '+server.name);
-
-  o := arr.Obj[index];
-  server.writeToJson(o);
-  Save;
-end;
-
-procedure TFHIRPluginSettings.ListServers(items: TStrings);
-var
-  arr : TJsonArray;
-  i : integer;
-begin
-  arr := json.forceArr['Servers'];
-  for i := 0 to arr.Count - 1 do
-    items.add(arr.Obj[i].str['name'] +' ('+arr.Obj[i].str['fhirEndpoint']+')');
-end;
-
-procedure TFHIRPluginSettings.moveServer(index, delta: integer);
-var
-  arr : TJsonArray;
-  i : integer;
-begin
-  arr := json.forceArr['Servers'];
-  arr.move(index, delta);
-end;
-
-procedure TFHIRPluginSettings.RegisterKnownServers;
-var
-  server : TRegisteredFHIRServer;
-begin
-  server := TRegisteredFHIRServer.Create;
-  try
-    server.name := 'Reference Server';
-    server.fhirEndpoint := 'http://fhir2.healthintersections.com.au/open';
-    server.addCdsHook('Get Terminology Information', TCDSHooks.codeView);
-    server.addCdsHook('Get Identifier Information', TCDSHooks.identifierView);
-    server.addCdsHook('Fetch Patient Alerts', TCDSHooks.patientView).preFetch.Add('Patient/{{Patient.id}}');
-    server.autoUseHooks := true;
-    registerServer(server);
-
-    server.clear;
-    server.name := 'Secure Reference Server';
-    server.fhirEndpoint := 'https://fhir2.healthintersections.com.au/closed';
-    server.SmartOnFHIR := true;
-    server.clientid := '458EA027-CDCC-4E89-B103-997965132D0C';
-    server.redirectport := 23145;
-    server.tokenEndpoint := 'https://authorize-dstu2.smarthealthit.org/token';
-    server.authorizeEndpoint := 'https://authorize-dstu2.smarthealthit.org/authorize';
-    server.addCdsHook('Get Terminology Information', TCDSHooks.codeView);
-    server.addCdsHook('Get Identifier Information', TCDSHooks.identifierView);
-    server.addCdsHook('Fetch Patient Alerts', TCDSHooks.patientView).preFetch.Add('Patient/{{Patient.id}}');
-    registerServer(server);
-  finally
-    server.free;
-  end;
-end;
-
-procedure TFHIRPluginSettings.registerServer(server : TRegisteredFHIRServer);
-var
-  arr : TJsonArray;
-  i : integer;
-  o : TJsonObject;
-  c : TFHIRCoding;
-begin
-  arr := json.forceArr['Servers'];
-  for i := 0 to arr.Count - 1 do
-    if (arr.Obj[i].str['Name'] = server.name) then
-      raise exception.Create('Duplicate Server Name '+server.name);
-  o := arr.addObject;
-  server.writeToJson(o);
-  Save;
-end;
-
-
-procedure TFHIRPluginSettings.Save;
-var
-  f : TFileStream;
-begin
-  if copy <> nil then
-    exit;
-
-  f := TFileStream.Create(filename, fmCreate);
-  try
-    TJSONWriter.writeObject(f, json, true);
-  finally
-    f.Free;
-  end;
-end;
-
-function TFHIRPluginSettings.ServerCount: integer;
-begin
-  result := json.forceArr['Servers'].Count;
-end;
-
-function TFHIRPluginSettings.serverInfo(index: integer): TRegisteredFHIRServer;
-var
-  o : TJsonObject;
-begin
-  result := TRegisteredFHIRServer.Create;
-  try
-    o := json.forceArr['Servers'].Obj[index];
-    result.readFromJson(o);
-    result.Link;
-  finally
-    result.Free;
-  end;
-end;
-
 
 end.

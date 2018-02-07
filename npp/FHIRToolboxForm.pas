@@ -1,5 +1,34 @@
 unit FHIRToolboxForm;
 
+
+{
+Copyright (c) 2011+, HL7 and Health Intersections Pty Ltd (http://www.healthintersections.com.au)
+All rights reserved.
+
+Redistribution and use in source and binary forms, with or without modification,
+are permitted provided that the following conditions are met:
+
+ * Redistributions of source code must retain the above copyright notice, this
+   list of conditions and the following disclaimer.
+ * Redistributions in binary form must reproduce the above copyright notice,
+   this list of conditions and the following disclaimer in the documentation
+   and/or other materials provided with the distribution.
+ * Neither the name of HL7 nor the names of its contributors may be used to
+   endorse or promote products derived from this software without specific
+   prior written permission.
+
+THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS 'AS IS' AND
+ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
+IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT,
+INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT
+NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
+PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY,
+WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE)
+ARISING IN ANY WAY OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE
+POSSIBILITY OF SUCH DAMAGE.
+}
+
 interface
 
 uses
@@ -37,6 +66,8 @@ type
     pnlMessage: TPanel;
     ToolButton1: TToolButton;
     ToolButton2: TToolButton;
+    ToolButton4: TToolButton;
+    ToolButton5: TToolButton;
     procedure Button1Click(Sender: TObject);
     procedure Button2Click(Sender: TObject);
     procedure FormCreate(Sender: TObject);
@@ -66,6 +97,8 @@ type
     procedure mPathEnter(Sender: TObject);
     procedure mPathChange(Sender: TObject);
     procedure ToolButton2Click(Sender: TObject);
+    procedure ToolButton4Click(Sender: TObject);
+    procedure ToolButton5Click(Sender: TObject);
   private
     { Private declarations }
     FMessageShort, FMessageLong : String;
@@ -90,7 +123,7 @@ implementation
 
 Uses
   FHIRPluginSettings,
-  NewServerForm,
+  EditRegisteredServerDialog,
   FHIRPlugin,
   FHIRPath;
 
@@ -144,17 +177,17 @@ begin
   _FuncDisconnect;
   if cbxServers.ItemIndex = cbxServers.Items.Count - 1 then
   begin
-    RegisterServerForm := TRegisterServerForm.create(npp);
+    EditRegisteredServerForm := TEditRegisteredServerForm.create(npp);
     try
-      if RegisterServerForm.ShowModal = mrOk then
+      if EditRegisteredServerForm.ShowModal = mrOk then
       begin
-        cbxServers.items.Insert(cbxServers.ItemIndex, RegisterServerForm.edtName.Text+' ('+RegisterServerForm.edtServer.Text+')');
+        cbxServers.items.Insert(cbxServers.ItemIndex, EditRegisteredServerForm.edtName.Text+' ('+EditRegisteredServerForm.edtServer.Text+')');
         cbxServers.ItemIndex := cbxServers.Items.Count - 2;
       end
       else
         cbxServers.ItemIndex := 0;
     finally
-      RegisterServerForm.Free;
+      EditRegisteredServerForm.Free;
     end;
   end;
 end;
@@ -236,7 +269,7 @@ end;
 procedure TFHIRToolbox.loadServers;
 begin
   cbxServers.Items.Clear;
-  Settings.listServers(cbxServers.Items);
+  Settings.listServers('', cbxServers.Items);
   cbxServers.Items.Add('Register...');
   cbxServers.ItemIndex := 0;
   SendMessage(cbxServers.Handle, CB_SETDROPPEDWIDTH, 300, 0);
@@ -244,7 +277,7 @@ end;
 
 procedure TFHIRToolbox.mPathChange(Sender: TObject);
 var
-  qry : TFHIRExpressionEngine;
+  qry : TFHIRPathEngine;
 begin
   Settings.Path := mPath.Text;
   if mPath.text = '' then
@@ -255,7 +288,7 @@ begin
   else
   begin
     try
-      qry := TFHIRExpressionEngine.create(nil);
+      qry := TFHIRPathEngine.create(nil);
       try
         qry.parse(mPath.Text).free;
         mPath.Color := clWindow;
@@ -352,6 +385,16 @@ end;
 procedure TFHIRToolbox.ToolButton2Click(Sender: TObject);
 begin
   FNpp.FuncExtractPath;
+end;
+
+procedure TFHIRToolbox.ToolButton4Click(Sender: TObject);
+begin
+  _FuncDifference;
+end;
+
+procedure TFHIRToolbox.ToolButton5Click(Sender: TObject);
+begin
+  _FuncGenerateCode;
 end;
 
 procedure TFHIRToolbox.tbConnectClick(Sender: TObject);

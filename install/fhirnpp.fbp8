@@ -61,7 +61,7 @@ begin
         as.defaultvalue = %npp-purpose%
         as.xpos = -1
         as.ypos = -1
-        as.returnvalue = "Add debugging functionality for failed install"
+        as.returnvalue = "Add Code Generation Capability"
         as.returnvariable = npp-purpose
       end
       action.variables.savetoini
@@ -83,7 +83,7 @@ begin
         failifvariablenotininifile = true
         id = {25828604-726F-4115-89FB-03799A67707B}
         ignorefilenotfound = false
-        inifile = C:\\work\\org.hl7.fhir.dstu2\\build\\publish\\version.info
+        inifile = C:\\work\\org.hl7.fhir.old\\org.hl7.fhir.dstu2\\build\\publish\\version.info
         sectionname = FHIR
         variables = "FhirVersion" +
                     ""
@@ -133,7 +133,7 @@ begin
         compileridl = true
         configname = Release
         debugversionnumbers = false
-        delphiversion = Delphi10Seattle
+        delphiversion = Delphi10Berlin
         description = "Compile the Plugin"
         eurekalogverboselogging = false
         frameworktype = VCL
@@ -166,16 +166,16 @@ begin
         useprojectsettings = []
         usepropertyset = false
         useversionfromdof = false
-        versioninfokeys = "CompanyName=" +
-                          "FileDescription=" +
-                          "FileVersion=1.0.0.1" +
-                          "InternalName=" +
-                          "LegalCopyright=" +
-                          "LegalTrademarks=" +
-                          "OriginalFilename=" +
-                          "ProductName=" +
-                          "ProductVersion=1.0.0.0" +
-                          "Comments=" +
+        versioninfokeys = "CompanyName\=" +
+                          "FileDescription\=" +
+                          "FileVersion\=1.0.0.1" +
+                          "InternalName\=" +
+                          "LegalCopyright\=" +
+                          "LegalTrademarks\=" +
+                          "OriginalFilename\=" +
+                          "ProductName\=" +
+                          "ProductVersion\=1.0.0.0" +
+                          "Comments\=" +
                           ""
         warningsaserror = false
         workaroundd5bug = false
@@ -187,11 +187,11 @@ begin
           assertions = true
           assignableconst = false
           booleval = false
-          compilerwarnings = "-w-UNSAFE_TYPE=0" +
-                             "-w-UNSAFE_CODE=0" +
-                             "-w-UNSAFE_CAST=0" +
+          compilerwarnings = "-w-UNSAFE_TYPE\=0" +
+                             "-w-UNSAFE_CODE\=0" +
+                             "-w-UNSAFE_CAST\=0" +
                              ""
-          conditionals = NPPUNICODE;RELEASE;FHIR2
+          conditionals = NPPUNICODE;RELEASE;FHIR3
           consoleapp = false
           debuginfo = false
           definitionsonly = false
@@ -215,7 +215,7 @@ begin
           mapfile = 0
           maxstacksize = 1048576
           minstacksize = 16384
-          namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;System.Win;Data.Win;Datasnap.Win;Web.Win;Soap.Win;Xml.Win;Bde;
+          namespaceprefixes = System;Xml;Data;Datasnap;Web;Soap;Winapi;System.Win;Data.Win;Web.Win;Soap.Win;Bde;Vcl;Vcl.Imaging;Vcl.Touch;Vcl.Samples;Vcl.Shell;
           openstrings = true
           optimisation = true
           outputdir = "C:\\Users\\Grahame Grieve\\AppData\\Roaming\\Notepad\+\+\\plugins"
@@ -225,13 +225,13 @@ begin
           recordfieldalign = fa8
           referenceinfo = false
           safedivide = false
-          searchpath = $(DELPHI)\\Lib\\Debug;C:\\PROGRA~1\\Jedi\\jcl\\lib\\d6\\debug
+          searchpath = $(DELPHI)\\Lib\\Debug;C:\\PROGRA~1\\Jedi\\jcl\\lib\\d6\\debug;C:\\work\\Components\\treeview\\Source
           showhints = true
           showwarnings = true
           stackframes = false
           stringchecks = true
           typedpointers = false
-          unitaliases = WinTypes=Windows;WinProcs=Windows;DbiTypes=BDE;DbiProcs=BDE;DbiErrs=BDE
+          unitaliases = WinTypes\=Windows;WinProcs\=Windows;DbiTypes\=BDE;DbiProcs\=BDE;DbiErrs\=BDE
           usedebugdcu = false
           usepackages = false
           varstringchecks = true
@@ -300,7 +300,7 @@ begin
       action.ftp.connect
       begin
         connecttimeoutinsec = 0
-        cookie = q3B4xMWDXfAo74OHdw==
+        cookie = q3B4xMWDXfAo74OHdw\=\=
         detailedlogging = false
         enablekeepalives = false
         ftpconnectionname = HealthIntersections
@@ -353,9 +353,9 @@ begin
         insertatxpath = /rss/channel/link
         nodename = item
         nodetext = "" +
-                   "      <title>Notepad\+\+ Plugin release 1.0.%BuildCount% %BuildDate%</title>" +
-                   "      <link>http://www.healthintersections.com.au/FhirServer/npp-install-1.0.%BuildCount%.exe</link>" +
-                   "      <description>%BuildDate% (v1.0.%BuildCount%): %npp-purpose%</description>" +
+                   "      <title\>Notepad\+\+ Plugin release 1.0.%BuildCount% %BuildDate%</title\>" +
+                   "      <link\>http://www.healthintersections.com.au/FhirServer/npp-install-1.0.%BuildCount%.exe</link\>" +
+                   "      <description\>%BuildDate% (v1.0.%BuildCount%): %npp-purpose%</description\>" +
                    "" +
                    ""
         parentxpath = /rss/channel

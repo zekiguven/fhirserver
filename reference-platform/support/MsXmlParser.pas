@@ -33,19 +33,13 @@ Interface
 Uses
   Windows, SysUtils, Classes, ComObj, Generics.Collections,
   AdvObjects, Advmemories, AdvBuffers, AdvStreams, AdvStringLists, AdvGenerics,
-  XmlBuilder, MsXml;
+  XmlBuilder, MsXml, ParserSupport;
 
 const
   MAP_ATTR_NAME = 'B88BF977DA9543B8A5915C84A70F03F7';
 
 Type
   TTextAction = (ttAsIs, ttTrim, ttTrimPad);
-
-  TSourceLocationObject = class (TAdvObject)
-  public
-    locationStart : TSourceLocation;
-    locationEnd : TSourceLocation;
-  end;
 
   TMsXmlSaxHandler = class (TinterfacedObject, IVBSAXContentHandler, IVBSAXErrorHandler)
   private
@@ -150,7 +144,7 @@ Implementation
 Uses
   ActiveX,
   AdvWinInetClients,
-  MsXmlBuilder,
+  MXmlBuilder,
   StringSupport,
   AdvVclStreams;
 
@@ -479,9 +473,9 @@ end;
 
 class function TMsXmlParser.ParseString(const sSource: String; locations : TAdvList<TSourceLocationObject>): IXMLDomDocument2;
 var
-  oMem : TStringStream;
+  oMem : TBytesStream;
 begin
-  oMem := TStringStream.Create(sSource);
+  oMem := TBytesStream.Create(TEncoding.UTF8.GetBytes(sSource));
   try
     result := Parse(oMem, locations);
   Finally
@@ -672,7 +666,7 @@ end;
 
 procedure TMsXmlSaxHandler.startElement(sourceLocation : TSourceLocation; uri, localname: string; attrs: IVBSAXAttributes);
 begin
-  // override in descendents
+  // override in descendants
 end;
 
 procedure TMsXmlSaxHandler.startElement(var uri, localname, qname: widestring; const attrs: IVBSAXAttributes);
@@ -689,7 +683,7 @@ end;
 
 procedure TMsXmlSaxHandler.text(chars: String; sourceLocation : TSourceLocation);
 begin
-  // for descendents
+  // for descendants
 end;
 
 procedure TMsXmlSaxHandler._Set_documentLocator(const locator: IVBSAXLocator);

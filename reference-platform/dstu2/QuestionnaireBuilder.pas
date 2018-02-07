@@ -38,8 +38,8 @@ interface
 
 uses
   SysUtils, Classes, Generics.Collections,
-  GUIDSupport, DateAndTime, AdvObjects, ShellSupport, StringSupport, AdvStringMatches, AdvExceptions,
-  FHIRResources, FHIRTypes, FHIRConstants, FHIRBase, FHIRParser,
+  GUIDSupport, DateSupport, AdvObjects, ShellSupport, StringSupport, AdvStringMatches, AdvExceptions,
+  FHIRResources, FHIRTypes, FHIRConstants, FHIRBase, FHIRParser, FHIRFactory,
   FHIRUtilities, FHIRSupport, FHIRProfileUtilities;
 
 Const
@@ -67,8 +67,8 @@ const
 
 
 Type
-  TGetValueSetExpansion = function(vs : TFHIRValueSet; ref : TFhirReference; limit, count, offset : integer; allowIncomplete : Boolean; dependencies : TStringList) : TFhirValueSet of object;
-  TLookupCodeEvent = function(system, code : String) : String of object;
+  TGetValueSetExpansion = function(vs : TFHIRValueSet; ref : TFhirReference; lang : String; limit, count, offset : integer; allowIncomplete : Boolean; dependencies : TStringList) : TFhirValueSet of object;
+  TLookupCodeEvent = function(system, version, code : String) : String of object;
   TLookupReferenceEvent = function(Context : TFHIRRequest; uri : String) : TResourceWithReference of object;
 
   {
@@ -103,6 +103,7 @@ Type
     FOnLookupReference : TLookupReferenceEvent;
     FContext : TFHIRRequest;
     FDependencies: TList<String>;
+    FLang : String;
 
     function nextId(prefix : string) : String;
 
@@ -152,7 +153,7 @@ Type
     procedure addTimeQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure addUriQuestions(group : TFHIRQuestionnaireItem; element : TFhirElementDefinition; path : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
 
-    function processAnswerGroup(group : TFhirQuestionnaireResponseItem; context : TFhirBase; defn :  TProfileDefinition) : boolean;
+    function processAnswerGroup(group : TFhirQuestionnaireResponseItem; context : TFhirObject; defn :  TProfileDefinition) : boolean;
 
     procedure processDataType(profile : TFHirStructureDefinition; group: TFHIRQuestionnaireItem; element: TFhirElementDefinition; path: String; t: TFhirElementDefinitionType; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList);
     procedure buildQuestion(group : TFHIRQuestionnaireItem; profile : TFHirStructureDefinition; element : TFhirElementDefinition; path : String; answerGroups : TFhirQuestionnaireResponseItemList);
@@ -166,7 +167,7 @@ Type
     procedure SetPrebuiltQuestionnaire(const Value: TFhirQuestionnaire);
     procedure SetContext(const Value: TFHIRRequest);
   public
-    Constructor Create; override;
+    Constructor Create(lang : String);
     Destructor Destroy; override;
 
     Property Profiles : TProfileManager read FProfiles write SetProfiles;
@@ -255,20 +256,20 @@ procedure TQuestionnaireBuilder.processExisting(path : String; answerGroups, nAn
 var
   ag : TFhirQuestionnaireResponseItem;
   ans: TFhirQuestionnaireResponseItem;
-  children: TFHIRObjectList;
-  ch : TFHIRObject;
+  children: TFHIRSelectionList;
+  ch : TFHIRSelection;
 begin
   // processing existing data
   for ag in answerGroups do
   begin
-    children := TFHIRObjectList.Create;
+    children := TFHIRSelectionList.Create;
     try
       TFHIRObject(ag.tag).ListChildrenByName(tail(path), children);
       for ch in children do
-        if ch <> nil then
+        if ch.value <> nil then
         begin
           ans := ag.groupList.Append;
-          ans.Tag := ch.Link;
+          ans.Tag := ch.value.Link;
           nAnswers.add(ans.link);
         end;
     finally
@@ -313,7 +314,7 @@ begin
     id.Value := FQuestionnaireId;
     FQuestionnaire.Version := profile.Version;
     FQuestionnaire.Status := convertStatus(profile.Status);
-    FQuestionnaire.Date := profile.Date.link;
+    FQuestionnaire.Date := profile.Date;
     FQuestionnaire.publisher := profile.Publisher;
     FQuestionnaire.Group := TFHIRQuestionnaireItem.Create;
     FQuestionnaire.group.conceptList.AddAll(profile.codeList);
@@ -351,7 +352,7 @@ begin
     try
       ref.reference := url;
       try
-        result := OnExpand(nil, ref, MaxListboxCodings, 0, 0, false, dependencies);
+        result := OnExpand(nil, ref, FLang, MaxListboxCodings, 0, 0, false, dependencies);
         for s in dependencies do
           if not FDependencies.Contains(s) then
             FDependencies.Add(s);
@@ -400,7 +401,7 @@ begin
     begin
       vs := TFhirValueSet(Fprofile.contained[ref.reference.Substring(1)]);
       try
-        result := OnExpand(vs, nil, MaxListboxCodings, 0, 0, false, dependencies);
+        result := OnExpand(vs, nil, FLang, MaxListboxCodings, 0, 0, false, dependencies);
         for s in dependencies do
           if not FDependencies.Contains(s) then
             FDependencies.Add(s);
@@ -427,7 +428,7 @@ begin
       result := FQuestionnaire.contained[vsCache.GetValueByKey(ref.reference)].link as TFhirValueSet
     else
       try
-        result := OnExpand(nil, ref, MaxListboxCodings, 0, 0,false, dependencies);
+        result := OnExpand(nil, ref, FLang, MaxListboxCodings, 0, 0,false, dependencies);
         for s in dependencies do
           if not FDependencies.Contains(s) then
             FDependencies.Add(s);
@@ -536,7 +537,7 @@ begin
   else if ((s = 'Coding') and (t = 'code')) then
     result := TFhirEnum.Create('', TFHIRCoding(v).code)
   else if ((s = 'dateTime') and (t = 'date')) then
-    result := TFhirDate.Create(TFhirDateTime(v).value.Link)
+    result := TFhirDate.Create(TFhirDateTime(v).value)
   else
     raise Exception.Create('Unable to convert from '+s+' to '+t+' at path = '+path);
 end;
@@ -603,14 +604,14 @@ begin
       result := qg;
 end;
 
-function TQuestionnaireBuilder.processAnswerGroup(group : TFhirQuestionnaireResponseItem; context : TFhirBase; defn :  TProfileDefinition) : boolean;
+function TQuestionnaireBuilder.processAnswerGroup(group : TFhirQuestionnaireResponseItem; context : TFhirObject; defn :  TProfileDefinition) : boolean;
 var
   g, g1 : TFhirQuestionnaireResponseItem;
   q : TFhirQuestionnaireResponseItemQuestion;
   a : TFhirQuestionnaireResponseItemQuestionAnswer;
   d : TProfileDefinition;
   t : TFhirElementDefinitionType;
-  o : TFHIRBase;
+  o : TFHIRObject;
 begin
   result := false;
 
@@ -943,7 +944,7 @@ begin
     vs.description := vs.name;
     vs.status := ConformanceResourceStatusActive;
     vs.expansion := TFhirValueSetExpansion.Create;
-    vs.expansion.timestamp := NowUTC;
+    vs.expansion.timestamp := TDateTimeEx.makeUTC;
     for t in types do
     begin
       cc := vs.expansion.containsList.Append;
@@ -1243,17 +1244,18 @@ end;
 
 constructor TQuestionnaireBuilder.create;
 begin
-  inherited;
+  inherited create;
   vsCache := TAdvStringMatch.create;
   FDependencies := TList<String>.create;
+  FLang := lang;
 end;
 
 function TQuestionnaireBuilder.addQuestion(group : TFHIRQuestionnaireItem; af : TFhirItemTypeEnum; path, id, name : String; required : boolean; answerGroups : TFhirQuestionnaireResponseItemList; vs : TFHIRValueSet) : TFHIRQuestionnaireItemQuestion;
 var
   ag : TFhirQuestionnaireResponseItem;
   aq : TFhirQuestionnaireResponseItemQuestion;
-  children : TFHIRObjectList;
-  child : TFHIRObject;
+  children : TFHIRSelectionList;
+  child : TFHIRSelection;
   vse : TFhirValueSet;
 begin
   try
@@ -1304,19 +1306,19 @@ begin
     begin
       for ag in answerGroups do
       begin
-        children := TFHIRObjectList.Create;
+        children := TFHIRSelectionList.Create;
         try
           aq := nil;
 
           if isPrimitive(ag.Tag) then
-            children.add(ag.Tag.Link)
+            children.add(TFHIRSelection.Create(ag.Tag.Link as TFHIRObject))
           else if ag.Tag is TFHIREnum then
-            children.add(TFHIRString.create(TFHIREnum(ag.Tag).value))
+            children.add(TFHIRSelection.Create(TFHIRString.create(TFHIREnum(ag.Tag).value)))
           else
             TFHIRObject(ag.Tag).ListChildrenByName(id, children);
 
           for child in children do
-            if child <> nil then
+            if child.value <> nil then
             begin
               if (aq = nil) then
               begin
@@ -1324,7 +1326,7 @@ begin
                 aq.LinkId := result.linkId;
                 aq.Text := result.text;
               end;
-              aq.answerList.append.value := convertType(child, af, vs, result.linkId);
+              aq.answerList.append.value := convertType(child.value, af, vs, result.linkId);
             end;
         finally
           children.Free;

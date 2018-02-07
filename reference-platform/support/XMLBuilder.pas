@@ -33,19 +33,7 @@ interface
 uses
   SysUtils, Classes,
   AdvStreams, AdvStringMatches, AdvObjectLists, AdvObjects,
-  XMLIntf, MsXML;
-
-type
-  TSourceLocation = record
-    line, col : integer;
-  end;
-
-function minLoc(src1, src2 : TSourceLocation) : TSourceLocation;
-function maxLoc(src1, src2 : TSourceLocation) : TSourceLocation;
-function nullLoc : TSourceLocation;
-function isNullLoc(src : TSourceLocation) : boolean;
-function locLessOrEqual(src1, src2 : TSourceLocation) : boolean;
-function locGreatorOrEqual(src1, src2 : TSourceLocation) : boolean;
+  ParserSupport, MXML{, XmlIntf};
 
 type
   TXmlCanonicalisationMethod = (xcmCanonicalise, xcmComments, xcmTrimWhitespace, {xcmPrefixRewrite, } xcmQNameAware);
@@ -74,6 +62,7 @@ type
   TXmlBuilder = {abstract} class (TAdvObject)
   private
     function GetCurrentNamespaces: TXmlBuilderNamespaceList;
+    function getNSAbbrev(iElement: TMXMLElement): String;
   Protected
     FNoHeader: Boolean;
     FCanonicalise: TXmlCanonicalisationMethodSet;
@@ -104,12 +93,12 @@ type
     procedure ProcessingInstruction(sName, sText : String); overload; virtual; abstract;
     procedure DocType(sText : String); overload; virtual; abstract;
 
-    Procedure WriteXml(iElement : IXMLDomElement); overload; virtual; abstract;
-    Procedure WriteXmlNode(iDoc : IXMLDOMNode); overload; virtual; abstract;
-
-    Procedure WriteXml(iElement : IXMLNode; first : boolean); overload; virtual; abstract;
-    Procedure WriteXmlNode(iNode : IXMLNode; first : boolean); overload; virtual; abstract;
-    Procedure WriteXmlDocument(iDoc : IXMLDocument); overload; virtual; abstract;
+    Procedure WriteXml(iElement : TMXMLElement);
+{
+    Procedure WriteXml(iElement : XmlIntf.IXMLNode; first : boolean); overload; virtual; abstract;
+    Procedure WriteXmlNode(iNode : XmlIntf.IXMLNode; first : boolean); overload; virtual; abstract;
+    Procedure WriteXmlDocument(iDoc : XmlIntf.IXMLDocument); overload; virtual; abstract;
+}
 
     procedure inject(Const aBytes : TBytes); Overload; virtual; abstract; // not supported on all implementations
 
@@ -198,61 +187,69 @@ begin
   FNamespaces.Add(CurrentNamespaces.clone);
 end;
 
-function minLoc(src1, src2 : TSourceLocation) : TSourceLocation;
+function TXmlBuilder.getNSAbbrev(iElement: TMXMLElement) : String;
+var
+  a : TMXmlAttribute;
+  i : integer;
 begin
-  if (src1.line < src2.line) then
-    result := src1
-  else if (src2.line < src1.line) then
-    result := src2
-  else if (src1.col < src2.col) then
-    result := src1
+  for a in iELement.Attributes.Values do
+    if a.Value = iElement.NamespaceURI then
+    begin
+      if (a.Name = 'xmlns') then
+        exit('')
+      else if a.Name.StartsWith('xmlns:') then
+        exit(a.Name.Substring(6)+':');
+    end;
+
+  if CurrentNamespaces.DefaultNS = iElement.NamespaceURI then
+    exit('');
+
+  for i := 0 to CurrentNamespaces.Count - 1 do
+  begin
+    if CurrentNamespaces.Values[i] = iElement.NamespaceURI then
+      exit(CurrentNamespaces.Keys[i]+':');
+  end;
+  if iElement.attribute['xmlns'] = '' then
+  begin
+    AddAttribute('xmlns', iElement.NamespaceURI);
+    CurrentNamespaces.DefaultNS := iElement.NamespaceURI;
+    exit('');
+  end
   else
-    result := src2
+  begin
+    AddAttribute('xmlns:ns', iElement.NamespaceURI);
+    CurrentNamespaces.Add('ns', iElement.NamespaceURI);
+    exit('ns:');
+  end
 end;
 
-function maxLoc(src1, src2 : TSourceLocation) : TSourceLocation;
+procedure TXmlBuilder.WriteXml(iElement: TMXMLElement);
+var
+  n : string;
+  a : TMXmlAttribute;
+  c : TMXmlElement;
 begin
-  if (src1.line > src2.line) then
-    result := src1
-  else if (src2.line > src1.line) then
-    result := src2
-  else if (src1.col > src2.col) then
-    result := src1
-  else
-    result := src2
+  n := iElement.name;
+  if n = '' then
+    n := getNSAbbrev(iElement)+iElement.LocalName;
+  for a in iElement.Attributes.Values do
+    if a.NamespaceURI <> '' then
+      AddAttributeNS(a.NamespaceURI, a.Name, a.Value)
+    else
+      AddAttribute(a.Name, a.Value);
+  Open(n);
+  for c in iElement.Children do
+    case c.NodeType of
+      ntElement: WriteXml(c);
+      ntText: Text(c.Text);
+      ntComment: Comment(c.Text);
+      ntDocument: raise Exception.Create('Illegal XML - document inside element');
+      ntAttribute: raise Exception.Create('Illegal XML - attribute in element chilren');
+      ntProcessingInstruction: ProcessingInstruction(c.Name, c.Text);
+      ntDocumentDeclaration: raise Exception.Create('Illegal DTD not supported');
+      ntCData: raise Exception.Create('Illegal CDATA not supported');
+    end;
+  Close(n);
 end;
-
-function nullLoc : TSourceLocation;
-begin
-  result.line := -1;
-  result.col := -1;
-end;
-
-
-function isNullLoc(src : TSourceLocation) : boolean;
-begin
-  result := (src.line = -1) and (src.col = -1);
-end;
-
-function locLessOrEqual(src1, src2 : TSourceLocation) : boolean;
-begin
-  if src1.line < src2.line then
-    result := true
-  else if src1.line > src2.line then
-    result := false
-  else
-    result := src1.col <= src2.col;
-end;
-
-function locGreatorOrEqual(src1, src2 : TSourceLocation) : boolean;
-begin
-  if src1.line > src2.line then
-    result := true
-  else if src1.line < src2.line then
-    result := false
-  else
-    result := src1.col >= src2.col;
-end;
-
 
 end.
